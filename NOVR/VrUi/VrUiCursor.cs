@@ -470,6 +470,7 @@ public class VrUiCursor: NOVRBehaviour
                 RestrictActionToVirtualMouse(uiModule.middleClick?.action, _virtualMouse.path);
                 RestrictActionToVirtualMouse(uiModule.rightClick?.action, _virtualMouse.path);
                 RestrictActionToVirtualMouse(uiModule.scrollWheel?.action, _virtualMouse.path);
+                RestrictNavigationToKeyboardAndGamepad(uiModule.move?.action);
                 return true;
             }
             else
@@ -482,6 +483,21 @@ public class VrUiCursor: NOVRBehaviour
         {
             Debug.LogError($"[NOVR] Exception while restricting UI actions to VirtualMouse: {ex}");
             return false;
+        }
+    }
+
+    // Generic joystick / XR axes (HMD, controllers, HOTAS at rest) otherwise feed UI navigation like a held arrow key.
+    private static void RestrictNavigationToKeyboardAndGamepad(InputAction? action)
+    {
+        if (action == null) return;
+        for (int i = 0; i < action.bindings.Count; i++)
+        {
+            var binding = action.bindings[i];
+            if (binding.isComposite) continue;
+            var path = binding.path ?? string.Empty;
+            if (path.StartsWith("<Keyboard>") || path.StartsWith("<Gamepad>")) continue;
+            action.ApplyBindingOverride(i, string.Empty);
+            Debug.Log($"[NOVR] Disabled UI navigation binding '{path}' on action '{action.name}'");
         }
     }
 
