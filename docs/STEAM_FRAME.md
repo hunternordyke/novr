@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.4.2**, targeting Nuclear Option **0.34.1**, Steam build
+NOVR Motion Prototype **0.4.4.3**, targeting Nuclear Option **0.34.1**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. It has **not** been flight
@@ -28,6 +28,32 @@ Restore both backed-up folders and restart to revert the experimental build.
 The package must include the updated patcher payload, not just `NOVR.dll`: it contains
 the OpenXR controller profiles. The existing upstream installer installs upstream NOVR,
 not this development branch. This package does not include BepInEx itself.
+
+## If the headset shows a flat screen inside a black border
+
+A desktop stream is not a VR session. NOVR can load and create its world-space menu
+while OpenXR initialization fails, leaving that menu visible only in the flat game
+window. Check `Player.log` for `XR_ERROR_RUNTIME_UNAVAILABLE` and SteamVR for a
+connected, tracked headset before changing HUD/menu size.
+
+On Frame, use **Streaming Status → host PC → Advanced → Stream VR without game**
+to establish the VR connection first, then launch Nuclear Option. If the host is
+advertised as “ready for 2D streaming only,” resolve the host's VR streaming setup
+first. Restart the game after establishing the connection; this build does not retry
+failed OpenXR initialization automatically.
+
+Linux host support remains experimental. On the local test PC, SteamVR beta and the
+OpenXR runtime were already configured, but Steam was started without its
+`-vrlinkforceenable` option. The host launcher was updated to retain `-pipewire`,
+`PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES=1`, and enable VR streaming. This is a host
+configuration change, not a setting included in this ZIP. See Valve's
+[platform support guidance](https://help.steampowered.com/en/faqs/view/2668-0B6E-79E0-A85B)
+and the [Linux streaming issue report](https://github.com/ValveSoftware/SteamVR-for-Linux/issues/962).
+
+Version **0.4.4.3** also fixes repeat-start payload installation: identical runtime
+DLLs are left untouched when Unity has already loaded them. MultiPass is now set
+explicitly before OpenXR initialization, including on the first install. Neither
+change replaces the need for an active VR streaming connection.
 
 ## Default bindings
 

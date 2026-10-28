@@ -1,6 +1,35 @@
 using NOVR.MotionControls;
 
 var passed = 0;
+var payloadTestDir = Path.Combine(Path.GetTempPath(), "novr-payload-" + Guid.NewGuid());
+Directory.CreateDirectory(payloadTestDir);
+try
+{
+    var source = Path.Combine(payloadTestDir, "source.dll");
+    var destination = Path.Combine(payloadTestDir, "installed.dll");
+    var bytes = Enumerable.Range(0, 17003).Select(i => (byte)(i % 251)).ToArray();
+    File.WriteAllBytes(source, bytes);
+    Check("runtime payload installs missing files", () =>
+    {
+        True(PayloadFile.CopyIfChanged(source, destination));
+        True(File.ReadAllBytes(destination).SequenceEqual(bytes));
+    });
+    Check("repeat installation leaves an identical locked assembly untouched", () =>
+    {
+        var stamp = File.GetLastWriteTimeUtc(destination);
+        using var mappedAssembly = new FileStream(destination, FileMode.Open, FileAccess.Read, FileShare.Read);
+        True(!PayloadFile.CopyIfChanged(source, destination));
+        True(File.GetLastWriteTimeUtc(destination) == stamp);
+    });
+    Check("runtime payload replaces a changed file even when sizes match", () =>
+    {
+        bytes[9000] ^= 0xff;
+        File.WriteAllBytes(source, bytes);
+        True(PayloadFile.CopyIfChanged(source, destination));
+        True(File.ReadAllBytes(destination).SequenceEqual(bytes));
+    });
+}
+finally { Directory.Delete(payloadTestDir, true); }
 void Check(string name, Action test)
 {
     test();

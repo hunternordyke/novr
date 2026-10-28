@@ -10,6 +10,7 @@
     <Compile Include="../NOVR/MotionControls/FlightControlMath.cs" Link="FlightControlMath.cs" />
     <Compile Include="../NOVR/MotionControls/ControllerButtonGate.cs" Link="ControllerButtonGate.cs" />
     <Compile Include="../NOVR/MotionControls/PointerGeometry.cs" Link="PointerGeometry.cs" />
+    <Compile Include="../NOVR.Patcher/PayloadFile.cs" Link="PayloadFile.cs" />
     <PackageReference Include="Mono.Cecil" Version="0.11.6" />
   </ItemGroup>
 </Project>
