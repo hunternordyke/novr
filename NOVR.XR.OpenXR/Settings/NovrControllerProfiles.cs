@@ -15,6 +15,10 @@ public partial class OpenXRSettings
         AddProfile<ValveIndexControllerProfile>(profiles, ValveIndexControllerProfile.featureId);
         AddProfile<HTCViveControllerProfile>(profiles, HTCViveControllerProfile.featureId);
         AddProfile<MicrosoftMotionControllerProfile>(profiles, MicrosoftMotionControllerProfile.featureId);
+        AddProfile<Valve.OpenXR.Utils.SteamFrameControllerProfile>(profiles, Valve.OpenXR.Utils.SteamFrameControllerProfile.featureId);
+        var frame = profiles.Find(item => item is Valve.OpenXR.Utils.SteamFrameControllerProfile);
+        frame.company = "Valve";
+        frame.openxrExtensionStrings = "XR_VALVE_frame_controller_interaction";
         features = profiles.ToArray();
     }
 

@@ -182,6 +182,104 @@ Check("HUD smoothing remains bounded after a frame stall", () =>
     Near(FlightControlMath.SmoothingWeight(0, 10), 0);
 });
 
+Check("a held flight trigger cannot turn into a menu click", () =>
+{
+    var flight = new ControllerButtonGate();
+    var menu = new ControllerButtonGate();
+    flight.Update(true, 0);
+    flight.Update(true, 1);
+    True(flight.Held && flight.Pressed);
+    flight.Update(false, 1);
+    menu.Update(true, 1);
+    True(!flight.Held && !flight.Released && !menu.Pressed && !menu.Held);
+    menu.Update(true, 0);
+    menu.Update(true, 1);
+    True(menu.Pressed);
+});
+Check("closing a menu with trigger held cannot start firing", () =>
+{
+    var flight = new ControllerButtonGate();
+    flight.Update(false, 1);
+    flight.Update(true, 1);
+    True(!flight.Held && !flight.Pressed);
+    flight.Update(true, 0);
+    flight.Update(true, 1);
+    True(flight.Held && flight.Pressed);
+});
+Check("tracking loss cancels release actions instead of clicking", () =>
+{
+    var button = new ControllerButtonGate();
+    button.Update(true, 0);
+    button.Update(true, 1);
+    button.Update(false, 0);
+    True(!button.Released && !button.Held);
+    button.Update(true, 1);
+    True(!button.Pressed);
+});
+Check("non-finite trigger data never produces a release action", () =>
+{
+    var button = new ControllerButtonGate();
+    button.Update(true, 0);
+    button.Update(true, 1);
+    button.Update(true, float.NaN);
+    True(!button.Released && !button.Held);
+});
+Check("controller taps create exactly one press and one release", () =>
+{
+    var button = new ControllerButtonGate();
+    button.Update(true, 0);
+    button.Update(true, 1);
+    True(button.Pressed);
+    button.Update(true, 1);
+    True(button.Held && !button.Pressed && !button.Released);
+    button.Update(true, 0);
+    True(button.Released && !button.Pressed);
+    button.Update(true, 0);
+    True(!button.Released);
+});
+Check("hand-origin ray hits the surface without centre-eye parallax", () =>
+{
+    True(PointerGeometry.IntersectRect(0.3f, 0, -2, -0.1f, 0, 1, -0.2f, -0.2f, 0.2f, 0.2f, out var distance));
+    Near(distance, 2);
+    Near(0.3f - 0.1f * distance, 0.1f);
+    // A centre-eye ray with the same direction would point at a different location.
+    True(Math.Abs(-0.1f * distance - 0.1f) > 0.2f);
+});
+Check("surface distances survive scaled canvas coordinates", () =>
+{
+    True(PointerGeometry.IntersectRect(300, 0, -2000, -100, 0, 1000, -200, -200, 200, 200, out var distance));
+    Near(distance, 2);
+});
+Check("parallel, rearward, non-finite and off-panel rays do not click", () =>
+{
+    True(!PointerGeometry.IntersectRect(0, 0, -2, 1, 0, 0, -1, -1, 1, 1, out _));
+    True(!PointerGeometry.IntersectRect(0, 0, 2, 0, 0, 1, -1, -1, 1, 1, out _));
+    True(!PointerGeometry.IntersectRect(float.NaN, 0, -2, 0, 0, 1, -1, -1, 1, 1, out _));
+    True(!PointerGeometry.IntersectRect(5, 0, -2, 0, 0, 1, -1, -1, 1, 1, out _));
+});
+Check("distant HUD symbology is excluded from menu hit testing", () =>
+    True(!PointerGeometry.IntersectRect(0, 0, -1000, 0, 0, 1, -100, -100, 100, 100, out _)));
+Check("map zoom rate is equal at 72, 90, 120 and 144 Hz", () =>
+{
+    float Simulate(int frames)
+    {
+        float zoom = 2;
+        for (int i = 0; i < frames; i++) zoom = PointerGeometry.Zoom(zoom, 0.6f, 1f / frames);
+        return zoom;
+    }
+    Near(Simulate(72), Simulate(90), 0.0001f);
+    Near(Simulate(90), Simulate(120), 0.0001f);
+    Near(Simulate(120), Simulate(144), 0.0001f);
+});
+Check("map zoom ignores invalid input and stays inside game limits", () =>
+{
+    Near(PointerGeometry.Zoom(2, float.NaN, 1), 2);
+    Near(PointerGeometry.Zoom(2, 1, -1), 2);
+    Near(PointerGeometry.Zoom(40, 1, 1), 40);
+    Near(PointerGeometry.Zoom(1, -1, 1), 1);
+    True(PointerGeometry.Zoom(2, 1, 50) < 2.2f);
+});
+
 if (args.Length == 2)
     Check("Harmony patch targets and injected fields match the installed game", () =>
         PatchCompatibility.Verify(args[0], args[1]));

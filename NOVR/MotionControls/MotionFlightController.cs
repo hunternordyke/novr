@@ -7,7 +7,7 @@ using CommonUsages = UnityEngine.XR.CommonUsages;
 
 namespace NOVR.MotionControls;
 
-[DefaultExecutionOrder(-50)]
+[DefaultExecutionOrder(-1200)]
 public sealed class MotionFlightController : MonoBehaviour
 {
     internal static MotionFlightController? Instance { get; private set; }
@@ -24,10 +24,13 @@ public sealed class MotionFlightController : MonoBehaviour
     private Vector3 _lastTranslationAnchor;
     private Quaternion _lastCalibrationRotation;
     private bool _ready;
-    private HandSample _stickHand;
-    private HandSample _throttleHand;
+    private float _placementTime = -1f;
+    internal void SchedulePlacement() => _placementTime = Time.unscaledTime + 3f;
+    private ControllerSample _stickHand;
+    private ControllerSample _throttleHand;
     private MotionControlSettings Settings => ModConfiguration.Instance.MotionControls;
 
+    internal bool FlightActive => _ready;
     internal bool StickHeld => _ready && _stickGrip.Held;
     internal bool ThrottleHeld => _ready && _throttleGrip.Held;
     internal float Pitch { get; private set; }
@@ -35,8 +38,8 @@ public sealed class MotionFlightController : MonoBehaviour
     internal float Yaw { get; private set; }
     internal bool HasYaw => Settings.ThumbstickYaw.Value && _stickHand.HasAxis;
     internal float Throttle { get; private set; }
-    private Vector3 StickPosition => HandedPosition(Settings.StickPosition.Value);
-    private Vector3 ThrottlePosition => HandedPosition(Settings.ThrottlePosition.Value);
+    private Vector3 StickPosition => HandedPosition(CockpitProfiles.StickPosition);
+    private Vector3 ThrottlePosition => HandedPosition(CockpitProfiles.ThrottlePosition);
 
     private void Awake() => Instance = this;
 
@@ -49,7 +52,12 @@ public sealed class MotionFlightController : MonoBehaviour
             Debug.Log($"[NOVR] Motion flight controls {(Settings.Enabled.Value ? "enabled" : "disabled")}.");
         }
         Sample();
-        if (!_ready) return;
+        if (!_ready) { _placementTime = -1f; return; }
+        if (_placementTime >= 0f && Time.unscaledTime >= _placementTime)
+        {
+            _placementTime = -1f;
+            PlaceAtHands();
+        }
 
         var placementGesture = _stickHand.Valid && _throttleHand.Valid &&
                                _stickHand.StickClick && _throttleHand.StickClick;
@@ -95,6 +103,7 @@ public sealed class MotionFlightController : MonoBehaviour
 
     private void Sample()
     {
+        CockpitProfiles.Instance?.Refresh();
         if (!TryGetCockpit(out var aircraft, out var trackingRoot))
         {
             Suspend();
@@ -122,8 +131,9 @@ public sealed class MotionFlightController : MonoBehaviour
 
         _ready = true;
         _visuals.Root.gameObject.SetActive(true);
-        _stickHand = ReadHand(Settings.LeftHanded.Value ? XRNode.LeftHand : XRNode.RightHand);
-        _throttleHand = ReadHand(Settings.LeftHanded.Value ? XRNode.RightHand : XRNode.LeftHand);
+        _visuals.Root.localPosition = CockpitProfiles.SeatOffset;
+        _stickHand = TrackedControllers.Read(Settings.LeftHanded.Value);
+        _throttleHand = TrackedControllers.Read(!Settings.LeftHanded.Value);
         if (!_throttleGrip.Held) Throttle = Mathf.Clamp01(aircraft.GetInputs().throttle);
 
         var stickWasHeld = _stickGrip.Held;
@@ -161,7 +171,7 @@ public sealed class MotionFlightController : MonoBehaviour
     {
         aircraft = null!;
         trackingRoot = null!;
-        if (!Settings.Enabled.Value || !XRSettings.enabled || !OpenXRUtility.IsSessionFocused ||
+        if (VrUi.WristMenu.IsOpen || !Settings.Enabled.Value || !XRSettings.enabled || !OpenXRUtility.IsSessionFocused ||
             !GameManager.flightControlsEnabled || Time.timeScale <= 0f || DynamicMap.mapMaximized ||
             RadialMenuMain.IsInUse() || (GameManager.controlMapper != null && GameManager.controlMapper.isOpen) ||
             CameraStateManager.cameraMode != CameraMode.cockpit || !GameManager.GetLocalAircraft(out aircraft) ||
@@ -204,9 +214,9 @@ public sealed class MotionFlightController : MonoBehaviour
     private void PlaceAtHands()
     {
         if (!_stickHand.Valid || !_throttleHand.Valid) return;
-        Settings.StickPosition.Value = HandedPosition(_stickHand.Position);
-        Settings.ThrottlePosition.Value = HandedPosition(_throttleHand.Position -
-            Vector3.forward * ((Throttle - 0.5f) * Settings.ThrottleTravel.Value));
+        CockpitProfiles.Instance?.SaveHandles(HandedPosition(_stickHand.Position),
+            HandedPosition(_throttleHand.Position -
+            Vector3.forward * ((Throttle - 0.5f) * Settings.ThrottleTravel.Value)));
         ModConfiguration.Instance.Config.Save();
         ResetGrips();
         Pulse(_stickHand.Device);
@@ -245,44 +255,4 @@ public sealed class MotionFlightController : MonoBehaviour
             device.SendHapticImpulse(0, 0.25f, 0.035f);
     }
 
-    private static HandSample ReadHand(XRNode node)
-    {
-        var device = InputDevices.GetDeviceAtXRNode(node);
-        if (!device.isValid || !device.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) || !tracked ||
-            !device.TryGetFeatureValue(CommonUsages.trackingState, out var tracking) ||
-            (tracking & (InputTrackingState.Position | InputTrackingState.Rotation)) !=
-            (InputTrackingState.Position | InputTrackingState.Rotation) ||
-            !device.TryGetFeatureValue(CommonUsages.devicePosition, out var position) ||
-            !device.TryGetFeatureValue(CommonUsages.deviceRotation, out var rotation) ||
-            !Finite(position) || !Finite(new Vector3(rotation.x, rotation.y, rotation.z)) ||
-            !FlightControlMath.IsFinite(rotation.w) || Quaternion.Dot(rotation, rotation) < 0.5f) return default;
-
-        if (!device.TryGetFeatureValue(CommonUsages.grip, out var grip))
-        {
-            if (!device.TryGetFeatureValue(CommonUsages.gripButton, out var pressed)) return default;
-            grip = pressed ? 1f : 0f;
-        }
-        var hasAxis = device.TryGetFeatureValue(CommonUsages.primary2DAxis, out var axis);
-        device.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out var stickClick);
-        return new HandSample
-        {
-            Valid = FlightControlMath.IsFinite(grip), Device = device, Grip = grip, Axis = axis,
-            HasAxis = hasAxis, StickClick = stickClick,
-            Position = NOVRHeadsetData.TranslationAnchor + NOVRHeadsetData.TranslationCalibrationOffset + position,
-            Rotation = NOVRHeadsetData.RotationCalibrationOffset * rotation
-        };
-    }
-
-    private static bool Finite(Vector3 value) => FlightControlMath.IsFinite(value.x) &&
-        FlightControlMath.IsFinite(value.y) && FlightControlMath.IsFinite(value.z);
-
-    private struct HandSample
-    {
-        public bool Valid, HasAxis, StickClick;
-        public UnityEngine.XR.InputDevice Device;
-        public float Grip;
-        public Vector3 Position;
-        public Quaternion Rotation;
-        public Vector2 Axis;
-    }
 }

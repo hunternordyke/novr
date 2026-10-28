@@ -1,0 +1,97 @@
+using UnityEngine;
+using UnityEngine.InputSystem.Controls;
+using UnityEngine.InputSystem.XR;
+using UnityEngine.XR;
+using UnityEngine.XR.OpenXR;
+using CommonUsages = UnityEngine.XR.CommonUsages;
+
+namespace NOVR.MotionControls;
+
+internal struct ControllerSample
+{
+    public bool Valid, HasAxis, StickClick, Primary, Secondary, Menu, Shoulder, Top, Outside, NativeFrame;
+    public InputDevice Device;
+    public float Grip, Trigger;
+    public Vector3 Position, AimPosition;
+    public Quaternion Rotation, AimRotation;
+    public Vector2 Axis;
+}
+
+internal static class TrackedControllers
+{
+    private static InputDevice? _reportedLeft, _reportedRight;
+    public static bool Available
+    {
+        get
+        {
+            if (!Application.isFocused || !XRSettings.enabled || !OpenXRUtility.IsSessionFocused) return false;
+            var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+            return head.isValid && head.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) && tracked &&
+                   (!head.TryGetFeatureValue(CommonUsages.userPresence, out var present) || present);
+        }
+    }
+
+    public static ControllerSample Read(bool left)
+    {
+        if (!Available) return default;
+        var device = InputDevices.GetDeviceAtXRNode(left ? XRNode.LeftHand : XRNode.RightHand);
+        if (!device.isValid || !device.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) || !tracked ||
+            !device.TryGetFeatureValue(CommonUsages.trackingState, out var tracking) ||
+            (tracking & (InputTrackingState.Position | InputTrackingState.Rotation)) !=
+            (InputTrackingState.Position | InputTrackingState.Rotation) ||
+            !device.TryGetFeatureValue(CommonUsages.devicePosition, out var position) ||
+            !device.TryGetFeatureValue(CommonUsages.deviceRotation, out var rotation) ||
+            !Finite(position) || !Finite(rotation)) return default;
+
+        if (!device.TryGetFeatureValue(CommonUsages.grip, out var grip))
+            grip = device.TryGetFeatureValue(CommonUsages.gripButton, out var gripButton) && gripButton ? 1f : 0f;
+        if (!device.TryGetFeatureValue(CommonUsages.trigger, out var trigger))
+            trigger = device.TryGetFeatureValue(CommonUsages.triggerButton, out var triggerButton) && triggerButton ? 1f : 0f;
+        var hasAxis = device.TryGetFeatureValue(CommonUsages.primary2DAxis, out var axis) &&
+                      FlightControlMath.IsFinite(axis.x) && FlightControlMath.IsFinite(axis.y);
+        device.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out var stickClick);
+        device.TryGetFeatureValue(CommonUsages.primaryButton, out var primary);
+        device.TryGetFeatureValue(CommonUsages.secondaryButton, out var secondary);
+        device.TryGetFeatureValue(CommonUsages.menuButton, out var menu);
+
+        var inputDevice = left ? XRController.leftHand : XRController.rightHand;
+        var nativeFrame = inputDevice?.layout == "SteamFrameController";
+        if ((left ? _reportedLeft : _reportedRight)?.Equals(device) != true)
+        {
+            if (left) _reportedLeft = device; else _reportedRight = device;
+            Debug.Log($"[NOVR] {(left ? "Left" : "Right")} controller: {device.name}; {(nativeFrame ? "native Steam Frame bindings" : "generic XR / Touch-compatible bindings")}.");
+        }
+        bool Button(string name) => inputDevice?.TryGetChildControl<ButtonControl>(name)?.isPressed == true;
+        var aimPosition = position;
+        var aimRotation = rotation;
+        // Use the runtime's aim pose, which differs from the grip pose on Frame.
+        var pointer = inputDevice?.TryGetChildControl<UnityEngine.XR.OpenXR.Input.PoseControl>("pointer");
+        if (pointer != null && pointer.isTracked.isPressed && (pointer.trackingState.ReadValue() & 3) == 3 &&
+            Finite(pointer.position.ReadValue()) && Finite(pointer.rotation.ReadValue()))
+        {
+            aimPosition = pointer.position.ReadValue();
+            aimRotation = pointer.rotation.ReadValue();
+        }
+        return new ControllerSample
+        {
+            Valid = FlightControlMath.IsFinite(grip) && FlightControlMath.IsFinite(trigger),
+            Device = device, Grip = grip, Trigger = trigger, HasAxis = hasAxis,
+            Axis = hasAxis ? axis : Vector2.zero, StickClick = stickClick,
+            Primary = nativeFrame ? Button("faceButtonBottom") : primary,
+            Secondary = nativeFrame ? Button("faceButtonInside") : secondary,
+            Menu = nativeFrame ? Button("menu") : menu,
+            Shoulder = Button("shoulder"), Top = Button("faceButtonTop"), Outside = Button("faceButtonOutside"),
+            NativeFrame = nativeFrame,
+            Position = MapPosition(position), Rotation = NOVRHeadsetData.RotationCalibrationOffset * rotation,
+            AimPosition = MapPosition(aimPosition), AimRotation = NOVRHeadsetData.RotationCalibrationOffset * aimRotation
+        };
+    }
+
+    public static Vector3 MapPosition(Vector3 position) =>
+        NOVRHeadsetData.TranslationAnchor + NOVRHeadsetData.TranslationCalibrationOffset + position;
+
+    public static bool Finite(Vector3 value) => FlightControlMath.IsFinite(value.x) &&
+        FlightControlMath.IsFinite(value.y) && FlightControlMath.IsFinite(value.z);
+    private static bool Finite(Quaternion value) => Finite(new Vector3(value.x, value.y, value.z)) &&
+        FlightControlMath.IsFinite(value.w) && Quaternion.Dot(value, value) > 0.5f;
+}

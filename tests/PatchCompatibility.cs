@@ -18,9 +18,14 @@ internal static class PatchCompatibility
             var method = patch.ConstructorArguments.Select(a => a.Value).OfType<string>().FirstOrDefault();
             if (target == null || method == null) continue;
             var definition = target.Resolve();
-            if (!definition.Methods.Any(m => m.Name == method))
+            var signature = patch.ConstructorArguments.FirstOrDefault(a => a.Type.FullName == "System.Type[]").Value as CustomAttributeArgument[];
+            var candidates = definition.Methods.Where(m => m.Name == method);
+            if (signature != null)
+                candidates = candidates.Where(m => m.Parameters.Select(p => p.ParameterType.FullName)
+                    .SequenceEqual(signature.Select(a => ((TypeReference)a.Value).FullName)));
+            if (!candidates.Any())
             {
-                failures.Add($"Missing method {target.FullName}.{method}");
+                failures.Add($"Missing method or overload {target.FullName}.{method}");
                 continue;
             }
             foreach (var parameter in type.Methods.SelectMany(m => m.Parameters).Where(p => p.Name.StartsWith("___")))

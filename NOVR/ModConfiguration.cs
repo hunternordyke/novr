@@ -17,6 +17,9 @@ public class ModConfiguration
     public readonly ConfigEntry<float> NativeMenuDistance;
     public readonly ConfigEntry<float> NativeMenuHeightOffset;
     public readonly ConfigEntry<float> HmdFollowResponse;
+    public readonly MotionControls.ControllerBindings ControllerBindings;
+    public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
+    public readonly ConfigEntry<bool> HudContrast, HudDeclutter;
 
     public ModConfiguration(ConfigFile config)
     {
@@ -24,6 +27,13 @@ public class ModConfiguration
 
         Config = config;
         MotionControls = new MotionControls.MotionControlSettings(config);
+        ControllerBindings = new MotionControls.ControllerBindings(config);
+        HudPanelScale = config.Bind("VR HUD", "Status Panel Scale", 1.15f,
+            new ConfigDescription("Size of cockpit status panels; aiming markers keep their angular alignment.", new AcceptableValueRange<float>(0.8f, 1.6f)));
+        HudPanelDistance = config.Bind("VR HUD", "Status Panel Distance", 4f,
+            new ConfigDescription("Status panel depth in meters. Angular size stays constant as depth changes.", new AcceptableValueRange<float>(2f, 10f)));
+        HudContrast = config.Bind("VR HUD", "Status Panel Backplates", true, "Dark backplates behind status panels for readability over bright terrain.");
+        HudDeclutter = config.Bind("VR HUD", "Declutter Status Panels", false, "Fade the secondary lower-left status panel. Weapon, countermeasure and aiming information remain visible.");
         HmdFollowResponse = config.Bind("VR HUD", "Head Follow Response", 10f,
             new ConfigDescription("Response of head-following status text. Higher values follow faster; 0 locks directly to the head. World target markers stay aligned independently.",
                 new AcceptableValueRange<float>(0f, 30f)));

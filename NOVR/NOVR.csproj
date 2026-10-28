@@ -18,6 +18,9 @@
         <ProjectReference Include="..\NOVR.XR.OpenXR\NOVR.XR.OpenXR.csproj" Private="false"/>
     </ItemGroup>
     <ItemGroup>
+        <Content Include="../NOVR.XR.OpenXR/Features/Valve/LICENSE.md" Link="ThirdParty/Valve-SteamFrame-LICENSE.txt">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <Content Include="Assets\**\*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

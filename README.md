@@ -5,14 +5,18 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 ## Experimental motion controls fork
 
 This branch adds a primitive cockpit stick and throttle operated by tracked controllers,
-plus HUD projection, waypoint, and map-cursor improvements. It builds against Nuclear
+controller laser pointers, combat bindings, a wrist panel, per-aircraft seat/handle profiles,
+and adjustable HUD readability. Steam Frame **PC streaming through SteamVR** is the
+binding target, with a Touch-compatible fallback. It builds against Nuclear
 Option **0.34.1**. It is a prototype awaiting headset flight testing, not a tested release.
 
 - **F7** enables/disables motion flight controls (off initially).
 - Hold grip near the stick, then tilt your wrist for pitch/roll. The stick-hand thumbstick controls yaw.
 - Hold grip near the throttle, then move forward/back. Releasing retains thrust with neutral physical throttle input.
 - **F8**, or holding both thumbstick clicks for 0.8 seconds, places the handles at your hands.
-- [Setup, testing, limitations, and next improvements](docs/MOTION_CONTROLS.md).
+- **View** on the throttle hand, or **F9**, opens the wrist panel. Enable motion controls there without a keyboard.
+- [Steam Frame bindings, installation, and testing](docs/STEAM_FRAME.md).
+- [Motion-control setup and projection details](docs/MOTION_CONTROLS.md).
 
 Use the experimental package built from this branch for these features. The upstream
 installer and upstream release links below install the original mod.

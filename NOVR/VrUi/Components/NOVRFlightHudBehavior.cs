@@ -52,6 +52,7 @@ public class NOVRFlightHudBehavior : UIRenderedCanvasBehavior
         panel.localEulerAngles = Vector3.zero;
         panel.localScale = localScale;
         MakePanelInvisible(panel);
+        HudReadability.Add(panel, panelName == "LowerLeftPanel");
         
         if (panelName == "TopRightPanel")
         {

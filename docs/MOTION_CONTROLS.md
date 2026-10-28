@@ -7,7 +7,7 @@ include VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.4.1` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.4.2` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.1 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -20,7 +20,7 @@ behavior in a live headset. Headset flight testing is still required.
 
 1. Close Nuclear Option.
 2. Keep a backup of your current `BepInEx/plugins/NOVR` and `BepInEx/patchers/NOVR` folders.
-3. With BepInEx 5 already installed, extract `NOVR-motion-controls-experimental.zip`
+3. With BepInEx 5 already installed, extract `NOVR-steam-frame-experimental.zip`
    into the game's **BepInEx** directory. The archive contains `plugins/NOVR` and
    `patchers/NOVR`; merge those folders and replace the matching files.
 4. Start Nuclear Option through your existing VR launch setup. The patcher deploys
@@ -55,8 +55,8 @@ within grabbing distance, and green while held. Grab feedback includes a short
 haptic pulse on devices that support it.
 
 Place the controllers where your hands can rest comfortably before calibrating. The
-controls stay in cockpit space as you look around. Placement is shared across
-aircraft in this iteration. `Left Handed` swaps hands and mirrors placement. After
+controls stay in cockpit space as you look around. Placement and seat offsets are now saved per aircraft and handedness. See the
+[Steam Frame guide](STEAM_FRAME.md) for the wrist panel and additional controls. `Left Handed` swaps hands and mirrors placement. After
 changing handedness, calibrate again if needed. Controllers without thumbstick
 clicks can use F8.
 
@@ -78,7 +78,7 @@ All values are in `BepInEx/config/deltawing.novr.cfg`.
 | Motion Controls / Thumbstick Yaw | true | Use thumbstick yaw while holding the stick. |
 | VR HUD / Head Follow Response | 10 | Head-following text response; higher is faster, 0 follows directly. |
 
-The loader registers Oculus Touch, Index, Vive, and Microsoft motion-controller
+The loader registers Steam Frame, Oculus Touch, Index, Vive, and Microsoft motion-controller
 OpenXR profiles. This is profile support in code, not a claim of testing every device
 or streaming runtime. Use an OpenXR runtime that exposes tracked controllers.
 
@@ -102,9 +102,11 @@ the original commit authorship retained. Other changes are implemented in this f
 
 ## Limits and required flight test
 
-This version supplies pitch, roll, optional yaw, and throttle. Weapons, targeting,
-countermeasures, gear, and menu clicks still use the game's normal bindings. Fully
-clickable cockpit switches and motion-controller menu pointers are future work.
+This version supplies pitch, roll, optional yaw, throttle, configurable combat buttons,
+controller pointers, and a wrist panel. See [Steam Frame bindings and setup](STEAM_FRAME.md).
+Cockpit switches are not individually clickable; the wrist panel provides selected actions.
+Map icons, pan and zoom work through the controller layer; right-click waypoint orders
+and text entry still require the existing input methods.
 
 Controls suspend in maps, menus that disable flight controls, external camera modes,
 pause, lost headset tracking, and lost OpenXR focus. A disconnected or untracked
@@ -144,20 +146,13 @@ behavior tests. The optional metadata check requires your own
 game and BepInEx installation; it does not execute the game or validate Harmony's
 runtime patching. Do not commit game DLLs or decompiled game source.
 
-## Recommended next improvements
+## Implemented follow-up and remaining work
 
-1. **Controller laser pointers and trigger clicks for all menus and the tactical map.**
-   This removes the mouse dependency during aircraft selection, mission setup, and
-   mid-flight map use. Use one shared ray for cursor placement and actual hit tests.
-2. **A compact combat-control layer on the controllers.** Add configurable trigger
-   fire, weapon selection, countermeasures, targeting, and a small wrist menu for
-   gear/radar/engine actions, with tooltips and deliberate ejection confirmation.
-3. **Per-aircraft seat and control placement profiles.** Save the preferred stick,
-   throttle, handedness, and eye position for each cockpit. Add in-VR adjustment so
-   users can tune it without editing a file or reaching for the keyboard.
-4. **Separate HUD readability controls.** Keep aiming and world markers aligned,
-   while allowing adjustable angular text size, contrast, panel distance, and
-   decluttering for secondary information. Include a quick reset-to-defaults action.
-5. **Predictable frame pacing and cockpit display performance.** Profile render
-   camera stacks and allocations with a headset; reduce redundant UI/layout work
-   and throttle nonessential display updates where measurements justify it.
+The controller pointer, combat layer, wrist panel, per-aircraft placement, seat adjustment,
+and HUD readability follow-up is described in [STEAM_FRAME.md](STEAM_FRAME.md).
+
+Remaining work should be driven by headset flight testing: verify aircraft-specific
+collective/auto-hover behavior, improve labels and control geometry, add direct cockpit
+switch interaction, and profile frame pacing and cockpit camera costs. Streaming latency
+and controller emulation need validation on Steam Frame; this code does not configure
+Steam Link quality, foveation, or networking.

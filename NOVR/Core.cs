@@ -33,7 +33,10 @@ public class Core : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         gameObject.AddComponent<VrCameraManager>();
         gameObject.AddComponent<APIBus>();
+        gameObject.AddComponent<MotionControls.CockpitProfiles>();
         gameObject.AddComponent<MotionControls.MotionFlightController>();
+        gameObject.AddComponent<MotionControls.ControllerActions>();
+        gameObject.AddComponent<VrUi.WristMenu>();
     }
 
     private void OnDestroy()
