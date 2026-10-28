@@ -17,8 +17,8 @@ namespace NOVR;
 
 [BepInPlugin(
     "deltawing.novr",
-    "NOVR",
-    "0.4.4")]
+    "NOVR (Motion Prototype)",
+    "0.4.4.1")]
 public class NOVRPlugin : BaseUnityPlugin
 {
     
@@ -39,7 +39,10 @@ public class NOVRPlugin : BaseUnityPlugin
 
     private void TrackingAcquired(XRNodeState obj)
     {
-        NOVRHeadsetData.CalibrateTranslation();
+        // Controller tracking can return while the pilot is reaching for a control.
+        // Only headset tracking acquisition should recenter the cockpit.
+        if (obj.nodeType is XRNode.Head or XRNode.CenterEye)
+            NOVRHeadsetData.CalibrateTranslation();
     }
      
     private void Awake()

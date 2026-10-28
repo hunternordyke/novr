@@ -1,0 +1,48 @@
+using Mono.Cecil;
+
+internal static class PatchCompatibility
+{
+    public static void Verify(string modPath, string gameManagedDirectory)
+    {
+        var resolver = new DefaultAssemblyResolver();
+        resolver.AddSearchDirectory(gameManagedDirectory);
+        resolver.AddSearchDirectory(Path.GetFullPath(Path.Combine(gameManagedDirectory, "..", "..", "BepInEx", "core")));
+        resolver.AddSearchDirectory(Path.GetDirectoryName(Path.GetFullPath(modPath))!);
+        using var mod = AssemblyDefinition.ReadAssembly(modPath, new ReaderParameters { AssemblyResolver = resolver });
+        var failures = new List<string>();
+        var verified = 0;
+        foreach (var type in AllTypes(mod.MainModule.Types))
+        foreach (var patch in type.CustomAttributes.Where(a => a.AttributeType.FullName == "HarmonyLib.HarmonyPatch"))
+        {
+            var target = patch.ConstructorArguments.Select(a => a.Value).OfType<TypeReference>().FirstOrDefault();
+            var method = patch.ConstructorArguments.Select(a => a.Value).OfType<string>().FirstOrDefault();
+            if (target == null || method == null) continue;
+            var definition = target.Resolve();
+            if (!definition.Methods.Any(m => m.Name == method))
+            {
+                failures.Add($"Missing method {target.FullName}.{method}");
+                continue;
+            }
+            foreach (var parameter in type.Methods.SelectMany(m => m.Parameters).Where(p => p.Name.StartsWith("___")))
+            {
+                var fieldName = parameter.Name[3..];
+                var owner = definition;
+                while (owner != null && !owner.Fields.Any(f => f.Name == fieldName)) owner = owner.BaseType?.Resolve();
+                if (owner == null) failures.Add($"Missing injected field {target.FullName}.{fieldName}");
+            }
+            verified++;
+        }
+        if (verified < 20) throw new Exception($"Only {verified} patch targets were checked; wrong build?");
+        if (failures.Count != 0) throw new Exception(string.Join(Environment.NewLine, failures));
+        Console.WriteLine($"Verified {verified} declared patch targets (metadata only; no game code executed).");
+    }
+
+    private static IEnumerable<TypeDefinition> AllTypes(IEnumerable<TypeDefinition> roots)
+    {
+        foreach (var type in roots)
+        {
+            yield return type;
+            foreach (var nested in AllTypes(type.NestedTypes)) yield return nested;
+        }
+    }
+}

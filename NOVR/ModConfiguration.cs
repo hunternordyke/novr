@@ -10,17 +10,23 @@ public class ModConfiguration
     
 
     public readonly ConfigFile Config;
+    public readonly MotionControls.MotionControlSettings MotionControls;
     public readonly ConfigEntry<float> TargetDesignatorOvershoot;
     public readonly ConfigEntry<bool> EnableNativeMenuUi;
     public readonly ConfigEntry<float> NativeMenuScale;
     public readonly ConfigEntry<float> NativeMenuDistance;
     public readonly ConfigEntry<float> NativeMenuHeightOffset;
+    public readonly ConfigEntry<float> HmdFollowResponse;
 
     public ModConfiguration(ConfigFile config)
     {
         Instance = this;
 
         Config = config;
+        MotionControls = new MotionControls.MotionControlSettings(config);
+        HmdFollowResponse = config.Bind("VR HUD", "Head Follow Response", 10f,
+            new ConfigDescription("Response of head-following status text. Higher values follow faster; 0 locks directly to the head. World target markers stay aligned independently.",
+                new AcceptableValueRange<float>(0f, 30f)));
         TargetDesignatorOvershoot = config.Bind(
             "General",
             "Target Designator Overshoot",

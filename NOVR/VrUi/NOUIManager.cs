@@ -6,9 +6,9 @@ using UnityEngine.Rendering.Universal;
 
 namespace NOVR.VrUi;
 
+[DefaultExecutionOrder(50)]
 public class NOUIManager : NOVRBehaviour
 {
-    private const float SmoothingFactor = 10f;
     private Camera? _cockpitHudCamera;
     private GameObject? _smoothedForwardReference;
 
@@ -58,15 +58,18 @@ public class NOUIManager : NOVRBehaviour
     private void Update()
     {
         ConfigureUiCameras();
-        UpdateSmoothedPosition();
     }
+
+    private void LateUpdate() => UpdateSmoothedPosition();
     
     private void UpdateSmoothedPosition()
     {
         var smoothedForwardReference = CockpitHudReference;
         var cam = CockpitHudCamera;
         smoothedForwardReference.transform.position = cam.transform.position;
-        smoothedForwardReference.transform.localRotation = Quaternion.Lerp(smoothedForwardReference.transform.localRotation, cam.transform.localRotation, Mathf.Clamp(Time.deltaTime * SmoothingFactor, 0, 1));
+        var response = ModConfiguration.Instance.HmdFollowResponse.Value;
+        var blend = response <= 0f ? 1f : MotionControls.FlightControlMath.SmoothingWeight(Time.unscaledDeltaTime, response);
+        smoothedForwardReference.transform.rotation = Quaternion.Slerp(smoothedForwardReference.transform.rotation, cam.transform.rotation, blend);
     }
 
     

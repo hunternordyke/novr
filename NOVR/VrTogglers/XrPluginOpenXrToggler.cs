@@ -9,6 +9,7 @@ public class XrPluginOpenXrToggler : XrPluginToggler
 {
     protected override XRLoader CreateLoader()
     {
+        OpenXRSettings.Instance.EnableNovrControllerProfiles();
         var xrLoader = ScriptableObject.CreateInstance<OpenXRLoader>();
         return xrLoader;
     }

@@ -2,16 +2,19 @@ using UnityEngine;
 
 namespace NOVR.VrUi.SpecialBehavior;
 
+[DefaultExecutionOrder(60)]
 public class NOVRHMDBehavior : UIRenderedCanvasBehavior
 {
     
     
     private float _offset = 1000;
 
-    private void Update()
+    private void LateUpdate()
     {
+        if (NOUIManager.I == null) return;
         var uiCam = APIBus.CockpitHudReference;
-        transform.position = uiCam.transform.forward * _offset;
+        if (uiCam == null) return;
+        transform.position = uiCam.transform.position + uiCam.transform.forward * _offset;
         transform.rotation = uiCam.transform.rotation;
         
         SetLocalPosition("Speed", new Vector3(-110f, 150f, 0f)); // TODO: Patch game files and use events to set these gameobjects

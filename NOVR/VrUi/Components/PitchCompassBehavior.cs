@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 namespace NOVR.VrUi.SpecialBehavior;
 
+[DefaultExecutionOrder(60)]
 public class PitchCompassBehavior : MonoBehaviour
 {
     private const int FullPitchStepCount = 36;
@@ -35,13 +36,14 @@ public class PitchCompassBehavior : MonoBehaviour
         BuildSlices();
     }
 
-    private void Update()
+    private void LateUpdate()
     {
         if (!_hasBuiltSlices) return;
         RefreshCockpitTransform();
         if (_sliceRoot == null || _cockpitTransform == null) return;
         
-        _sliceRoot.transform.position = Vector3.zero;
+        if (NOUIManager.I == null) return;
+        _sliceRoot.transform.position = APIBus.CockpitHudCamera.transform.position;
         
         
         var inverseCockpitRotation = Quaternion.Inverse(_cockpitTransform.rotation);

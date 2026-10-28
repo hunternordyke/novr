@@ -35,6 +35,7 @@ public class NOVRHeadsetData : NOVRBehaviour
 
     public static void CalibrateTranslation(CalibrationAxes calibrationAxes = CalibrationAxes.All, bool overrideExistingInNonCalibratedAxes = false)
     {
+        if (_trackingPositionMethod == null) return;
         Vector3 currentError = -(Vector3)_trackingPositionMethod.Invoke(null, TrackingMethodArgs);
         bool ov  = overrideExistingInNonCalibratedAxes;
         TranslationCalibrationOffset = new Vector3(
@@ -47,6 +48,7 @@ public class NOVRHeadsetData : NOVRBehaviour
 
     public static void CalibrateRotation(CalibrationAxes calibrationAxes = CalibrationAxes.Yaw, bool overrideExistingInNonCalibratedAxes = false)
     {
+        if (_trackingRotationMethod == null) return;
         var currentRotation = (Quaternion)_trackingRotationMethod.Invoke(null, TrackingMethodArgs);
         var currentEuler = currentRotation.eulerAngles;
         Vector3 currentError = new(
