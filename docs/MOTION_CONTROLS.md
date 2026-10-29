@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.2` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.3` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -120,9 +120,32 @@ tracking/focus, or changing aircraft clears the confirmation. The native quick
 wheel does not yet have a motion-controller binding; use these wrist actions.
 
 The models are deliberately simple: a stick with a base, and a throttle sliding along
-a rail. White spheres show tracked hand positions. Handles are blue at rest, amber
-within grabbing distance, and green while held. Grab feedback includes a short
-haptic pulse on devices that support it.
+a rail. Version 0.4.5.3 gives them solid depth-writing surfaces and subtle shading,
+so their shape and overlapping parts are easier to read. White spheres show tracked
+hand positions. Handles are blue at rest, amber within grabbing distance, and green
+while held. Grab feedback includes a short haptic pulse on supported devices.
+
+Captions sit above and outboard of the handles on dark backplates, leaving the
+shared console clear at the default positions. They mirror with the hand layout
+and respect foreground cockpit
+geometry instead of drawing through it. They follow font-atlas rebuilds without
+changing the game's shared font material. They show hold/latch state
+and the grip action needed to release a latch. Five throttle marks span the chosen
+travel range in 25% steps; they are visual guides, not physical detents. The readout
+stays above the handle as travel is adjusted. **BRAKES ON** appears in
+amber when the aircraft's native brake input is applied, including a keyboard/HOTAS
+brake input while the motion models are visible. **BRAKES RELEASED** confirms release.
+This reports the brake command, not measured deceleration or a parking-brake latch.
+
+If a handle model cannot load, motion input suspends and reports a recovery message.
+Toggle motion controls off and on to retry. Failed or replaced models release their
+owned geometry/materials without modifying shared game meshes.
+
+For 0.4.5.3, 17 offline in-game checks verify opaque/shaded surfaces, caption bounds
+and font refresh, native brake indication, tracking cleanup, resource disposal and
+recovery after a deliberately failed model load. Render inspection also checks
+foreground text occlusion and the handles alongside the shared console. These use
+temporary simulated input; physical headset reach and comfort remain unverified.
 
 Place the controllers where your hands can rest comfortably before calibrating. The
 controls stay in cockpit space as you look around. Placement and seat offsets are now saved per aircraft and handedness. See the

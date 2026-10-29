@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.2**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.3**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -127,6 +127,14 @@ moves the four throttle actions together to keep their buttons distinct:
 upgrade; an added brake binding starts unassigned if its default button is already
 used by a custom throttle action. The wrist page shows the active bindings and warns
 about shared buttons. Neither layout changes the flight stick, map or wrist controls.
+
+Version **0.4.5.3** makes the stick/throttle solid and shaded, moves their captions
+clear of the handles, and adds readable backplates. Captions now respect cockpit
+occlusion. Throttle markings follow the
+selected travel distance. The throttle readout shows **BRAKES ON** in amber while
+the game's brake input is applied, then **BRAKES RELEASED**. It also shows native
+keyboard/HOTAS braking while motion models are visible. These are command indicators;
+the flight controls still use the same bindings and grip modes.
 
 ## Shared 3D console
 

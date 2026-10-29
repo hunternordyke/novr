@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -10,51 +11,93 @@ internal sealed class MotionControlVisuals : IDisposable
 {
     public Transform Root { get; }
     private readonly Transform _stickBase, _stickPivot, _throttleBase, _throttleHandle;
-    private readonly Transform _stickHand, _throttleHand, _rail;
+    private readonly Transform _stickHand, _throttleHand, _rail, _throttleCaption;
+    private readonly Transform[] _railTicks = new Transform[5];
     private readonly Renderer _stickGrip, _throttleGrip;
-    private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial;
-    private readonly TextMesh _stickLabel, _throttleLabel;
+    private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial, _textMaterial;
+    private readonly Font _font;
+    private readonly TextMesh _stickLabel, _throttleLabel, _brakeLabel;
+    private bool? _lastBrake;
+    private float _lastTravel = -1;
+    private readonly Dictionary<Mesh, Mesh> _shadedMeshes = new();
     private int _lastThrottlePercent = -1;
     private string? _lastStickCaption, _lastThrottleCaption;
 
     public MotionControlVisuals(Transform trackingRoot)
     {
         Root = Child("NOVR Motion Flight Controls", trackingRoot);
-        var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? Shader.Find("Sprites/Default");
-        _baseMaterial = Material(shader, new Color(0.12f, 0.15f, 0.19f));
-        _idleMaterial = Material(shader, new Color(0.35f, 0.65f, 0.8f));
-        _hoverMaterial = Material(shader, new Color(1f, 0.75f, 0.18f));
-        _heldMaterial = Material(shader, new Color(0.2f, 1f, 0.5f));
-        _handMaterial = Material(shader, new Color(0.85f, 0.9f, 1f));
+        try
+        {
+            _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            // GUI/Text Shader ignores depth. UI/Default supports the same alpha
+            // font atlas with an explicit per-material depth test.
+            var textShader = Shader.Find("UI/Default");
+            if (textShader == null) throw new InvalidOperationException("No depth-tested caption shader is available.");
+            _textMaterial = new Material(textShader) { name = "NOVR flight caption", color = Color.white };
+            _textMaterial.SetInt("unity_GUIZTestMode", (int)CompareFunction.LessEqual);
+            RefreshFontTexture(_font);
+            Font.textureRebuilt += RefreshFontTexture;
+            _baseMaterial = CockpitMaterials.Opaque("NOVR flight control", new Color(0.12f, 0.15f, 0.19f));
+            _idleMaterial = CockpitMaterials.Opaque("NOVR flight control", new Color(0.35f, 0.65f, 0.8f));
+            _hoverMaterial = CockpitMaterials.Opaque("NOVR flight control", new Color(1f, 0.75f, 0.18f));
+            _heldMaterial = CockpitMaterials.Opaque("NOVR flight control", new Color(0.2f, 1f, 0.5f));
+            _handMaterial = CockpitMaterials.Opaque("NOVR flight control", new Color(0.85f, 0.9f, 1f));
 
-        _stickBase = Child("Stick", Root);
-        Shape("Base", PrimitiveType.Cylinder, _stickBase, Vector3.zero, new Vector3(0.12f, 0.015f, 0.12f), _baseMaterial);
-        _stickPivot = Child("Pivot", _stickBase);
-        Shape("Shaft", PrimitiveType.Cylinder, _stickPivot, new Vector3(0, 0.05f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
-        _stickGrip = Shape("Grip", PrimitiveType.Capsule, _stickPivot, new Vector3(0, 0.12f, 0), new Vector3(0.05f, 0.04f, 0.05f), _idleMaterial);
-        Shape("Top", PrimitiveType.Sphere, _stickPivot, new Vector3(0, 0.155f, 0), new Vector3(0.025f, 0.012f, 0.025f), _baseMaterial);
-        _stickLabel = Label("STICK / GRIP", _stickBase, new Vector3(0, 0.02f, 0.10f));
+            _stickBase = Child("Stick", Root);
+            Shape("Base", PrimitiveType.Cylinder, _stickBase, Vector3.zero, new Vector3(0.12f, 0.015f, 0.12f), _baseMaterial);
+            _stickPivot = Child("Pivot", _stickBase);
+            Shape("Shaft", PrimitiveType.Cylinder, _stickPivot, new Vector3(0, 0.05f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
+            _stickGrip = Shape("Grip", PrimitiveType.Capsule, _stickPivot, new Vector3(0, 0.12f, 0), new Vector3(0.05f, 0.04f, 0.05f), _idleMaterial);
+            Shape("Top", PrimitiveType.Sphere, _stickPivot, new Vector3(0, 0.155f, 0), new Vector3(0.025f, 0.012f, 0.025f), _baseMaterial);
+            _stickLabel = Label("STICK\nHOLD GRIP", _stickBase, new Vector3(.16f, .23f, .07f));
+            Shape("Stick label backplate", PrimitiveType.Cube, _stickLabel.transform, new Vector3(0, 0, .005f),
+                new Vector3(.19f, .054f, .006f), _baseMaterial);
 
-        _throttleBase = Child("Throttle", Root);
-        _rail = Shape("Rail", PrimitiveType.Cube, _throttleBase, new Vector3(0, -0.05f, 0), new Vector3(0.1f, 0.02f, 0.3f), _baseMaterial).transform;
-        _throttleHandle = Child("Handle", _throttleBase);
-        Shape("Post", PrimitiveType.Cube, _throttleHandle, new Vector3(0, -0.025f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
-        _throttleGrip = Shape("Grip", PrimitiveType.Cube, _throttleHandle, Vector3.zero, new Vector3(0.1f, 0.045f, 0.05f), _idleMaterial);
-        _throttleLabel = Label("THROTTLE / GRIP", _throttleBase, new Vector3(0, 0.02f, 0.20f));
+            _throttleBase = Child("Throttle", Root);
+            _rail = Shape("Rail", PrimitiveType.Cube, _throttleBase, new Vector3(0, -0.05f, 0), new Vector3(0.1f, 0.02f, 0.3f), _baseMaterial).transform;
+            _throttleHandle = Child("Handle", _throttleBase);
+            Shape("Post", PrimitiveType.Cube, _throttleHandle, new Vector3(0, -0.025f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
+            _throttleGrip = Shape("Grip", PrimitiveType.Cube, _throttleHandle, Vector3.zero, new Vector3(0.1f, 0.045f, 0.05f), _idleMaterial);
+            _throttleCaption = Child("Throttle readout", _throttleBase);
+            _throttleCaption.localRotation = Quaternion.Euler(35, 0, 0);
+            _throttleLabel = Label("THROTTLE\nHOLD GRIP", _throttleCaption, new Vector3(0, .0185f, 0));
+            _throttleLabel.transform.localRotation = Quaternion.identity;
+            _brakeLabel = Label("BRAKES RELEASED", _throttleCaption, new Vector3(0, -.035f, 0));
+            _brakeLabel.transform.localRotation = Quaternion.identity;
+            _brakeLabel.characterSize = .0041f;
+            Shape("Throttle label backplate", PrimitiveType.Cube, _throttleCaption, new Vector3(0, 0, .005f),
+                new Vector3(.19f, .105f, .006f), _baseMaterial);
+            for (var i = 0; i < _railTicks.Length; i++)
+                _railTicks[i] = Shape("Travel marker " + i, PrimitiveType.Cube, _throttleBase,
+                    Vector3.zero, new Vector3(i % 2 == 0 ? .02f : .013f, .003f, .003f), _idleMaterial).transform;
 
-        _stickHand = Shape("Stick Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
-        _throttleHand = Shape("Throttle Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
+            _stickHand = Shape("Stick Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
+            _throttleHand = Shape("Throttle Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
+        }
+        catch { Dispose(); throw; }
     }
 
     public void Update(Vector3 stick, Vector3 throttle, float travel, float angle, float pitch, float roll,
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
-        bool stickLatched = false, bool throttleLatched = false, bool stickTapMode = false, bool throttleTapMode = false)
+        bool stickLatched = false, bool throttleLatched = false, bool stickTapMode = false, bool throttleTapMode = false,
+        bool brakesApplied = false)
     {
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
         _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
         _throttleBase.localPosition = throttle;
-        _rail.localScale = new Vector3(0.1f, 0.02f, travel + 0.05f);
+        // Put captions above and outboard of the handles, leaving the central
+        // console's screens and switches clear. Mirror with the hand positions.
+        var side = stick.x >= throttle.x ? 1f : -1f;
+        _stickLabel.transform.localPosition = new Vector3(side * .16f, .23f, .07f);
+        _throttleCaption.localPosition = new Vector3(-side * .16f, .11f, .07f);
+        if (_lastTravel != travel)
+        {
+            _lastTravel = travel;
+            _rail.localScale = new Vector3(0.1f, 0.02f, travel + 0.05f);
+            for (var i = 0; i < _railTicks.Length; i++)
+                _railTicks[i].localPosition = new Vector3(-.037f, -.038f, (i * .25f - .5f) * travel);
+        }
         _throttleHandle.localPosition = Vector3.forward * ((thrust - 0.5f) * travel);
         _stickGrip.sharedMaterial = stickHeld ? _heldMaterial : stickNear ? _hoverMaterial : _idleMaterial;
         _throttleGrip.sharedMaterial = throttleHeld ? _heldMaterial : throttleNear ? _hoverMaterial : _idleMaterial;
@@ -62,10 +105,16 @@ internal sealed class MotionControlVisuals : IDisposable
         _stickHand.localPosition = stickHand;
         _throttleHand.gameObject.SetActive(throttleTracked);
         _throttleHand.localPosition = throttleHand;
-        var stickCaption = stickLatched ? "STICK LATCHED\nTAP GRIP TO RELEASE" : stickHeld ? "STICK / HELD" : stickTapMode ? "STICK / TAP OR HOLD GRIP" : "STICK / HOLD GRIP";
+        var stickCaption = stickLatched ? "STICK LATCHED\nGRIP TO RELEASE" : stickHeld ? "STICK\nHELD" : stickTapMode ? "STICK\nTAP OR HOLD GRIP" : "STICK\nHOLD GRIP";
         if (_lastStickCaption != stickCaption) { _stickLabel.text = stickCaption; _lastStickCaption = stickCaption; }
+        if (_lastBrake != brakesApplied)
+        {
+            _lastBrake = brakesApplied;
+            _brakeLabel.text = brakesApplied ? "BRAKES ON" : "BRAKES RELEASED";
+            _brakeLabel.color = brakesApplied ? new Color(1f, .75f, .18f) : new Color(.65f, .72f, .78f);
+        }
         var percent = Mathf.RoundToInt(thrust * 100);
-        var throttleCaption = throttleLatched ? "LATCHED / TAP GRIP TO RELEASE" : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
+        var throttleCaption = throttleLatched ? "LATCHED\nGRIP TO RELEASE" : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
         if (_lastThrottlePercent != percent || _lastThrottleCaption != throttleCaption)
         {
             _throttleLabel.text = $"THROTTLE {percent}%\n{throttleCaption}";
@@ -82,7 +131,7 @@ internal sealed class MotionControlVisuals : IDisposable
         return child.transform;
     }
 
-    private static Renderer Shape(string name, PrimitiveType type, Transform parent, Vector3 position, Vector3 scale, Material material)
+    private Renderer Shape(string name, PrimitiveType type, Transform parent, Vector3 position, Vector3 scale, Material material)
     {
         var shape = GameObject.CreatePrimitive(type);
         shape.name = name;
@@ -93,6 +142,26 @@ internal sealed class MotionControlVisuals : IDisposable
         var collider = shape.GetComponent<Collider>();
         collider.enabled = false;
         Object.Destroy(collider);
+        var filter = shape.GetComponent<MeshFilter>();
+        var original = filter.sharedMesh;
+        if (!_shadedMeshes.TryGetValue(original, out var shaded))
+        {
+            // Unity primitives share their source meshes with the rest of the game.
+            // Shade our own copy and reuse it across matching shapes.
+            shaded = Object.Instantiate(original);
+            shaded.name = "NOVR shaded " + original.name;
+            var normals = shaded.normals;
+            var light = new Vector3(-.3f, .6f, -.8f).normalized;
+            var colors = new Color[normals.Length];
+            for (var i = 0; i < colors.Length; i++)
+            {
+                var value = .58f + .42f * Mathf.Max(0, Vector3.Dot(normals[i], light));
+                colors[i] = new Color(value, value, value, 1);
+            }
+            shaded.colors = colors;
+            _shadedMeshes.Add(original, shaded);
+        }
+        filter.sharedMesh = shaded;
         var renderer = shape.GetComponent<Renderer>();
         renderer.sharedMaterial = material;
         renderer.shadowCastingMode = ShadowCastingMode.Off;
@@ -100,22 +169,24 @@ internal sealed class MotionControlVisuals : IDisposable
         return renderer;
     }
 
-    private static Material Material(Shader shader, Color color)
+    private void RefreshFontTexture(Font font)
     {
-        var material = new Material(shader) { enableInstancing = true };
-        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-        if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-        return material;
+        if (font != _font || _textMaterial == null) return;
+        var texture = _font.material.mainTexture;
+        _textMaterial.mainTexture = texture;
+        // Dynamic fonts are alpha-only: supply white RGB without altering alpha.
+        var alphaOnly = texture is Texture2D atlas && atlas.format == TextureFormat.Alpha8;
+        _textMaterial.SetVector("_TextureSampleAdd", alphaOnly ? new Vector4(1, 1, 1, 0) : Vector4.zero);
     }
 
-    private static TextMesh Label(string value, Transform parent, Vector3 position)
+    private TextMesh Label(string value, Transform parent, Vector3 position)
     {
         var text = Child("Label", parent).gameObject.AddComponent<TextMesh>();
         text.text = value;
-        text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        text.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
+        text.font = _font;
+        text.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial;
         text.fontSize = 40;
-        text.characterSize = 0.008f;
+        text.characterSize = 0.0048f;
         text.anchor = TextAnchor.MiddleCenter;
         text.alignment = TextAlignment.Center;
         text.color = Color.white;
@@ -126,11 +197,15 @@ internal sealed class MotionControlVisuals : IDisposable
 
     public void Dispose()
     {
+        Font.textureRebuilt -= RefreshFontTexture;
         if (Root != null) Object.Destroy(Root.gameObject);
+        foreach (var mesh in _shadedMeshes.Values) Object.Destroy(mesh);
+        _shadedMeshes.Clear();
         Object.Destroy(_baseMaterial);
         Object.Destroy(_idleMaterial);
         Object.Destroy(_hoverMaterial);
         Object.Destroy(_heldMaterial);
         Object.Destroy(_handMaterial);
+        Object.Destroy(_textMaterial);
     }
 }

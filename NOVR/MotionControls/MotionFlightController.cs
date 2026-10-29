@@ -14,6 +14,7 @@ public sealed class MotionFlightController : MonoBehaviour
     private readonly FlightGrip _stickGrip = new();
     private readonly FlightGrip _throttleGrip = new();
     private MotionControlVisuals? _visuals;
+    private bool _visualsFailed;
     private Aircraft? _aircraft;
     private Quaternion _neutralStick;
     private float _throttleStartPosition;
@@ -118,7 +119,7 @@ public sealed class MotionFlightController : MonoBehaviour
             Settings.StickAngle.Value, Pitch, Roll, Throttle, StickHeld, ThrottleHeld,
             IsNearStick(), IsNearThrottle(), _stickHand.Valid, _stickHand.Position,
             _throttleHand.Valid, _throttleHand.Position, _stickGrip.Latched, _throttleGrip.Latched,
-            Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value);
+            Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value, _aircraft != null && _aircraft.GetInputs().brake > .05f);
     }
 
     // Called from both the render loop and the native pilot input hooks, so a physics tick
@@ -140,17 +141,34 @@ public sealed class MotionFlightController : MonoBehaviour
     private void Sample()
     {
         CockpitProfiles.Instance?.Refresh();
+        if (!Settings.Enabled.Value) _visualsFailed = false;
         if (!TryGetCockpit(out var aircraft, out var trackingRoot))
         {
             Suspend();
             return;
         }
 
+        if (_aircraft != aircraft) _visualsFailed = false;
+        if (_visualsFailed)
+        {
+            ReportStatus("Handle models unavailable; toggle motion controls to retry");
+            Suspend();
+            return;
+        }
         if (_aircraft != aircraft || _visuals == null || _visuals.Root == null || _visuals.Root.parent != trackingRoot)
         {
             _visuals?.Dispose();
+            _visuals = null;
             _aircraft = aircraft;
-            _visuals = new MotionControlVisuals(trackingRoot);
+            try { _visuals = new MotionControlVisuals(trackingRoot); }
+            catch (System.Exception exception)
+            {
+                _visualsFailed = true;
+                ReportStatus("Handle models unavailable; toggle motion controls to retry");
+                Debug.LogError($"[NOVR] Could not create motion-control models: {exception}");
+                Suspend();
+                return;
+            }
             Debug.Log($"[NOVR] Created motion control models for {aircraft.name}; tracking root={trackingRoot.name}, camera={APIBus.MainCamera?.name}, cockpit layer={(int)LayerHelper.Layers.Cockpit}.");
             ResetGrips();
         }

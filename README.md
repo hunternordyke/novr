@@ -10,7 +10,9 @@ and adjustable HUD readability. Version **0.4.5.0** adds an original shared 3D c
 with guarded physical controls and live weapon/countermeasure/minimap displays,
 and corrects reversed motion-stick pitch. **0.4.5.1** adds optional tap-to-latch
 grips and in-headset control-feel settings and binding help. **0.4.5.2** adds
-wheel/air brakes and selectable throttle-button layouts. Steam Frame **PC streaming through SteamVR** is the
+wheel/air brakes and selectable throttle-button layouts. **0.4.5.3** improves
+handle depth/shading, backs the captions with solid panels and adds actual brake-state
+feedback and throttle-travel marks. Steam Frame **PC streaming through SteamVR** is the
 binding target, with a Touch-compatible fallback. It builds against Nuclear
 Option **0.34.3**. It is a prototype awaiting headset flight testing, not a tested release.
 
