@@ -19,6 +19,7 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
+    private GameObject? _alertsPage;
     private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage, _aimingPage, _opticalPage;
     private readonly Dictionary<GameObject, string> _pageTitles = new();
     private GameObject? _performancePage;
@@ -46,6 +47,7 @@ internal sealed class WristMenu : MonoBehaviour
         var c = ModConfiguration.Instance; c.FocusedFlightHud.Value = true;
         c.FlightHudScale.Value += amount; c.MarkerScale.Value += amount;
         c.MarkerLabelScale.Value += amount; c.ReticleScale.Value += amount; c.WeaponHudScale.Value += amount;
+        c.CockpitAlerts.Scale.Value += amount;
     }
 
     private void Update()
@@ -391,8 +393,22 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Aiming & markers", 1, 3, () => ShowPage(_aimingPage!));
         AddButton("AOTS helmet view", 1, 4, () => ShowPage(_opticalPage!));
         AddButton("Reset HUD", 0, 4, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.MarkerScale.Value = .45f; config.MarkerLabelScale.Value = .55f; config.ReticleScale.Value = .45f; config.WeaponHudScale.Value = .5f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
-        var displayInfo = Label(_displayPage.transform, "", new Vector2(0,-180), new Vector2(510,125), 19);
+        AddButton("Threats & feed", 0, 5, () => ShowPage(_alertsPage!));
+        var displayInfo = Label(_displayPage.transform, "", new Vector2(0,-210), new Vector2(510,76), 18);
         _liveLabels.Add((displayInfo, () => $"Flight {config.FlightHudScale.Value*100:0}% • Symbols {config.MarkerScale.Value*100:0}%\nStatus-panel depth {config.HudPanelDistance.Value:0.0} m\nDepth changes preserve apparent size."));
+
+        _alertsPage = Page("THREATS & FEED");
+        var alerts = config.CockpitAlerts;
+        AddLiveButton(() => "Compact: " + (alerts.Enabled.Value ? "ON" : "OFF"), 0, 0, () => alerts.Enabled.Value = !alerts.Enabled.Value);
+        AddLiveButton(() => "Kill feed: " + (alerts.Feed.Value ? "ON" : "OFF"), 1, 0, () => alerts.Feed.Value = !alerts.Feed.Value);
+        AddButton("Smaller alerts", 0, 1, () => alerts.Scale.Value -= .05f);
+        AddButton("Larger alerts", 1, 1, () => alerts.Scale.Value += .05f);
+        AddButton("Alerts lower", 0, 2, () => alerts.Height.Value -= .025f);
+        AddButton("Alerts higher", 1, 2, () => alerts.Height.Value += .025f);
+        AddLiveButton(() => "World notch: " + (alerts.WorldNotch.Value ? "ON" : "OFF"), 0, 3, () => alerts.WorldNotch.Value = !alerts.WorldNotch.Value);
+        AddButton("Reset alerts", 1, 3, () => { alerts.Enabled.Value = true; alerts.Feed.Value = true; alerts.Scale.Value = 1; alerts.Height.Value = -.30f; alerts.WorldNotch.Value = false; });
+        var alertInfo = Label(_alertsPage.transform, "", new Vector2(0, -150), new Vector2(510, 190), 18);
+        _liveLabels.Add((alertInfo, () => $"Size {alerts.Scale.Value*100:0}% · Height {alerts.Height.Value:0.00} m\nM = missile · R = radar · J = jamming\n12h is the aircraft nose; 6h is behind.\nNOTCH is an evasion direction, not a threat bearing.\nQuiet scope disappears. Latest 3 feed entries only.\nClose View to inspect placement."));
 
         _opticalPage = Page("AOTS HELMET VIEW");
         AddLiveButton(() => "AOTS HUD: " + (config.OpticalHud.Enabled.Value ? "ON" : "OFF"), 0, 0, OpticalTargetingHud.Toggle);

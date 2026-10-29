@@ -65,12 +65,33 @@ internal static class PatchCompatibility
             (owner: "TargetCam", field: "canvasObjectTarget", type: "UnityEngine.GameObject"),
             (owner: "TargetCam", field: "canvasObjectLanding", type: "UnityEngine.GameObject"),
             (owner: "HUDMissileState", field: "hint", type: "TMPro.TextMeshProUGUI"),
+            (owner: "ThreatList", field: "itemLookup", type: "System.Collections.Generic.Dictionary`2<PersistentID,ThreatItem>"),
+            (owner: "ThreatItem", field: "missile", type: "Missile"),
+            (owner: "MessageUI", field: "killFeedText", type: "TMPro.TextMeshProUGUI"),
+            (owner: "MessageUI", field: "messageFeed", type: "MessageFeed"),
+            (owner: "MessageUI", field: "chat", type: "ChatBox"),
+            (owner: "MessageUI", field: "backgroundImage", type: "UnityEngine.UI.Image"),
+            (owner: "KillDisplay", field: "killText", type: "TMPro.TextMeshProUGUI"),
+            (owner: "KillDisplay", field: "rankText", type: "TMPro.TextMeshProUGUI"),
+            (owner: "KillDisplay", field: "rankBackground", type: "UnityEngine.UI.Image"),
             (owner: "HUDLaserGuidedState", field: "hint", type: "TMPro.TextMeshProUGUI") })
         {
             var field = game.MainModule.Types.Single(t => t.FullName == contract.owner).Fields.SingleOrDefault(f => f.Name == contract.field);
             if (field?.FieldType.FullName != contract.type) failures.Add($"Native readout field mismatch {contract.owner}.{contract.field}");
         }
         if (verified < 20) throw new Exception($"Only {verified} patch targets were checked; wrong build?");
+        // These nested native types are private, so their Harmony targets are
+        // resolved dynamically. Verify return values and injected fields too.
+        var radarWarning = game.MainModule.Types.Single(t => t.Name == "RadarWarning");
+        foreach (var name in new[] { "RadarWarningIcon", "JammingIcon" })
+        {
+            var icon = radarWarning.NestedTypes.Single(t => t.Name == name);
+            var position = icon.Methods.Single(m => m.Name == "Position");
+            if (position.ReturnType.FullName != "System.Boolean" || position.Parameters.Count != 0 ||
+                icon.Fields.Single(f => f.Name == "image").FieldType.FullName != "UnityEngine.UI.Image" ||
+                (name == "JammingIcon" && icon.Fields.Single(f => f.Name == "text").FieldType.FullName != "UnityEngine.UI.Text"))
+                failures.Add("Native threat-graphic contract changed: " + name);
+        }
         var selector = game.MainModule.Types.Single(t => t.Name == "CombatHUD").Methods.Single(m => m.Name == "TargetSelect").Body.Instructions;
         var acquisitionSites = selector.Count(i => i.OpCode == Mono.Cecil.Cil.OpCodes.Ldc_R4 && i.Operand is float f && f == 100 &&
             i.Next?.Operand is MethodReference call && call.DeclaringType.Name == "FastMath" && call.Name == "InRange");

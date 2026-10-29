@@ -20,6 +20,7 @@ public class ModConfiguration
     public readonly ConfigEntry<float> HmdFollowResponse;
     public readonly MotionControls.ControllerBindings ControllerBindings;
     internal readonly MotionControls.OpticalHudSettings OpticalHud;
+    internal readonly VrUi.SpecialBehavior.CockpitAlertSettings CockpitAlerts;
     internal readonly ConfigEntry<MotionControls.TargetCueMode> TargetCue;
     public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
     public readonly ConfigEntry<bool> HudContrast, HudDeclutter, FocusedFlightHud;
@@ -40,6 +41,7 @@ public class ModConfiguration
         MotionControls = new MotionControls.MotionControlSettings(config);
         ControllerBindings = new MotionControls.ControllerBindings(config);
         OpticalHud = new MotionControls.OpticalHudSettings(config);
+        CockpitAlerts = new VrUi.SpecialBehavior.CockpitAlertSettings(config);
         TargetCue = config.Bind("VR HUD", "Target Aim Cue", global::NOVR.MotionControls.TargetCueMode.Context,
             "Context shows a small target cue only near a selectable target or while selecting. Always keeps a faint dot visible. Off hides the aim cue. Target diamonds and weapon sights are unchanged.");
         CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");

@@ -4,6 +4,7 @@ var passed = 0;
 TexturePreparationChecks.Run(Check, True);
 HudPresentationChecks.Run(Check, True);
 OpticalHudChecks.Run(Check, True);
+CockpitAlertChecks.Run(Check, True);
 Check("Idle pointer prefers an actionable control over the other hand's background", () =>
 {
     foreach (var left in new[] { false, true })

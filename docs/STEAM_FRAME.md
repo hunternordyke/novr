@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.6.2**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.6.9 candidate**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -8,7 +8,9 @@ now starts through SteamVR/OpenXR using DirectX 11 on the Linux/Proton test host
 Live logs confirm 67 single-player missions, controller clicks through mission
 selection, the airbase map and Reserve/Fly, and entry into an aircraft. Motion
 flight controls, HUD comfort and the other controller bindings still need hands-on
-validation.
+validation. The 0.4.6.9 cockpit-alert and menu changes have offline validation only;
+see [Cockpit alerts](COCKPIT_ALERTS.md). The last installed version on the test host
+is 0.4.6.8; the candidate has not been launched or installed.
 
 ## Install and start
 

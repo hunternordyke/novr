@@ -58,6 +58,7 @@ internal sealed class HudReadability : MonoBehaviour
         transform.localScale = _baseScale * (config.HudPanelScale.Value * ratio);
         var incomingMissile = _secondary && _threats != null && _threats.transform.childCount > 0;
         if (_backplate != null) _backplate.enabled = config.HudContrast.Value &&
+            !(_secondary && CockpitAlerts.Active) &&
             (!MotionControls.UniversalCockpitPanel.HasDisplays || incomingMissile);
         if (_group != null) _group.alpha = _secondary && config.HudDeclutter.Value && !incomingMissile ? 0.15f : 1f;
     }

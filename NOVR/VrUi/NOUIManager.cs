@@ -46,6 +46,7 @@ public class NOUIManager : NOVRBehaviour
         UIBehaviorPatcher.DoPatching();
         Create<VrUiCursor>(transform);
         Create<NativeVrUiRoot>(transform);
+        gameObject.AddComponent<SpecialBehavior.CockpitAlerts>();
         ConfigureUiCameras();
     }
 
