@@ -12,8 +12,9 @@ and corrects reversed motion-stick pitch. **0.4.5.1** adds optional tap-to-latch
 grips and in-headset control-feel settings and binding help. **0.4.5.2** adds
 wheel/air brakes and selectable throttle-button layouts. **0.4.5.3** improves
 handle depth/shading, backs the captions with solid panels and adds actual brake-state
-feedback and throttle-travel marks. Steam Frame **PC streaming through SteamVR** is the
-binding target, with a Touch-compatible fallback. It builds against Nuclear
+feedback and throttle-travel marks. **0.4.5.4** restores native target/landing-camera
+zoom and accurate instrument magnification while preserving headset projection.
+Steam Frame **PC streaming through SteamVR** is the binding target, with a Touch-compatible fallback. It builds against Nuclear
 Option **0.34.3**. It is a prototype awaiting headset flight testing, not a tested release.
 
 - **F6** shows/hides the console; hiding it restores the original status HUD.

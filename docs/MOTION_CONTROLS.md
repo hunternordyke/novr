@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.3` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.4` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -174,6 +174,25 @@ All values are in `BepInEx/config/deltawing.novr.cfg`.
 The loader registers Steam Frame, Oculus Touch, Index, Vive, and Microsoft motion-controller
 OpenXR profiles. This is profile support in code, not a claim of testing every device
 or streaming runtime. Use an OpenXR runtime that exposes tracked controllers.
+
+## Instrument camera projection
+
+Version 0.4.5.4 restores native target-camera zoom, lost-target zoom-out and the
+wide landing-camera view. Instrument magnification reads the same field of view
+that drives the rendered image. The previous independent projection workaround
+has been removed.
+
+The field-of-view guard now applies only to cameras that may render to the
+headset. Render textures, reflection/preview cameras and cameras explicitly
+excluded from XR retain their normal FOV setters. Both target-camera components
+opt out of URP XR rendering. Headset projection remains runtime-controlled; this
+change adds no headset zoom or new button binding.
+
+21 checks in an offline FS-12 mission verify the actual camera setters, projection
+matrices and native target/landing behavior, alongside the headset guard and URP
+camera classification. The guard cases temporarily control the XR-enabled flag;
+the instrument checks run with the real active XR runtime. The diagnostic code
+is excluded from the package. Physical stereo comfort remains unverified.
 
 ## HUD and UI changes
 
