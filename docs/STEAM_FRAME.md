@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.4.6**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.4.8**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -20,8 +20,9 @@ validation.
    Linux/Proton host, use the normal DirectX 11 launch, not the Vulkan launch option.
    An explicit `-force-d3d11` launch succeeded; the Vulkan launch exited during
    OpenXR initialization.
-4. In a cockpit, press the throttle-hand **View** button to open the wrist panel.
-   Toggle **Motion controls**, then choose **Place handles (3s)**. The panel closes;
+4. In a cockpit, press the throttle-hand **View** button (the thin button at the top
+   of the left controller in the default layout) to open the wrist panel. Choose
+   **Place handles (3s)**; this also enables motion controls. The panel closes;
    place both hands comfortably and wait three seconds. A short haptic pulse confirms
    placement when the controllers support it. Release both grips before grabbing.
 5. Use **Seat up/down/left/right/forward/back** for 2 cm adjustments. Placements and
@@ -83,6 +84,13 @@ pointer active independently of the desktop cursor flag after loading transition
 The game runs in the background while VR is enabled. Opening the runtime dashboard
 still cancels VR input; the mouse fallback requires desktop focus. `Player.log` now
 reports pointer state changes, tracking/focus information and controller UI presses.
+
+Version **0.4.4.8** uses the active player-pilot state and local aircraft ownership
+instead of the unused legacy `Pilot.playerControlled` field. Cockpit checks run
+before querying scene menus, and the radial-menu query tolerates scene startup.
+A pending handle placement survives temporary readiness/tracking loss for up to ten
+seconds after its countdown, then logs a reason if it cannot complete. The wrist
+panel and game log show motion-control readiness status.
 
 ## Default bindings
 

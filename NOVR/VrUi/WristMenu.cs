@@ -60,7 +60,7 @@ internal sealed class WristMenu : MonoBehaviour
         if (_status != null)
             _status.text = (CockpitProfiles.Instance?.AircraftName ?? "Cockpit") + "\n" +
                 $"Motion controls: {(config.MotionControls.Enabled.Value ? "ON" : "OFF")}  |  HUD {config.HudPanelScale.Value:0.00}x\n" +
-                "Seat and handle positions save automatically";
+                (MotionFlightController.Instance?.Status ?? "Waiting for cockpit");
     }
 
     private void Open()

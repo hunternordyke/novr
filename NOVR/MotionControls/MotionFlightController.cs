@@ -25,7 +25,15 @@ public sealed class MotionFlightController : MonoBehaviour
     private Quaternion _lastCalibrationRotation;
     private bool _ready;
     private float _placementTime = -1f;
-    internal void SchedulePlacement() => _placementTime = Time.unscaledTime + 3f;
+    private string? _reportedStatus;
+    private float _nextStatusReport;
+    internal string Status { get; private set; } = "Waiting for cockpit";
+    internal void SchedulePlacement()
+    {
+        _placementTime = Time.unscaledTime + 3f;
+        Status = "Place your hands; waiting 3 seconds";
+        Debug.Log("[NOVR] Handle placement scheduled for three seconds from now.");
+    }
     private ControllerSample _stickHand;
     private ControllerSample _throttleHand;
     private MotionControlSettings Settings => ModConfiguration.Instance.MotionControls;
@@ -52,8 +60,15 @@ public sealed class MotionFlightController : MonoBehaviour
             Debug.Log($"[NOVR] Motion flight controls {(Settings.Enabled.Value ? "enabled" : "disabled")}.");
         }
         Sample();
-        if (!_ready) { _placementTime = -1f; return; }
-        if (_placementTime >= 0f && Time.unscaledTime >= _placementTime)
+        // Brief tracking/focus or menu transitions must not silently discard the
+        // user's placement request. Retry for a bounded period once ready.
+        if (_placementTime >= 0f && Time.unscaledTime > _placementTime + 10f)
+        {
+            _placementTime = -1f;
+            Debug.LogWarning($"[NOVR] Handle placement timed out: {Status}. Try Place handles again after resolving this state.");
+        }
+        if (!_ready) return;
+        if (_placementTime >= 0f && Time.unscaledTime >= _placementTime && _stickHand.Valid && _throttleHand.Valid)
         {
             _placementTime = -1f;
             PlaceAtHands();
@@ -97,7 +112,9 @@ public sealed class MotionFlightController : MonoBehaviour
             return false;
         }
         Sample();
-        return _ready && pilot != null && !pilot.dead && pilot.playerControlled &&
+        // Pilot.playerControlled is a legacy serialized field with no writers in
+        // 0.34.3. Local aircraft ownership and the active pilot state are authoritative.
+        return _ready && pilot != null && !pilot.dead &&
                pilot.aircraft == _aircraft && pilot.currentState == pilot.playerState;
     }
 
@@ -115,6 +132,7 @@ public sealed class MotionFlightController : MonoBehaviour
             _visuals?.Dispose();
             _aircraft = aircraft;
             _visuals = new MotionControlVisuals(trackingRoot);
+            Debug.Log($"[NOVR] Created motion control models for {aircraft.name}; tracking root={trackingRoot.name}, camera={APIBus.MainCamera?.name}, cockpit layer={(int)LayerHelper.Layers.Cockpit}.");
             ResetGrips();
         }
 
@@ -130,6 +148,7 @@ public sealed class MotionFlightController : MonoBehaviour
         }
 
         _ready = true;
+        ReportStatus("Ready; release grips, then grab a handle");
         _visuals.Root.gameObject.SetActive(true);
         _visuals.Root.localPosition = CockpitProfiles.SeatOffset;
         _stickHand = TrackedControllers.Read(Settings.LeftHanded.Value);
@@ -171,35 +190,54 @@ public sealed class MotionFlightController : MonoBehaviour
     {
         aircraft = null!;
         trackingRoot = null!;
-        if (VrUi.WristMenu.IsOpen || !Settings.Enabled.Value || !XRSettings.enabled || !OpenXRUtility.IsSessionFocused ||
-            !GameManager.flightControlsEnabled || Time.timeScale <= 0f || DynamicMap.mapMaximized ||
-            RadialMenuMain.IsInUse() || (GameManager.controlMapper != null && GameManager.controlMapper.isOpen) ||
-            CameraStateManager.cameraMode != CameraMode.cockpit || !GameManager.GetLocalAircraft(out aircraft) ||
-            aircraft.cockpit == null || aircraft.cockpit.IsDetached()) return false;
+        if (!Settings.Enabled.Value) return Blocked("Motion controls are off");
+        if (VrUi.WristMenu.IsOpen) return Blocked("Close wrist panel to use the handles");
+        if (!XRSettings.enabled) return Blocked("VR is not active");
+        if (!OpenXRUtility.IsSessionFocused) return Blocked("Return to the game from SteamVR");
+        if (CameraStateManager.cameraMode != CameraMode.cockpit) return Blocked("Switch to cockpit view");
+        if (!GameManager.GetLocalAircraft(out aircraft)) return Blocked("No local aircraft");
+        if (aircraft.cockpit == null || aircraft.cockpit.IsDetached()) return Blocked("No attached cockpit");
+        if (!GameManager.flightControlsEnabled) return Blocked("Game flight input is disabled");
+        if (Time.timeScale <= 0f) return Blocked("Game is paused");
+        if (DynamicMap.mapMaximized) return Blocked("Close the tactical map");
+        if (SceneSingleton<RadialMenuMain>.i != null && RadialMenuMain.IsInUse()) return Blocked("Close the radial menu");
+        if (GameManager.controlMapper != null && GameManager.controlMapper.isOpen) return Blocked("Close the control settings");
 
         var hasLocalPilot = false;
         foreach (var pilot in aircraft.pilots)
         {
-            if (pilot != null && !pilot.dead && pilot.playerControlled && pilot.currentState == pilot.playerState)
+            if (pilot != null && !pilot.dead && pilot.currentState == pilot.playerState)
             {
                 hasLocalPilot = true;
                 break;
             }
         }
-        if (!hasLocalPilot) return false;
+        if (!hasLocalPilot) return Blocked("No active local pilot in player state");
 
         var camera = APIBus.MainCamera;
-        if (camera == null || camera.GetComponent<NOVRPoseDriver>() == null || camera.transform.parent == null)
-            return false;
+        if (camera == null) return Blocked("Main camera is not ready");
+        if (camera.GetComponent<NOVRPoseDriver>() == null) return Blocked($"Main camera has no VR pose driver ({camera.name})");
+        if (camera.transform.parent == null) return Blocked($"Main camera has no tracking root ({camera.name})");
         var cameraState = SceneSingleton<CameraStateManager>.i;
-        if (cameraState == null || cameraState.followingUnit != aircraft) return false;
+        if (cameraState == null || cameraState.followingUnit != aircraft) return Blocked("Camera is not following the local aircraft");
 
         var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
         if (!head.isValid || !head.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) || !tracked)
-            return false;
-        if (head.TryGetFeatureValue(CommonUsages.userPresence, out var present) && !present) return false;
+            return Blocked("Headset tracking is unavailable");
+        if (head.TryGetFeatureValue(CommonUsages.userPresence, out var present) && !present) return Blocked("Headset reports it is not being worn");
         trackingRoot = camera.transform.parent;
         return true;
+    }
+
+    private bool Blocked(string reason) { ReportStatus(reason); return false; }
+
+    private void ReportStatus(string status)
+    {
+        Status = status;
+        if (status == _reportedStatus || Time.unscaledTime < _nextStatusReport) return;
+        _reportedStatus = status;
+        _nextStatusReport = Time.unscaledTime + 2f;
+        Debug.Log($"[NOVR] Motion controls: {status}.");
     }
 
     private bool IsNearStick() => _stickHand.Valid &&
