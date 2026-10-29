@@ -27,7 +27,7 @@ public sealed class MotionControlSettings
         StickAngle = Float(config, "Stick Angle", 25f, 5f, 60f, "Degrees of wrist tilt for full pitch or roll.");
         Deadzone = Float(config, "Stick Deadzone", 0.06f, 0f, 0.4f, "Fraction of stick travel ignored around center.");
         ResponseExponent = Float(config, "Stick Response", 1.5f, 1f, 3f, "Response curve; higher values make small movements less sensitive.");
-        ThrottleTravel = Float(config, "Throttle Travel", 0.25f, 0.05f, 0.6f, "Meters of forward hand movement from idle to full throttle.");
+        ThrottleTravel = Float(config, "Throttle Travel", 0.25f, 0.05f, 0.6f, "Meters from minimum to maximum command: lift the collective in helicopters; slide the throttle forward in other aircraft.");
         GrabRadius = Float(config, "Grab Radius", 0.12f, 0.03f, 0.3f, "Maximum hand distance from a handle when pressing grip.");
         StickTapGrip = config.Bind(section, "Stick Tap Grip", false, "Tap grip briefly to latch the stick; squeeze again to release. Holding longer than 0.3 seconds releases normally. Moving more than 40 cm from the handle, tracking loss or menus releases the latch.");
         ThrottleTapGrip = config.Bind(section, "Throttle Tap Grip", false, "Optional tap-to-latch throttle grip, with the same release behavior as Stick Tap Grip.");

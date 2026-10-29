@@ -59,6 +59,17 @@ public sealed class MotionFlightController : MonoBehaviour
     internal float Throttle { get; private set; }
     private Vector3 StickPosition => HandedPosition(CockpitProfiles.StickPosition);
     private Vector3 ThrottlePosition => HandedPosition(CockpitProfiles.ThrottlePosition);
+    internal static bool UsesLiftCollective(Aircraft? aircraft) => aircraft != null && aircraft.GetControlsFilter() is HeloControlsFilter;
+    private bool LiftCollective => UsesLiftCollective(_aircraft);
+    private float ThrottleHandPosition => LiftCollective ? _throttleHand.Position.y : _throttleHand.Position.z;
+    private Vector3 ThrottleOffset
+    {
+        get
+        {
+            var offset = FlightControlMath.ThrottleOffset(LiftCollective, Throttle, Settings.ThrottleTravel.Value);
+            return new Vector3(0, offset.height, offset.forward);
+        }
+    }
 
     private void Awake() => Instance = this;
 
@@ -123,7 +134,7 @@ public sealed class MotionFlightController : MonoBehaviour
             _throttleHand.Valid, _throttleHand.Position, _stickGrip.Latched, _throttleGrip.Latched,
             Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value, _aircraft != null && _aircraft.GetInputs().brake > .05f,
             _aircraft?.IsAutoHoverEnabled() == true ? "HOVER INPUT" :
-                _aircraft?.GetAircraftParameters().takeoffDistance == 0 ? "COLLECTIVE" : "THROTTLE");
+                _aircraft?.GetAircraftParameters().takeoffDistance == 0 ? "COLLECTIVE" : "THROTTLE", LiftCollective);
     }
 
     // Capture the pilot's command before native hover/flight filters turn it
@@ -228,21 +239,21 @@ public sealed class MotionFlightController : MonoBehaviour
         var throttleWasHeld = _throttleGrip.Held;
         _throttleGrip.Update(_throttleHand.Valid, _throttleHand.Grip, IsNearThrottle(), Settings.ThrottleTapGrip.Value,
             Time.realtimeSinceStartup, Vector3.Distance(_throttleHand.Position,
-                ThrottlePosition + Vector3.forward * ((Throttle - .5f) * Settings.ThrottleTravel.Value)) <= Mathf.Max(.4f, Settings.GrabRadius.Value * 2));
+                ThrottlePosition + ThrottleOffset) <= Mathf.Max(.4f, Settings.GrabRadius.Value * 2));
         if (_throttleGrip.Held && !throttleWasHeld)
         {
-            _throttleStartPosition = _throttleHand.Position.z;
+            _throttleStartPosition = ThrottleHandPosition;
             _throttleStartValue = Throttle;
             Pulse(_throttleHand.Device);
         }
         if (_throttleGrip.Held)
             Throttle = FlightControlMath.Throttle(_throttleStartValue, _throttleStartPosition,
-                _throttleHand.Position.z, Settings.ThrottleTravel.Value);
+                ThrottleHandPosition, Settings.ThrottleTravel.Value);
         if (!_stickHand.Valid || !_throttleHand.Valid)
             ReportStatus(!_stickHand.Valid && !_throttleHand.Valid ? "Both controllers need tracking" :
                 ((!_stickHand.Valid ? Settings.LeftHanded.Value : !Settings.LeftHanded.Value) ? "Left controller needs tracking" : "Right controller needs tracking"));
         else if (_stickGrip.Latched || _throttleGrip.Latched)
-            ReportStatus($"Stick {(_stickGrip.Latched ? "latched" : _stickGrip.Held ? "held" : "free")} • Throttle {(_throttleGrip.Latched ? "latched" : _throttleGrip.Held ? "held" : "free")}");
+            ReportStatus($"Stick {(_stickGrip.Latched ? "latched" : _stickGrip.Held ? "held" : "free")} • {(LiftCollective ? "Collective" : "Throttle")} {(_throttleGrip.Latched ? "latched" : _throttleGrip.Held ? "held" : "free")}");
         else ReportStatus("Ready; release grips, then grab a handle");
     }
 
@@ -304,7 +315,7 @@ public sealed class MotionFlightController : MonoBehaviour
         Vector3.Distance(_stickHand.Position, StickPosition) <= Settings.GrabRadius.Value;
 
     private bool IsNearThrottle() => _throttleHand.Valid && Vector3.Distance(_throttleHand.Position,
-        ThrottlePosition + Vector3.forward * ((Throttle - 0.5f) * Settings.ThrottleTravel.Value)) <= Settings.GrabRadius.Value;
+        ThrottlePosition + ThrottleOffset) <= Settings.GrabRadius.Value;
 
     private Vector3 HandedPosition(Vector3 position) => Settings.LeftHanded.Value
         ? new Vector3(-position.x, position.y, position.z) : position;
@@ -313,8 +324,7 @@ public sealed class MotionFlightController : MonoBehaviour
     {
         if (!_stickHand.Valid || !_throttleHand.Valid) return;
         CockpitProfiles.Instance?.SaveHandles(HandedPosition(_stickHand.Position),
-            HandedPosition(_throttleHand.Position -
-            Vector3.forward * ((Throttle - 0.5f) * Settings.ThrottleTravel.Value)));
+            HandedPosition(_throttleHand.Position - ThrottleOffset));
         ModConfiguration.Instance.Config.Save();
         ResetGrips();
         Pulse(_stickHand.Device);

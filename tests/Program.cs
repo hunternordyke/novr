@@ -295,6 +295,43 @@ Check("neutral or invalid stick poses cannot deflect controls", () =>
 });
 Check("grabbing throttle preserves current thrust", () =>
     Near(FlightControlMath.Throttle(0.73f, 1.2f, 1.2f, 0.25f), 0.73f));
+Check("collective has a rigid arm and monotonic lift through the full configured travel", () =>
+{
+    foreach (var travel in new[] { .05f, .25f, .6f })
+    {
+        var length = FlightControlMath.CollectiveArmLength(travel);
+        var lastHeight = float.NegativeInfinity;
+        for (var i = 0; i <= 100; i++)
+        {
+            var p = FlightControlMath.ThrottleOffset(true, i / 100f, travel);
+            True(p.height > lastHeight);
+            Near(p.height * p.height + (p.forward + length) * (p.forward + length), length * length);
+            Near(FlightControlMath.Throttle(0, -travel * .5f, p.height, travel), i / 100f);
+            lastHeight = p.height;
+        }
+        Near(FlightControlMath.ThrottleOffset(true, 1, travel).height -
+             FlightControlMath.ThrottleOffset(true, 0, travel).height, travel);
+        Near(FlightControlMath.ThrottleOffset(true, .5f, travel).forward, 0);
+    }
+});
+Check("collective travel stays finite at command limits", () =>
+{
+    foreach (var travel in new[] { .05f, .25f, .6f })
+    {
+        Near(FlightControlMath.ThrottleOffset(true, -1, travel).height, -travel * .5f);
+        Near(FlightControlMath.ThrottleOffset(true, 2, travel).height, travel * .5f);
+    }
+});
+Check("jet throttle retains its straight forward path at every command", () =>
+{
+    foreach (var travel in new[] { .05f, .25f, .6f })
+    for (var i = 0; i <= 100; i++)
+    {
+        var p = FlightControlMath.ThrottleOffset(false, i / 100f, travel);
+        Near(p.height, 0);
+        Near(p.forward, (i / 100f - .5f) * travel);
+    }
+});
 Check("forward throttle movement increases thrust proportionately", () =>
     Near(FlightControlMath.Throttle(0.3f, 0.2f, 0.3f, 0.25f), 0.7f));
 Check("throttle clamps at both physical travel limits", () =>

@@ -4,7 +4,7 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-NOVR Motion Prototype **0.4.5.7** adds a tracked-controller stick and throttle,
+NOVR Motion Prototype **0.4.5.8** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
 The shared 3D console puts live weapons, countermeasures and the minimap beside
 physical gear, radar, engine, flight-assist and guarded eject controls.
@@ -24,7 +24,7 @@ controller reach, stereo comfort and flight feel still need headset evaluation.
 - **F6** shows/hides the console; hiding it restores the original status HUD.
 - **F7** enables/disables motion flight controls (off initially).
 - Hold grip near the stick, then tilt your wrist for pitch/roll. The stick-hand thumbstick controls yaw.
-- Hold grip near the throttle, then move forward/back. Releasing retains thrust with neutral physical throttle input.
+- Hold grip near the throttle, then move forward/back. In helicopters, lift/lower the hinged collective instead. Releasing retains the command with neutral physical throttle input.
 - Hold the throttle and left D-pad down (Frame), or left thumbstick click (Touch), to brake. Choose a trigger-brake layout from **View → Flight controls → Button bindings**.
 - **F8** enables motion controls and places the handles at your hands. Release both handles first; holding both thumbstick clicks for 0.8 seconds also places them when motion controls are enabled.
 - **View** on the throttle hand, or **F9**, opens the wrist panel. Enable motion controls there without a keyboard.

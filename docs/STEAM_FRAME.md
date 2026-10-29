@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.7**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.8**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -166,6 +166,13 @@ requires a compatible aircraft and at least 1 m ground clearance. During hover,
 **HOVER INPUT** shows the pilot’s command rather than automatic engine power;
 letting go and regrabbing preserves that command. The normal caption is
 **COLLECTIVE** or **THROTTLE**, depending on the aircraft.
+
+Version 0.4.5.8 gives helicopters such as the SAH-46 a hinged collective: **grip
+and lift to increase, lower to decrease**. Jets and the VT-7 retain forward/back
+throttle motion. **View → Flight controls** shows the appropriate travel direction
+and adjustment labels. Both layouts use the existing throttle-hand buttons and
+saved per-aircraft/handedness positions. Use **Place handles** again if the new
+lift range needs more clearance around your chair.
 
 ## Default bindings
 

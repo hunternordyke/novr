@@ -28,6 +28,7 @@ internal sealed class WristMenu : MonoBehaviour
     private bool _anchored;
     internal static bool IsOpen => _instance?._panel?.activeSelf == true;
     internal static bool IsConsoleSetup => IsOpen && _instance?._consolePage?.activeSelf == true;
+    private static bool CollectiveControls => GameManager.GetLocalAircraft(out var aircraft) && MotionFlightController.UsesLiftCollective(aircraft);
     private void Awake() => _instance = this;
 
     private void Update()
@@ -55,7 +56,9 @@ internal sealed class WristMenu : MonoBehaviour
         if (_controlsInfo != null && _controlsPage?.activeSelf == true)
         {
             var motion = config.MotionControls;
-            _controlsInfo.text = $"Stick travel {motion.StickAngle.Value:0}°  •  Deadzone {motion.Deadzone.Value * 100:0}%\nThrottle travel {motion.ThrottleTravel.Value * 100:0.#} cm\nTap mode: tap to latch, squeeze again to release.\nLong holds still release normally.\nRelease the handle before using the console.";
+            var travelLabel = CollectiveControls ? "Collective lift" : "Throttle travel";
+            var direction = CollectiveControls ? "UP increases" : "FORWARD increases";
+            _controlsInfo.text = $"Stick travel {motion.StickAngle.Value:0}°  •  Deadzone {motion.Deadzone.Value * 100:0}%\n{travelLabel} {motion.ThrottleTravel.Value * 100:0.#} cm • {direction}\nTap mode: tap to latch, squeeze again to release.\nLong holds still release normally.\nRelease the handle before using the console.";
         }
         if (Time.unscaledTime >= _nextHelpRefresh)
         {
@@ -230,14 +233,14 @@ internal sealed class WristMenu : MonoBehaviour
         var motion = config.MotionControls;
         AddLiveButton(() => "Stick grip: " + (motion.StickTapGrip.Value ? "TAP" : "HOLD"), 0, 0,
             () => { motion.StickTapGrip.Value = !motion.StickTapGrip.Value; MotionFlightController.Instance?.ResetGrips(); });
-        AddLiveButton(() => "Throttle grip: " + (motion.ThrottleTapGrip.Value ? "TAP" : "HOLD"), 1, 0,
+        AddLiveButton(() => (CollectiveControls ? "Collective grip: " : "Throttle grip: ") + (motion.ThrottleTapGrip.Value ? "TAP" : "HOLD"), 1, 0,
             () => { motion.ThrottleTapGrip.Value = !motion.ThrottleTapGrip.Value; MotionFlightController.Instance?.ResetGrips(); });
         AddButton("Less sensitive", 0, 1, () => motion.StickAngle.Value += 5);
         AddButton("More sensitive", 1, 1, () => motion.StickAngle.Value -= 5);
         AddButton("Deadzone −", 0, 2, () => motion.Deadzone.Value -= .01f);
         AddButton("Deadzone +", 1, 2, () => motion.Deadzone.Value += .01f);
-        AddButton("Shorter throttle", 0, 3, () => motion.ThrottleTravel.Value -= .025f);
-        AddButton("Longer throttle", 1, 3, () => motion.ThrottleTravel.Value += .025f);
+        AddLiveButton(() => CollectiveControls ? "Shorter lift" : "Shorter throttle", 0, 3, () => motion.ThrottleTravel.Value -= .025f);
+        AddLiveButton(() => CollectiveControls ? "Longer lift" : "Longer throttle", 1, 3, () => motion.ThrottleTravel.Value += .025f);
         AddLiveButton(() => "Thumbstick yaw: " + (motion.ThumbstickYaw.Value ? "ON" : "OFF"), 0, 4,
             () => motion.ThumbstickYaw.Value = !motion.ThumbstickYaw.Value);
         AddButton("Reset response", 1, 4, () => { motion.StickAngle.Value = 25; motion.Deadzone.Value = .06f; motion.ResponseExponent.Value = 1.5f; motion.ThrottleTravel.Value = .25f; });

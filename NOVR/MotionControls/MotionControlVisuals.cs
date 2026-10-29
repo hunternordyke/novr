@@ -12,13 +12,16 @@ internal sealed class MotionControlVisuals : IDisposable
     public Transform Root { get; }
     private readonly Transform _stickBase, _stickPivot, _throttleBase, _throttleHandle;
     private readonly Transform _stickHand, _throttleHand, _rail, _throttleCaption;
+    private readonly Transform _sliderParts, _collectiveParts, _collectiveJoint, _collectiveShaft;
     private readonly Transform[] _railTicks = new Transform[5];
-    private readonly Renderer _stickGrip, _throttleGrip;
+    private readonly Renderer _stickGrip, _throttleGrip, _collectiveGrip;
     private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial, _textMaterial;
     private readonly Font _font;
     private readonly TextMesh _stickLabel, _throttleLabel, _brakeLabel;
     private bool? _lastBrake;
     private float _lastTravel = -1;
+    private bool? _lastCollective;
+    private float _lastSide;
     private readonly Dictionary<Mesh, Mesh> _shadedMeshes = new();
     private int _lastThrottlePercent = -1;
     private string? _lastStickCaption, _lastThrottleCaption, _lastThrottleTitle;
@@ -56,8 +59,20 @@ internal sealed class MotionControlVisuals : IDisposable
             _throttleBase = Child("Throttle", Root);
             _rail = Shape("Rail", PrimitiveType.Cube, _throttleBase, new Vector3(0, -0.05f, 0), new Vector3(0.1f, 0.02f, 0.3f), _baseMaterial).transform;
             _throttleHandle = Child("Handle", _throttleBase);
-            Shape("Post", PrimitiveType.Cube, _throttleHandle, new Vector3(0, -0.025f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
-            _throttleGrip = Shape("Grip", PrimitiveType.Cube, _throttleHandle, Vector3.zero, new Vector3(0.1f, 0.045f, 0.05f), _idleMaterial);
+            _sliderParts = Child("Sliding throttle", _throttleHandle);
+            Shape("Post", PrimitiveType.Cube, _sliderParts, new Vector3(0, -0.025f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
+            _throttleGrip = Shape("Grip", PrimitiveType.Cube, _sliderParts, Vector3.zero, new Vector3(0.1f, 0.045f, 0.05f), _idleMaterial);
+            _collectiveParts = Child("Collective grip", _throttleHandle);
+            _collectiveGrip = Shape("Grip", PrimitiveType.Capsule, _collectiveParts, Vector3.zero,
+                new Vector3(.045f, .055f, .045f), _idleMaterial);
+            _collectiveGrip.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            Shape("Grip head", PrimitiveType.Cube, _collectiveParts, new Vector3(0, .012f, .047f),
+                new Vector3(.065f, .035f, .035f), _baseMaterial);
+            _collectiveJoint = Shape("Collective hinge", PrimitiveType.Cylinder, _throttleBase, Vector3.zero,
+                new Vector3(.065f, .04f, .065f), _baseMaterial).transform;
+            _collectiveJoint.localRotation = Quaternion.Euler(0, 0, 90);
+            _collectiveShaft = Shape("Collective arm", PrimitiveType.Cylinder, _throttleBase, Vector3.zero,
+                new Vector3(.023f, .14f, .023f), _baseMaterial).transform;
             _throttleCaption = Child("Throttle readout", _throttleBase);
             _throttleCaption.localRotation = Quaternion.Euler(35, 0, 0);
             _throttleLabel = Label("THROTTLE\nHOLD GRIP", _throttleCaption, new Vector3(0, .0185f, 0));
@@ -81,7 +96,7 @@ internal sealed class MotionControlVisuals : IDisposable
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
         bool stickLatched = false, bool throttleLatched = false, bool stickTapMode = false, bool throttleTapMode = false,
-        bool brakesApplied = false, string throttleTitle = "THROTTLE")
+        bool brakesApplied = false, string throttleTitle = "THROTTLE", bool collective = false)
     {
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
         _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
@@ -90,17 +105,45 @@ internal sealed class MotionControlVisuals : IDisposable
         // console's screens and switches clear. Mirror with the hand positions.
         var side = stick.x >= throttle.x ? 1f : -1f;
         _stickLabel.transform.localPosition = new Vector3(side * .16f, .23f, .07f);
-        _throttleCaption.localPosition = new Vector3(-side * .16f, .11f, .07f);
-        if (_lastTravel != travel)
+        _throttleCaption.localPosition = new Vector3(-side * .16f, collective ? Mathf.Max(.11f, travel * .5f) : .11f, .07f);
+        if (_lastTravel != travel || _lastCollective != collective || _lastSide != side)
         {
             _lastTravel = travel;
+            _lastCollective = collective;
+            _lastSide = side;
+            _rail.gameObject.SetActive(!collective);
+            _sliderParts.gameObject.SetActive(!collective);
+            _collectiveParts.gameObject.SetActive(collective);
+            _collectiveJoint.gameObject.SetActive(collective);
+            _collectiveShaft.gameObject.SetActive(collective);
             _rail.localScale = new Vector3(0.1f, 0.02f, travel + 0.05f);
             for (var i = 0; i < _railTicks.Length; i++)
-                _railTicks[i].localPosition = new Vector3(-.037f, -.038f, (i * .25f - .5f) * travel);
+            {
+                var marker = FlightControlMath.ThrottleOffset(collective, i * .25f, travel);
+                _railTicks[i].localPosition = collective
+                    ? new Vector3(-side * .055f, marker.height, marker.forward)
+                    : new Vector3(-side * .037f, -.038f, marker.forward);
+                _railTicks[i].localScale = collective ? new Vector3(i % 2 == 0 ? .02f : .013f, .003f, .012f)
+                    : new Vector3(i % 2 == 0 ? .02f : .013f, .003f, .003f);
+            }
         }
-        _throttleHandle.localPosition = Vector3.forward * ((thrust - 0.5f) * travel);
+        var offset = FlightControlMath.ThrottleOffset(collective, thrust, travel);
+        _throttleHandle.localPosition = new Vector3(0, offset.height, offset.forward);
+        _throttleHandle.localRotation = Quaternion.identity;
+        if (collective)
+        {
+            var length = FlightControlMath.CollectiveArmLength(travel);
+            var pivot = Vector3.back * length;
+            var arm = _throttleHandle.localPosition - pivot;
+            _collectiveJoint.localPosition = pivot;
+            _collectiveShaft.localPosition = pivot + arm * .5f;
+            _collectiveShaft.localRotation = Quaternion.FromToRotation(Vector3.up, arm);
+            _collectiveShaft.localScale = new Vector3(.023f, length * .5f, .023f);
+            _throttleHandle.localRotation = Quaternion.LookRotation(arm, Vector3.up);
+        }
         _stickGrip.sharedMaterial = stickHeld ? _heldMaterial : stickNear ? _hoverMaterial : _idleMaterial;
         _throttleGrip.sharedMaterial = throttleHeld ? _heldMaterial : throttleNear ? _hoverMaterial : _idleMaterial;
+        _collectiveGrip.sharedMaterial = _throttleGrip.sharedMaterial;
         _stickHand.gameObject.SetActive(stickTracked);
         _stickHand.localPosition = stickHand;
         _throttleHand.gameObject.SetActive(throttleTracked);
@@ -114,7 +157,9 @@ internal sealed class MotionControlVisuals : IDisposable
             _brakeLabel.color = brakesApplied ? new Color(1f, .75f, .18f) : new Color(.65f, .72f, .78f);
         }
         var percent = Mathf.RoundToInt(thrust * 100);
-        var throttleCaption = throttleLatched ? "LATCHED\nGRIP TO RELEASE" : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
+        var throttleCaption = throttleLatched ? "LATCHED\nGRIP TO RELEASE" : collective
+            ? (throttleHeld ? "LIFT TO INCREASE" : throttleTapMode ? "TAP/HOLD + LIFT" : "GRIP + LIFT")
+            : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
         if (_lastThrottlePercent != percent || _lastThrottleCaption != throttleCaption || _lastThrottleTitle != throttleTitle)
         {
             _throttleLabel.text = $"{throttleTitle} {percent}%\n{throttleCaption}";

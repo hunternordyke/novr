@@ -125,7 +125,7 @@ contextual hints follow the approach described in the
 
 ## Validation status
 
-68 automated checks pass, including pitch polarity, diagonal stick input,
+71 automated checks pass, including pitch polarity, diagonal stick input,
 guarded-ejection transitions, embedded mesh integrity and 45 Harmony target
 metadata checks against Nuclear Option 0.34.3. The game builds with no errors.
 22 live checks in a disposable offline FS-12 mission verify initialization, widget
@@ -155,6 +155,10 @@ their backplates and the wrist capability labels fit their buttons. These tests
 use simulated hand and altitude conditions with the aircraft held stationary;
 they validate input and UI behavior, not hover flight handling. The prior 18
 flight-grip/menu and 32 controller-console checks also passed again on 0.4.5.7.
+The 81 cross-aircraft hover/widget checks were repeated and passed on 0.4.5.8,
+with lift-driven collective input in the SAH-46 and forward throttle input in the
+VT-7 and FS-12. See [motion controls](MOTION_CONTROLS.md) for the 152 additional
+collective/throttle placement and interaction checks.
 Live fixed-camera captures verify the model, readable weapon/countermeasure
 widgets and minimized map. These captures use a
 temporary diagnostic camera; they do not establish stereo comfort or physical

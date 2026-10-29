@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.7` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.8` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -61,7 +61,7 @@ using native Frame labels or the active fallback and the selected handedness.
 Missing hand tracking and unsuccessful placement now show a message on the console.
 F8 also closes the wrist menu before placing handles.
 
-Validation: 68 automated checks and 18 live offline checks with
+Validation: 71 automated checks and 18 live offline checks with
 simulated tracked hands. The live checks exercise native pitch/throttle input,
 latching/release, tracking recovery, breakaway, wrist cancellation, settings and
 profile-aware binding help. Fixed-camera captures check the wrist layout and
@@ -74,10 +74,36 @@ Version 0.4.5.7 captures throttle/collective input before native hover filtering
 The virtual handle follows the pilot’s command, not the engine power produced by
 the hover controller, so release/regrab does not adopt automatic power output.
 Its caption changes to **HOVER INPUT** during hover assist, otherwise **COLLECTIVE**
-on aircraft using collective input or **THROTTLE**. Forward/back hand travel stays
-the same. Use the console **HOV** key or **View → Flight actions → Hover assist**;
+on aircraft using collective input or **THROTTLE**. Use the console **HOV** key or
+**View → Flight actions → Hover assist**;
 unavailable aircraft and the native 1 m ground-clearance restriction are explained
 in the UI.
+
+Version 0.4.5.8 gives helicopters such as the SAH-46 a **hinged collective**:
+grip the handle and lift to increase the command, or lower it to decrease.
+Sideways and forward/back motion does not change the collective command.
+The model and grab point follow the same arc. This follows the lift/lower
+convention described in the [FAA Helicopter Flying Handbook](https://www.faa.gov/sites/faa.gov/files/helicopter_flying_handbook.pdf).
+The VT-7 and fixed-wing aircraft keep their forward/back throttle rail.
+The motion direction does not change when hover assist is toggled.
+
+**View → Flight controls** calls this setting **Collective lift** in helicopters,
+with **Shorter lift / Longer lift** buttons. The default full range is 25 cm.
+Saved positions remain the middle of the range. **Place handles** aligns the
+visible grips with your hands at the current command, including a fully raised
+or lowered collective, and saves separately for each aircraft and handedness.
+Existing helicopter positions are retained; use placement again if the new lift
+range needs more clearance around your chair.
+
+Validation for 0.4.5.8: 76 controller-driven checks in the SAH-46 and the same
+76 checks in the VT-7 pass. They exercise the actual native command with both
+handedness layouts, reject motion on other axes, preserve release/regrab, check
+placement at 0/50/100% over 5/25/60 cm travel, and cover native axis conventions,
+tap latching, breakaway, tracking recovery and label fitting. The aircraft are
+held stationary and controller poses are simulated; these are not flight tests.
+Rendered inspection verifies the new lever and its clearance from the shared
+console at nominal placement. Some aircraft sidewalls can intersect the outboard
+handle captions; saved handle placement remains adjustable.
 
 ## Brakes and throttle buttons
 
@@ -113,6 +139,7 @@ above.
 | Move the stick-hand thumbstick horizontally | Yaw, while the stick is held. Disable `Thumbstick Yaw` to use pedals. |
 | Left hand near throttle, then press grip | Grab at the current throttle setting without jumping. |
 | Move held throttle forward/back | Increase/decrease throttle. Travel is 25 cm by default. |
+| Lift/lower the held helicopter collective | Increase/decrease collective command. Lift is 25 cm by default; sideways/forward motion is ignored. |
 | Release stick grip | Return to the game's normal pitch/roll input. With neutral physical controls, the stick centers. |
 | Release throttle grip | Return to the native throttle accumulator at the last setting. Physical throttle input can take over. |
 | F8 | Enable motion controls and place handles when both hands are tracked. Release grips before grabbing again. |
@@ -128,8 +155,8 @@ The same page provides **Eject... → Confirm eject**. Cancel, Close, loss of
 tracking/focus, or changing aircraft clears the confirmation. The native quick
 wheel does not yet have a motion-controller binding; use these wrist actions.
 
-The models are deliberately simple: a stick with a base, and a throttle sliding along
-a rail. Version 0.4.5.3 gives them solid depth-writing surfaces and subtle shading,
+The models are deliberately simple: a stick with a base, and either a throttle
+sliding along a rail or a hinged helicopter collective. Version 0.4.5.3 gives them solid depth-writing surfaces and subtle shading,
 so their shape and overlapping parts are easier to read. White spheres show tracked
 hand positions. Handles are blue at rest, amber within grabbing distance, and green
 while held. Grab feedback includes a short haptic pulse on supported devices.

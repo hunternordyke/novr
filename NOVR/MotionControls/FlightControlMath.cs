@@ -25,6 +25,18 @@ internal static class FlightControlMath
         return Clamp(initialValue + (position - initialPosition) / travel, 0f, 1f);
     }
 
+    // Both input hit testing and the model use this path. Collective input is
+    // measured vertically; the small fore/aft arc is visual, not another axis.
+    public static float CollectiveArmLength(float travel) => Math.Max(.28f, travel);
+
+    public static (float height, float forward) ThrottleOffset(bool collective, float value, float travel)
+    {
+        var displacement = (Clamp(value, 0f, 1f) - .5f) * travel;
+        if (!collective) return (0f, displacement);
+        var length = CollectiveArmLength(travel);
+        return (displacement, (float)Math.Sqrt(length * length - displacement * displacement) - length);
+    }
+
     public static (float pitch, float roll) Stick(float tiltX, float tiltY, float tiltZ,
         float angle, float deadzone, float exponent)
     {
