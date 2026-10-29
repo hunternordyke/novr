@@ -51,7 +51,7 @@ internal sealed class MotionControlVisuals : IDisposable
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand)
     {
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
-        _stickPivot.localRotation = Quaternion.Euler(-pitch * angle, 0f, -roll * angle);
+        _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
         _throttleBase.localPosition = throttle;
         _rail.localScale = new Vector3(0.1f, 0.02f, travel + 0.05f);
         _throttleHandle.localPosition = Vector3.forward * ((thrust - 0.5f) * travel);

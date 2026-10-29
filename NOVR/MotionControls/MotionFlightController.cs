@@ -25,6 +25,12 @@ public sealed class MotionFlightController : MonoBehaviour
     private Quaternion _lastCalibrationRotation;
     private bool _ready;
     private float _placementTime = -1f;
+    private float _placementConfirmationUntil;
+    internal string? PlacementHint => _placementTime >= 0
+        ? (Time.unscaledTime < _placementTime
+            ? $"PLACE YOUR HANDS  •  {Mathf.CeilToInt(_placementTime - Time.unscaledTime)}"
+            : "PLACEMENT  •  WAITING FOR BOTH CONTROLLERS")
+        : Time.unscaledTime < _placementConfirmationUntil ? "HANDLES PLACED  •  RELEASE GRIPS, THEN GRAB" : null;
     private string? _reportedStatus;
     private float _nextStatusReport;
     internal string Status { get; private set; } = "Waiting for cockpit";
@@ -56,8 +62,14 @@ public sealed class MotionFlightController : MonoBehaviour
         if (Keyboard.current?.f7Key.wasPressedThisFrame == true)
         {
             Settings.Enabled.Value = !Settings.Enabled.Value;
+            if (!Settings.Enabled.Value) _placementTime = -1f;
             ResetGrips();
             Debug.Log($"[NOVR] Motion flight controls {(Settings.Enabled.Value ? "enabled" : "disabled")}.");
+        }
+        if (Keyboard.current?.f8Key.wasPressedThisFrame == true)
+        {
+            Settings.Enabled.Value = true;
+            _placementTime = Time.unscaledTime;
         }
         Sample();
         // Brief tracking/focus or menu transitions must not silently discard the
@@ -90,7 +102,6 @@ public sealed class MotionFlightController : MonoBehaviour
             _calibrationHold = 0f;
             _calibrationLatched = false;
         }
-        if (Keyboard.current?.f8Key.wasPressedThisFrame == true) PlaceAtHands();
     }
 
     private void LateUpdate()
@@ -259,6 +270,7 @@ public sealed class MotionFlightController : MonoBehaviour
         ResetGrips();
         Pulse(_stickHand.Device);
         Pulse(_throttleHand.Device);
+        _placementConfirmationUntil = Time.unscaledTime + 3f;
         Debug.Log("[NOVR] Virtual stick and throttle placed at hands. Release grips before grabbing.");
     }
 

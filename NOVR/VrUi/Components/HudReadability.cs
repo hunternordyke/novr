@@ -12,6 +12,7 @@ internal sealed class HudReadability : MonoBehaviour
     private Image? _backplate;
     private CanvasGroup? _group;
     private bool _secondary;
+    private ThreatList? _threats;
 
     internal static void Add(Transform panel, bool secondary)
     {
@@ -21,6 +22,7 @@ internal sealed class HudReadability : MonoBehaviour
 
     private void Awake()
     {
+        _threats = GetComponentInChildren<ThreatList>(true);
         _baseScale = transform.localScale;
         _basePosition = transform.localPosition;
         _group = gameObject.AddComponent<CanvasGroup>();
@@ -41,6 +43,12 @@ internal sealed class HudReadability : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (MotionControls.UniversalCockpitPanel.IsDocked(transform))
+        {
+            if (_backplate != null) _backplate.enabled = false;
+            if (_group != null) _group.alpha = 1f;
+            return;
+        }
         var config = ModConfiguration.Instance;
         var camera = APIBus.CockpitHudCamera;
         var originalPosition = transform.parent != null ? transform.parent.TransformPoint(_basePosition) : _basePosition;
@@ -48,7 +56,9 @@ internal sealed class HudReadability : MonoBehaviour
         var ratio = config.HudPanelDistance.Value / Mathf.Max(0.01f, direction.magnitude);
         transform.position = camera.transform.position + direction * ratio;
         transform.localScale = _baseScale * (config.HudPanelScale.Value * ratio);
-        if (_backplate != null) _backplate.enabled = config.HudContrast.Value;
-        if (_group != null) _group.alpha = _secondary && config.HudDeclutter.Value ? 0.15f : 1f;
+        var incomingMissile = _secondary && _threats != null && _threats.transform.childCount > 0;
+        if (_backplate != null) _backplate.enabled = config.HudContrast.Value &&
+            (!MotionControls.UniversalCockpitPanel.HasDisplays || incomingMissile);
+        if (_group != null) _group.alpha = _secondary && config.HudDeclutter.Value && !incomingMissile ? 0.15f : 1f;
     }
 }

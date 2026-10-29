@@ -37,6 +37,18 @@ internal static class ControllerMapPatch
         [HarmonyPrefix]
         private static bool Prefix(DynamicMap __instance, float __0, ref Vector2 ___positionOffset, Vector2 ___stationaryOffset, System.Action? ___onMapChanged)
         {
+            // A console zoom is centered on the aircraft by CenterMinimizedMap;
+            // desktop mouse coordinates must never become a world-space pivot.
+            if (!DynamicMap.mapMaximized && UniversalCockpitPanel.IsDocked(__instance.transform))
+            {
+                var previous = __instance.GetZoomLevel();
+                if (previous <= 0 || !FlightControlMath.IsFinite(__0)) return false;
+                var zoom = Mathf.Clamp(__0, 1, 12);
+                __instance.mapImage.transform.localScale *= zoom / previous;
+                __instance.mapScaleCenter.localScale = Vector3.one * zoom;
+                ___onMapChanged?.Invoke();
+                return false;
+            }
             var cursor = VrUiCursor.I;
             if (cursor?.ControllerOverMap != true) return true;
             var oldScale = __instance.GetZoomLevel();

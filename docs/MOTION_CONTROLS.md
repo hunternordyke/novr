@@ -2,14 +2,14 @@
 
 This is the first iteration toward the hands-on cockpit interaction described in the
 [official VTOL VR manual](https://cdn.steamstatic.com/steam/apps/667970/manuals/VTOL_VR_Manual.pdf).
-The implementation is original NOVR code and uses runtime Unity primitives; it does not
-include VTOL VR code, models, or textures.
+The stick and throttle use runtime Unity primitives. The shared console uses an
+original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.4.8` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.0` in the BepInEx log.
 
-The mod and patcher compile against Nuclear Option 0.34.1 (Steam build 26272685).
+The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
 response curves, throttle handoff, and frame-rate-independent HUD smoothing. A local
 metadata check verifies declared Harmony method targets and injected fields against
@@ -46,8 +46,18 @@ the previous package is the way to revert all HUD/runtime changes.
 | Move held throttle forward/back | Increase/decrease throttle. Travel is 25 cm by default. |
 | Release stick grip | Return to the game's normal pitch/roll input. With neutral physical controls, the stick centers. |
 | Release throttle grip | Return to the native throttle accumulator at the last setting. Physical throttle input can take over. |
-| F8 or both thumbstick clicks held for 0.8 seconds | Place controls at your hands. Release grips before grabbing again. |
+| F8 | Enable motion controls and place handles when both hands are tracked. Release grips before grabbing again. |
+| Both thumbstick clicks held for 0.8 seconds | Place handles while motion controls are enabled. |
 | F7 | Toggle the feature. |
+
+Version 0.4.5.0 corrects the reversed pitch input: pulling back sends the game's
+negative pitch command (nose-up), and pushing forward sends positive pitch
+(nose-down). The visible handle follows the same motion. Roll is unchanged.
+
+For landing gear, open **View → Flight / Setup → Toggle gear** on Frame.
+The same page provides **Eject... → Confirm eject**. Cancel, Close, loss of
+tracking/focus, or changing aircraft clears the confirmation. The native quick
+wheel does not yet have a motion-controller binding; use these wrist actions.
 
 The models are deliberately simple: a stick with a base, and a throttle sliding along
 a rail. White spheres show tracked hand positions. Handles are blue at rest, amber
@@ -104,7 +114,9 @@ the original commit authorship retained. Other changes are implemented in this f
 
 This version supplies pitch, roll, optional yaw, throttle, configurable combat buttons,
 controller pointers, and a wrist panel. See [Steam Frame bindings and setup](STEAM_FRAME.md).
-Cockpit switches are not individually clickable; the wrist panel provides selected actions.
+The shared [3D console](UNIVERSAL_COCKPIT_PANEL.md) provides interactive gear, radar,
+engine, assist and guarded eject controls. Original aircraft-model switches remain
+unchanged. Its two displays receive the existing status widgets and minimized map.
 Map icons, pan and zoom work through the controller layer; right-click waypoint orders
 and text entry still require the existing input methods.
 

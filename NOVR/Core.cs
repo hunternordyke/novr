@@ -13,6 +13,7 @@ namespace NOVR;
 public class Core : MonoBehaviour
 {
     
+    private bool _quitting;
     private float _originalFixedDeltaTime;
 
     private NOVRHeadsetData? _headsetData;
@@ -37,10 +38,14 @@ public class Core : MonoBehaviour
         gameObject.AddComponent<MotionControls.MotionFlightController>();
         gameObject.AddComponent<MotionControls.ControllerActions>();
         gameObject.AddComponent<VrUi.WristMenu>();
+        gameObject.AddComponent<MotionControls.UniversalCockpitPanel>();
     }
+
+    private void OnApplicationQuit() => _quitting = true;
 
     private void OnDestroy()
     {
+        if (_quitting) return;
         Debug.Log("NOVR has been destroyed. This shouldn't have happened. Recreating...");
         
         Create();

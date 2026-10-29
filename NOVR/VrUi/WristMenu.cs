@@ -17,7 +17,8 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _setupPage, _flightPage;
+    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage;
+    private Aircraft? _ejectAircraft;
     private Transform? _buttonParent;
     private bool _anchored;
     internal static bool IsOpen => _instance?._panel?.activeSelf == true;
@@ -37,6 +38,12 @@ internal sealed class WristMenu : MonoBehaviour
             if (IsOpen) Close(); else Open();
         }
         if (!IsOpen) return;
+        if (_ejectPage?.activeSelf == true &&
+            (!GameManager.GetLocalAircraft(out var confirmAircraft) || confirmAircraft != _ejectAircraft))
+        {
+            Close();
+            return;
+        }
         if (!cockpit || !hand.Valid || DynamicMap.mapMaximized || CursorManager.GetFlag(CursorFlags.GameMenu))
         {
             Close();
@@ -75,9 +82,34 @@ internal sealed class WristMenu : MonoBehaviour
 
     internal static void Close()
     {
+        if (_instance?._ejectPage?.activeSelf == true) _instance.ShowFlightPage();
+        if (_instance != null) _instance._ejectAircraft = null;
         if (_instance?._panel != null) _instance._panel.SetActive(false);
         CursorManager.SetFlag(WristCursorFlag, false);
         MotionFlightController.Instance?.ResetGrips();
+    }
+
+    private void ShowFlightPage()
+    {
+        _ejectAircraft = null;
+        _ejectPage?.SetActive(false);
+        _consolePage?.SetActive(false);
+        _setupPage?.SetActive(false);
+        _flightPage?.SetActive(true);
+    }
+
+    private void AskToEject()
+    {
+        if (!GameManager.GetLocalAircraft(out _ejectAircraft)) return;
+        _flightPage!.SetActive(false);
+        _ejectPage!.SetActive(true);
+    }
+
+    private void ConfirmEject()
+    {
+        if (GameManager.GetLocalAircraft(out var aircraft) && aircraft == _ejectAircraft)
+            ControllerActions.Instance?.QueueWristAction("Eject");
+        Close();
     }
 
     private void EnsurePanel()
@@ -132,12 +164,51 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("HUD farther", 1, 4, () => config.HudPanelDistance.Value += 0.5f);
         AddButton("Reset HUD", 0, 5, () => { config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4f; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
         AddButton("Mirror handedness", 1, 5, () => { config.MotionControls.LeftHanded.Value = !config.MotionControls.LeftHanded.Value; Close(); });
+        AddButton("Eject...", 0, 6, AskToEject);
+        AddButton("Console setup", 1, 6, () => { _flightPage.SetActive(false); _consolePage!.SetActive(true); });
         Label(_flightPage.transform, "Flight actions close this panel.\nRelease grips, then grab again to fly.\nGear and radar obey the game's restrictions.", new Vector2(0, -224), new Vector2(510, 105), 20);
         _flightPage.SetActive(false);
+        _ejectPage = new GameObject("Confirm ejection", typeof(RectTransform));
+        _ejectPage.transform.SetParent(rect, false);
+        _buttonParent = _ejectPage.transform;
+        Label(_ejectPage.transform, "Eject from this aircraft?\nThis starts the game's ejection sequence.", new Vector2(0, 65), new Vector2(510, 120), 24);
+        AddButton("Cancel", 0, 4, ShowFlightPage);
+        AddButton("Confirm eject", 1, 4, ConfirmEject);
+        _ejectPage.SetActive(false);
+        _consolePage = new GameObject("Universal console setup", typeof(RectTransform));
+        _consolePage.transform.SetParent(rect, false);
+        _buttonParent = _consolePage.transform;
+        AddButton("Show / hide console", 0, 0, () => config.CockpitPanelEnabled.Value = !config.CockpitPanelEnabled.Value);
+        AddButton("Reset console", 1, 0, () => { config.CockpitPanelPosition.Value = new Vector3(0, -.32f, .65f); config.CockpitPanelTilt.Value = 20; config.CockpitPanelScale.Value = 1; config.CockpitPanelEnabled.Value = true; });
+        AddButton("Panel up", 0, 1, () => MoveConsole(Vector3.up * .02f));
+        AddButton("Panel down", 1, 1, () => MoveConsole(Vector3.down * .02f));
+        AddButton("Panel left", 0, 2, () => MoveConsole(Vector3.left * .02f));
+        AddButton("Panel right", 1, 2, () => MoveConsole(Vector3.right * .02f));
+        AddButton("Panel nearer", 0, 3, () => MoveConsole(Vector3.back * .02f));
+        AddButton("Panel farther", 1, 3, () => MoveConsole(Vector3.forward * .02f));
+        AddButton("Tilt up", 0, 4, () => config.CockpitPanelTilt.Value += 5);
+        AddButton("Tilt down", 1, 4, () => config.CockpitPanelTilt.Value -= 5);
+        AddButton("Panel smaller", 0, 5, () => config.CockpitPanelScale.Value -= .05f);
+        AddButton("Panel larger", 1, 5, () => config.CockpitPanelScale.Value += .05f);
+        Label(_consolePage.transform, "One layout and position for every aircraft.\nAdjustments preview on the console.\nF6 also shows/hides it.", new Vector2(0, -195), new Vector2(510, 125), 20);
+        _consolePage.SetActive(false);
         _buttonParent = rect;
-        AddButton("Flight / Setup", 0, 8, () => { var setup = _setupPage.activeSelf; _setupPage.SetActive(!setup); _flightPage.SetActive(setup); });
+        AddButton("Flight / Setup", 0, 8, () =>
+        {
+            if (_ejectPage.activeSelf || _consolePage.activeSelf) { ShowFlightPage(); return; }
+            var setup = _setupPage.activeSelf;
+            _setupPage.SetActive(!setup);
+            _flightPage.SetActive(setup);
+        });
         AddButton("Close", 1, 8, Close);
         LayerHelper.SetLayerRecursive(_panel.transform, LayerHelper.GetVrUiLayer());
+    }
+
+    private static void MoveConsole(Vector3 delta)
+    {
+        var position = ModConfiguration.Instance.CockpitPanelPosition;
+        var p = position.Value + delta;
+        position.Value = new Vector3(Mathf.Clamp(p.x, -.5f, .5f), Mathf.Clamp(p.y, -.75f, .15f), Mathf.Clamp(p.z, .3f, 1.2f));
     }
 
     private void AddButton(string text, int column, int row, Action action)

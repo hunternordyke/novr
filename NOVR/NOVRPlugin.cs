@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Reflection;
 using BepInEx;
 using HarmonyLib;
@@ -18,7 +18,7 @@ namespace NOVR;
 [BepInPlugin(
     "deltawing.novr",
     "NOVR (Motion Prototype)",
-    "0.4.4.8")]
+    "0.4.5.0")]
 public class NOVRPlugin : BaseUnityPlugin
 {
     

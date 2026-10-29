@@ -15,6 +15,7 @@
         <RootNamespace>NOVR</RootNamespace>
     </PropertyGroup>
     <ItemGroup>
+        <EmbeddedResource Include="Assets/CockpitPanel.json" LogicalName="NOVR.CockpitPanel.json" />
         <ProjectReference Include="..\NOVR.XR.OpenXR\NOVR.XR.OpenXR.csproj" Private="false"/>
     </ItemGroup>
     <ItemGroup>

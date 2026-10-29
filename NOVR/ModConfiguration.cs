@@ -20,6 +20,9 @@ public class ModConfiguration
     public readonly MotionControls.ControllerBindings ControllerBindings;
     public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
     public readonly ConfigEntry<bool> HudContrast, HudDeclutter;
+    public readonly ConfigEntry<bool> CockpitPanelEnabled;
+    public readonly ConfigEntry<Vector3> CockpitPanelPosition;
+    public readonly ConfigEntry<float> CockpitPanelTilt, CockpitPanelScale;
 
     public ModConfiguration(ConfigFile config)
     {
@@ -28,6 +31,10 @@ public class ModConfiguration
         Config = config;
         MotionControls = new MotionControls.MotionControlSettings(config);
         ControllerBindings = new MotionControls.ControllerBindings(config);
+        CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");
+        CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Panel center relative to the recentered seat, in meters. Shared by every aircraft.");
+        CockpitPanelTilt = config.Bind("Universal Cockpit Panel", "Tilt", 20f, new ConfigDescription("Upward-facing panel tilt in degrees.", new AcceptableValueRange<float>(0, 60)));
+        CockpitPanelScale = config.Bind("Universal Cockpit Panel", "Scale", 1f, new ConfigDescription("Shared panel size.", new AcceptableValueRange<float>(0.65f, 1.4f)));
         HudPanelScale = config.Bind("VR HUD", "Status Panel Scale", 1.15f,
             new ConfigDescription("Size of cockpit status panels; aiming markers keep their angular alignment.", new AcceptableValueRange<float>(0.8f, 1.6f)));
         HudPanelDistance = config.Bind("VR HUD", "Status Panel Distance", 4f,

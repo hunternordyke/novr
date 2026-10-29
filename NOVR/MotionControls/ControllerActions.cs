@@ -16,17 +16,25 @@ internal sealed class ControllerActions : MonoBehaviour
 
     internal void QueueWristAction(string action)
     {
+        QueuePanelAction(action);
+        WristMenu.Close();
+    }
+
+    internal void QueuePanelAction(string action)
+    {
         if (action != "Gear" && action != "Radar" && action != "Toggle Engine" && action != "Flight Assist" &&
-            action != "Next Weapon" && action != "Next Countermeasure") return;
+            action != "Next Weapon" && action != "Next Countermeasure" && action != "Eject") return;
         if (!GameManager.GetLocalAircraft(out var aircraft)) return;
         _queuedAction = action;
         _queuedFrame = Time.frameCount + 1;
         _queuedAircraft = aircraft;
-        WristMenu.Close();
     }
 
     internal bool Queued(string action) => _queuedAction == action && _queuedFrame == Time.frameCount &&
-        TrackedControllers.Available && !Cursor.visible && Time.timeScale > 0 && GameManager.flightControlsEnabled &&
+        TrackedControllers.Available && Time.timeScale > 0 && GameManager.flightControlsEnabled &&
+        !CursorManager.GetFlag(CursorFlags.GameMenu) && (GameManager.controlMapper == null || !GameManager.controlMapper.isOpen) &&
+        !DynamicMap.mapMaximized && !WristMenu.IsOpen &&
+        (SceneSingleton<RadialMenuMain>.i == null || !RadialMenuMain.IsInUse()) &&
         CameraStateManager.cameraMode == CameraMode.cockpit && GameManager.GetLocalAircraft(out var aircraft) && aircraft == _queuedAircraft;
 
     private void Update()
@@ -116,6 +124,7 @@ internal static class ControllerPressedActionPatch
     [HarmonyPostfix]
     private static void Postfix(Rewired.Player __instance, string __0, ref bool __result)
     {
-        if (__instance == GameManager.playerInput && __0 == "Gear") __result |= ControllerActions.Instance?.Queued(__0) == true;
+        if (__instance == GameManager.playerInput && (__0 == "Gear" || __0 == "Eject"))
+            __result |= ControllerActions.Instance?.Queued(__0) == true;
     }
 }

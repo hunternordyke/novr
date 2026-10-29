@@ -31,7 +31,9 @@ internal static class FlightControlMath
         if (!IsFinite(tiltX) || !IsFinite(tiltY) || !IsFinite(tiltZ) || !IsFinite(angle) || angle <= 0f)
             return (0f, 0f);
         const float radiansToDegrees = 180f / (float)Math.PI;
-        return (Axis(-(float)Math.Atan2(tiltZ, tiltY) * radiansToDegrees / angle, deadzone, exponent),
+        // Nuclear Option uses negative pitch for nose-up (negative local X rotation).
+        // Tilting the handle toward the pilot gives negative Z, matching that convention.
+        return (Axis((float)Math.Atan2(tiltZ, tiltY) * radiansToDegrees / angle, deadzone, exponent),
                 Axis((float)Math.Atan2(tiltX, tiltY) * radiansToDegrees / angle, deadzone, exponent));
     }
 

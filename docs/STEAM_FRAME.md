@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.4.8**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.0**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -28,9 +28,11 @@ validation.
 5. Use **Seat up/down/left/right/forward/back** for 2 cm adjustments. Placements and
    seat offsets save automatically for the aircraft and handedness.
 
-The keyboard fallbacks are F7 to enable motion controls, F8 to place handles, and F9
+The keyboard fallbacks are F6 to toggle the console, F7 to toggle motion controls,
+F8 to enable motion controls and place handles, and F9
 to open the wrist panel. Holding both thumbstick clicks for 0.8 seconds also places
-the handles. Motion flight controls remain off initially; menu pointers are on.
+the handles. The console shows a placement countdown and confirmation.
+Motion flight controls remain off initially; menu pointers and the console are on.
 Restore both backed-up folders and restart to revert the experimental build.
 
 The package must include the updated patcher payload, not just `NOVR.dll`: it contains
@@ -92,6 +94,28 @@ A pending handle placement survives temporary readiness/tracking loss for up to 
 seconds after its countdown, then logs a reason if it cannot complete. The wrist
 panel and game log show motion-control readiness status.
 
+Version **0.4.5.0** corrects inverted motion-stick pitch, matching the game's
+negative-pitch/nose-up convention and its cockpit stick animation. Pulling back
+commands nose-up; pushing forward commands nose-down. Roll is unchanged. The
+wrist Flight page now includes an ejection action with a separate confirmation.
+The shared 3D console adds physical controls, live weapon/status displays and the
+minimap. It also adds readable countermeasure selection, minimap zoom keys, live
+placement adjustments and a weapon SAFE indicator. An offline 22-check exercise
+covers console actions, HUD restoration and the ejection camera handoff; physical
+controller reach and stereo comfort still need headset testing. See [the universal cockpit console guide](UNIVERSAL_COCKPIT_PANEL.md).
+
+## Shared 3D console
+
+The console appears automatically in the cockpit. Its layout and placement are
+shared by every aircraft. Release a flight-control grip, then use the laser and
+trigger or grip a nearby console control. The gear lever supports grab-and-move;
+ejection requires lifting the red guard and a separate deliberate pull/hold.
+Weapon/countermeasure status and the minimap move to its displays.
+
+Use **View → Flight / Setup → Console setup** to adjust its position, tilt and
+size. **F6** shows/hides it and restores the previous HUD layout when hidden.
+Console interactions and display fitting still require in-headset validation.
+
 ## Default bindings
 
 Right-handed layout: right hand = stick/pointer; left hand = throttle/wrist panel.
@@ -101,6 +125,7 @@ on the opposite controller; the labels differ between hands.
 
 | Action | Native Steam Frame | Touch-compatible fallback | Context |
 | --- | --- | --- | --- |
+| Show/hide console | Wrist Console setup | F6 | Cockpit |
 | Grab flight control | Grip near handle | Grip near handle | Cockpit, motion controls enabled |
 | Fire selected weapon | Right trigger | Right trigger | Hold stick grip; release trigger before firing after a mode change |
 | Countermeasures | Left trigger | Left trigger | Hold throttle grip |
@@ -144,7 +169,12 @@ trigger press. **Flight / Setup** switches between pages. It provides:
 
 Flight actions close the panel and enter the game's existing input path on the next
 frame. The game retains its G-LOC, weapon safety, gear/radar altitude restrictions and
-multiplayer command handling. There is no ejection action in the panel.
+multiplayer command handling. For landing gear, choose **View → Flight / Setup →
+Toggle gear**. For ejection, choose **Eject...**, then **Confirm eject**. **Cancel**
+returns to the flight page; closing the panel, losing tracking/focus, or changing
+aircraft clears the confirmation. Ejection uses the game's normal input handling.
+The native radial quick wheel does not yet have a motion-controller binding;
+the wrist panel provides the listed actions instead.
 
 Profiles use the aircraft definition's stable key, with separate left/right-handed
 layouts. The config section's hash avoids invalid configuration characters; its

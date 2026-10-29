@@ -49,10 +49,8 @@ internal static class DynamicMapRotationSafePatch
             __instance.mapImage.transform.localEulerAngles = new Vector3(0.0f, 0.0f, combatHud.aircraft.transform.eulerAngles.y);
             __instance.mapImage.transform.localPosition = MapOffsetToLocalPosition(__instance, mapFocusPosition);
             __instance.viewIndicator.transform.localPosition = new Vector3(cameraPosition.x, cameraPosition.z, 0.0f);
-            __instance.viewIndicator.transform.eulerAngles = new Vector3(
-                0.0f,
-                0.0f,
-                __instance.mapImage.transform.eulerAngles.z - viewYaw);
+            __instance.viewIndicator.transform.rotation = __instance.mapImage.transform.rotation *
+                Quaternion.Euler(0f, 0f, -viewYaw);
             return false;
         }
     }

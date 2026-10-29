@@ -140,8 +140,20 @@ Check("pulling the stick commands nose up, pushing commands nose down", () =>
 {
     var sine = (float)Math.Sin(25 * Math.PI / 180);
     var cosine = (float)Math.Cos(25 * Math.PI / 180);
-    Near(FlightControlMath.Stick(0, cosine, -sine, 25, 0.06f, 1.5f).pitch, 1);
-    Near(FlightControlMath.Stick(0, cosine, sine, 25, 0.06f, 1.5f).pitch, -1);
+    // The game's fly-by-wire target angular velocity and cockpit stick animation
+    // both use pitch directly on local X: negative is nose-up, positive nose-down.
+    Near(FlightControlMath.Stick(0, cosine, -sine, 25, 0.06f, 1.5f).pitch, -1);
+    Near(FlightControlMath.Stick(0, cosine, sine, 25, 0.06f, 1.5f).pitch, 1);
+});
+Check("diagonal stick movement keeps pitch and roll directions independent", () =>
+{
+    var tilt = (float)Math.Tan(12.5 * Math.PI / 180);
+    var upRight = FlightControlMath.Stick(tilt, 1, -tilt, 25, 0.06f, 1.5f);
+    var downLeft = FlightControlMath.Stick(-tilt, 1, tilt, 25, 0.06f, 1.5f);
+    True(upRight.pitch < 0 && upRight.roll > 0);
+    Near(upRight.pitch, -upRight.roll);
+    Near(downLeft.pitch, -upRight.pitch);
+    Near(downLeft.roll, -upRight.roll);
 });
 Check("leaning stick right commands right roll without pitch", () =>
 {
@@ -309,8 +321,89 @@ Check("map zoom ignores invalid input and stays inside game limits", () =>
     True(PointerGeometry.Zoom(2, 1, 50) < 2.2f);
 });
 
+Check("eject cover requires a separate released grip before pulling", () =>
+{
+    var eject = new GuardedEjection();
+    True(!eject.BeginPull());
+    eject.LiftCover();
+    True(!eject.BeginPull());
+    True(!eject.Pull(1, 10, true));
+    eject.Release();
+    True(eject.BeginPull());
+    True(!eject.Pull(.044f, 10, true));
+    True(eject.Pull(.045f, 0, true));
+    True(!eject.Open && !eject.Pull(1, 10, true));
+});
+Check("laser ejection needs a sustained hold, never a release or a cancelled pull", () =>
+{
+    var eject = new GuardedEjection();
+    eject.LiftCover(); eject.Release(); True(eject.BeginPull());
+    True(!eject.Pull(10, .74f, false));
+    eject.Release();
+    True(!eject.Pull(10, 2, false));
+    True(eject.BeginPull());
+    True(eject.Pull(0, .75f, false));
+});
+Check("focus, aircraft and menu resets cannot leave ejection armed", () =>
+{
+    var eject = new GuardedEjection();
+    eject.LiftCover(); eject.Release(); True(eject.BeginPull());
+    eject.Reset();
+    True(!eject.Open && !eject.Pull(1, 10, true));
+    eject.Release(); True(!eject.BeginPull());
+});
+Check("invalid hand samples cannot trigger ejection", () =>
+{
+    var eject = new GuardedEjection();
+    eject.LiftCover(); eject.Release(); True(eject.BeginPull());
+    True(!eject.Pull(float.NaN, 1, true));
+    True(!eject.Pull(1, float.PositiveInfinity, false));
+    True(!eject.Pull(-1, 1, true));
+});
+
+Check("an incomplete console asset fails before creating scene objects", () =>
+{
+    foreach (var json in new[] { "{}", "null", "{\"materials\":null,\"groups\":[],\"parts\":[]}" })
+    {
+        var rejected = false;
+        try { CockpitPanelAsset.Load(json); } catch (InvalidDataException) { rejected = true; }
+        True(rejected);
+    }
+});
+
 if (args.Length == 2)
+{
+    Check("shipped console contains complete, finite mesh geometry and every control pivot", () =>
+    {
+        using var assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly(args[0]);
+        var resource = assembly.MainModule.Resources.OfType<Mono.Cecil.EmbeddedResource>()
+            .Single(r => r.Name == "NOVR.CockpitPanel.json");
+        using var stream = resource.GetResourceStream();
+        using var reader = new StreamReader(stream);
+        var json = reader.ReadToEnd();
+        var runtimeAsset = CockpitPanelAsset.Load(json);
+        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 13 && runtimeAsset.materials.Length > 3);
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var model = document.RootElement;
+        var groups = model.GetProperty("groups").EnumerateArray().Select(g => g.GetProperty("name").GetString()).ToHashSet();
+        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "zoom_in", "zoom_out" })
+            True(groups.Contains(name));
+        var materials = model.GetProperty("materials").GetArrayLength();
+        var triangles = 0;
+        foreach (var part in model.GetProperty("parts").EnumerateArray())
+        {
+            True(groups.Contains(part.GetProperty("group").GetString()));
+            True(part.GetProperty("material").GetInt32() >= 0 && part.GetProperty("material").GetInt32() < materials);
+            var vertices = part.GetProperty("vertices").EnumerateArray().Select(v => v.GetSingle()).ToArray();
+            True(vertices.Length > 0 && vertices.Length % 3 == 0 && vertices.All(v => float.IsFinite(v) && Math.Abs(v) < 1));
+            var indices = part.GetProperty("triangles").EnumerateArray().Select(i => i.GetInt32()).ToArray();
+            True(indices.Length % 3 == 0 && indices.All(i => i >= 0 && i < vertices.Length / 3));
+            triangles += indices.Length / 3;
+        }
+        True(triangles > 100 && triangles < 25000);
+    });
     Check("Harmony patch targets and injected fields match the installed game", () =>
         PatchCompatibility.Verify(args[0], args[1]));
+}
 
 Console.WriteLine($"{passed} checks passed.");
