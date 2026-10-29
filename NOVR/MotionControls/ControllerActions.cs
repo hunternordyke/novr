@@ -8,7 +8,7 @@ namespace NOVR.MotionControls;
 internal sealed class ControllerActions : MonoBehaviour
 {
     internal static ControllerActions? Instance { get; private set; }
-    private readonly ControllerButtonGate _fire = new(), _countermeasures = new(), _weapon = new(), _target = new(), _nextCountermeasure = new(), _map = new(), _clear = new();
+    private readonly ControllerButtonGate _fire = new(), _countermeasures = new(), _weapon = new(), _target = new(), _nextCountermeasure = new(), _map = new(), _clear = new(), _brake = new();
     private string? _queuedAction;
     private int _queuedFrame;
     private Aircraft? _queuedAircraft;
@@ -44,9 +44,11 @@ internal sealed class ControllerActions : MonoBehaviour
         var stick = TrackedControllers.Read(config.MotionControls.LeftHanded.Value);
         var throttle = TrackedControllers.Read(!config.MotionControls.LeftHanded.Value);
         var controls = MotionFlightController.Instance;
-        var flight = bindings.CombatEnabled.Value && controls != null && controls.FlightActive && !Cursor.visible && !WristMenu.IsOpen;
+        var flightControls = controls != null && controls.FlightActive && !Cursor.visible && !WristMenu.IsOpen;
+        var flight = bindings.CombatEnabled.Value && flightControls;
         var stickActive = flight && stick.Valid && controls!.StickHeld;
         var throttleActive = flight && throttle.Valid && controls!.ThrottleHeld;
+        _brake.Update(flightControls && throttle.Valid && controls!.ThrottleHeld, ControllerBindings.Read(throttle, bindings.Brake.Value));
         _fire.Update(stickActive, ControllerBindings.Read(stick, bindings.Fire.Value));
         _countermeasures.Update(throttleActive, ControllerBindings.Read(throttle, bindings.Countermeasures.Value));
         _weapon.Update(stickActive, ControllerBindings.Read(stick, bindings.NextWeapon.Value));
@@ -74,6 +76,7 @@ internal sealed class ControllerActions : MonoBehaviour
 
     internal bool Held(string action) => TrackedControllers.Available && !WristMenu.IsOpen && !Cursor.visible && action switch
     {
+        "Brake" => _brake.Held,
         "Fire" => _fire.Held,
         "Countermeasures" => _countermeasures.Held,
         _ => false
@@ -87,11 +90,12 @@ internal sealed class ControllerActions : MonoBehaviour
         _ => false
     };
 
-    private void OnDisable()
+    internal void ResetButtons()
     {
         _queuedAction = null;
-        foreach (var gate in new[] { _fire, _countermeasures, _weapon, _target, _nextCountermeasure, _map, _clear }) gate.Reset();
+        foreach (var gate in new[] { _fire, _countermeasures, _weapon, _target, _nextCountermeasure, _map, _clear, _brake }) gate.Reset();
     }
+    private void OnDisable() => ResetButtons();
     private void OnDestroy() { OnDisable(); if (Instance == this) Instance = null; }
 }
 

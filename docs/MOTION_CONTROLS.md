@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.1` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.2` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -61,11 +61,35 @@ using native Frame labels or the active fallback and the selected handedness.
 Missing hand tracking and unsuccessful placement now show a message on the console.
 F8 also closes the wrist menu before placing handles.
 
-Validation for this update: 58 automated checks and 18 live offline checks with
+Validation: 62 automated checks and 18 live offline checks with
 simulated tracked hands. The live checks exercise native pitch/throttle input,
 latching/release, tracking recovery, breakaway, wrist cancellation, settings and
 profile-aware binding help. Fixed-camera captures check the wrist layout and
-button contrast. Physical grip timing and comfort still need headset evaluation.
+button contrast. A further 18 offline checks cover native braking, separate brake/CM
+actions, tracking/menu cancellation, placement protection and the throttle-layout UI.
+Four configuration-loading checks cover default and custom-binding preservation.
+Physical grip timing and comfort still need headset evaluation.
+
+## Brakes and throttle buttons
+
+While holding or latching the throttle, hold **left D-pad down** on native Frame
+or **left thumbstick click** on a Touch-compatible profile to apply the game's
+wheel/air brakes. Releasing the button releases braking. These buttons follow
+handedness. Brakes remain available when the motion combat-button layer is disabled.
+
+Open **View → Flight controls → Button bindings** for two complete throttle layouts.
+**Trigger: CMs** preserves the existing countermeasure-trigger layout and adds a
+separate brake button. **Trigger: brakes** puts braking on the trigger and moves
+countermeasures to the shoulder (Frame) or primary face button (Touch). The page
+shows every resulting binding before you return to flight. Selecting a layout
+replaces only the four throttle-hand brake/CM/target bindings; custom settings on
+other controls are preserved. Existing custom throttle assignments are preserved
+on upgrade; if the new default brake would conflict, it starts unassigned.
+
+Tracking loss or opening a menu cancels braking. Release and press the grip/button
+again after returning. The hands-free placement gesture is ignored while either
+flight handle is held, so thumbstick-click bindings cannot accidentally relocate
+controls while flying.
 
 ## Flying
 
@@ -83,7 +107,7 @@ above.
 | Release stick grip | Return to the game's normal pitch/roll input. With neutral physical controls, the stick centers. |
 | Release throttle grip | Return to the native throttle accumulator at the last setting. Physical throttle input can take over. |
 | F8 | Enable motion controls and place handles when both hands are tracked. Release grips before grabbing again. |
-| Both thumbstick clicks held for 0.8 seconds | Place handles while motion controls are enabled. |
+| Both thumbstick clicks held for 0.8 seconds | Release both handles first, then place them while motion controls are enabled. |
 | F7 | Toggle the feature. |
 
 Version 0.4.5.0 corrects the reversed pitch input: pulling back sends the game's
@@ -148,7 +172,7 @@ the original commit authorship retained. Other changes are implemented in this f
 
 ## Limits and required flight test
 
-This version supplies pitch, roll, optional yaw, throttle, configurable combat buttons,
+This version supplies pitch, roll, optional yaw, throttle, brakes, configurable combat buttons,
 controller pointers, and a wrist panel. See [Steam Frame bindings and setup](STEAM_FRAME.md).
 The shared [3D console](UNIVERSAL_COCKPIT_PANEL.md) provides interactive gear, radar,
 engine, assist and guarded eject controls. Original aircraft-model switches remain

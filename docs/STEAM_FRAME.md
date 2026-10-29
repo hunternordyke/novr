@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.1**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.2**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -30,7 +30,7 @@ validation.
 
 The keyboard fallbacks are F6 to toggle the console, F7 to toggle motion controls,
 F8 to enable motion controls and place handles, and F9
-to open the wrist panel. Holding both thumbstick clicks for 0.8 seconds also places
+to open the wrist panel. Release both handles first; holding both thumbstick clicks for 0.8 seconds also places
 the handles. The console shows a placement countdown and confirmation.
 Motion flight controls remain off initially; menu pointers and the console are on.
 Restore both backed-up folders and restart to revert the experimental build.
@@ -110,6 +110,24 @@ for grip mode, sensitivity, deadzone, throttle travel and yaw settings. **Contro
 help** shows the bindings currently in use, including Frame/Touch fallback and
 handedness. Missing tracking and failed handle placement have visible feedback.
 
+Version **0.4.5.2** adds wheel/air-brake input and a throttle-layout page:
+**View → Flight controls → Button bindings**. Braking uses D-pad down on native
+Frame, or the throttle-hand thumbstick click on Touch fallback. Hold the throttle
+(or latch it) while using that button. The optional **Trigger: brakes** layout
+moves the four throttle actions together to keep their buttons distinct:
+
+| Throttle action | Native Frame, trigger-brake layout | Touch fallback, trigger-brake layout |
+| --- | --- | --- |
+| Brake, hold | Left trigger | Left trigger |
+| Countermeasures, hold | Left shoulder | Left X |
+| Select target, release | Left D-pad down | Left Y |
+| Next countermeasure, release | Left D-pad right | Left thumbstick click |
+
+**Trigger: CMs** restores the default table below. Custom bindings survive an
+upgrade; an added brake binding starts unassigned if its default button is already
+used by a custom throttle action. The wrist page shows the active bindings and warns
+about shared buttons. Neither layout changes the flight stick, map or wrist controls.
+
 ## Shared 3D console
 
 The console appears automatically in the cockpit. Its layout and placement are
@@ -134,6 +152,7 @@ on the opposite controller; the labels differ between hands.
 | Show/hide console | Wrist Console setup | F6 | Cockpit |
 | Grab flight control | Grip near handle | Grip near handle | Cockpit, motion controls enabled |
 | Fire selected weapon | Right trigger | Right trigger | Hold stick grip; release trigger before firing after a mode change |
+| Wheel / air brake | Left D-pad down | Left thumbstick click | Hold button while holding or latching throttle |
 | Countermeasures | Left trigger | Left trigger | Hold throttle grip |
 | Next weapon | Right shoulder | Right A | Hold stick; activates on button release |
 | Select target | Left shoulder | Left X | Hold throttle; selects under the head-directed target designator on release |
@@ -161,7 +180,9 @@ Bindings are editable in `BepInEx/config/deltawing.novr.cfg` under
 `Primary`, `Secondary`, `Menu`, `Shoulder`, `Top`, `Outside`, `StickClick`, and `None`.
 `ShoulderOrPrimary` and `OutsideOrSecondary` select the native Frame button when
 available and the ordinary Touch button otherwise. `Primary` means Frame A/D-pad down;
-`Secondary` means Frame X/D-pad right. Avoid assigning conflicting actions to the same
+`Secondary` means Frame X/D-pad right. `PrimaryOrStickClick`, `PrimaryOrSecondary`
+and `SecondaryOrStickClick` adapt the throttle presets to Frame/Touch input.
+Avoid assigning conflicting actions to the same
 button. Combat bindings are distinct from the fixed trigger/menu pointer interaction.
 
 ## Wrist panel and cockpit profiles

@@ -5,7 +5,7 @@ namespace NOVR.MotionControls;
 public sealed class ControllerBindings
 {
     public readonly ConfigEntry<bool> PointerEnabled, CombatEnabled;
-    public readonly ConfigEntry<ControllerButton> Fire, Countermeasures, NextWeapon, SelectTarget, NextCountermeasure, Map, WristMenu, ClearTargets;
+    public readonly ConfigEntry<ControllerButton> Fire, Countermeasures, NextWeapon, SelectTarget, NextCountermeasure, Map, WristMenu, ClearTargets, Brake;
     public readonly ConfigEntry<float> PointerResponse;
     public ControllerBindings(ConfigFile config)
     {
@@ -21,9 +21,25 @@ public sealed class ControllerBindings
         Map = config.Bind(section, "Map - stick hand", ControllerButton.OutsideOrSecondary, "Frame B, or B on Touch-compatible controllers. Opens/closes the tactical map.");
         WristMenu = config.Bind(section, "Wrist Menu - throttle hand", ControllerButton.Menu, "Frame View, or the Touch left menu button. F9 is a keyboard fallback.");
         ClearTargets = config.Bind(section, "Clear Targets - stick hand", ControllerButton.Top, "Frame Y. Also available in the wrist panel on other controllers.");
+        var brakeDefault = ControllerButton.PrimaryOrStickClick;
+        // Do not give a new action a button already used by a custom setup.
+        if (ThrottleBindingProfiles.SharesButton(brakeDefault, true, Countermeasures.Value, SelectTarget.Value, NextCountermeasure.Value, WristMenu.Value) ||
+            ThrottleBindingProfiles.SharesButton(brakeDefault, false, Countermeasures.Value, SelectTarget.Value, NextCountermeasure.Value, WristMenu.Value))
+            brakeDefault = ControllerButton.None;
+        Brake = config.Bind(section, "Brake - throttle hand", brakeDefault,
+            "Hold Frame D-pad down, or the throttle-hand thumbstick click on Touch-compatible controllers, while gripping the throttle. Uses the game's wheel/air-brake input. The wrist Button bindings page offers a trigger-brake layout.");
     }
 
-    internal static float Read(ControllerSample hand, ControllerButton button) => button switch
+    internal ThrottleButtons ThrottleButtons => new(Brake.Value, Countermeasures.Value, SelectTarget.Value, NextCountermeasure.Value);
+    internal void ApplyThrottleLayout(ThrottleBindingLayout layout)
+    {
+        var preset = ThrottleBindingProfiles.Get(layout);
+        Brake.Value = preset.Brake; Countermeasures.Value = preset.Countermeasures;
+        SelectTarget.Value = preset.Target; NextCountermeasure.Value = preset.NextCountermeasure;
+        ControllerActions.Instance?.ResetButtons();
+    }
+
+    internal static float Read(ControllerSample hand, ControllerButton button) => ControllerButtonNames.Resolve(button, hand.NativeFrame) switch
     {
         ControllerButton.Trigger => hand.Trigger,
         ControllerButton.Primary => hand.Primary ? 1 : 0,
@@ -33,8 +49,6 @@ public sealed class ControllerBindings
         ControllerButton.Top => hand.Top ? 1 : 0,
         ControllerButton.Outside => hand.Outside ? 1 : 0,
         ControllerButton.StickClick => hand.StickClick ? 1 : 0,
-        ControllerButton.ShoulderOrPrimary => (hand.NativeFrame ? hand.Shoulder : hand.Primary) ? 1 : 0,
-        ControllerButton.OutsideOrSecondary => (hand.NativeFrame ? hand.Outside : hand.Secondary) ? 1 : 0,
         _ => 0
     };
 }

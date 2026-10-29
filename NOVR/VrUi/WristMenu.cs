@@ -18,9 +18,9 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage;
+    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _helpBackPage;
     private readonly List<(Text label, Func<string> text)> _liveLabels = new();
-    private Text? _controlsInfo, _bindingHelp;
+    private Text? _controlsInfo, _bindingHelp, _bindingsInfo;
     private float _nextHelpRefresh;
     private Aircraft? _ejectAircraft;
     private Transform? _buttonParent;
@@ -48,10 +48,14 @@ internal sealed class WristMenu : MonoBehaviour
         if (_controlsInfo != null && _controlsPage?.activeSelf == true)
         {
             var motion = config.MotionControls;
-            _controlsInfo.text = $"Stick travel {motion.StickAngle.Value:0}°  •  Deadzone {motion.Deadzone.Value * 100:0}%\nThrottle travel {motion.ThrottleTravel.Value * 100:0} cm\nTap mode: tap to latch, squeeze again to release.\nLong holds still release normally.\nRelease the handle before using the console.";
+            _controlsInfo.text = $"Stick travel {motion.StickAngle.Value:0}°  •  Deadzone {motion.Deadzone.Value * 100:0}%\nThrottle travel {motion.ThrottleTravel.Value * 100:0.#} cm\nTap mode: tap to latch, squeeze again to release.\nLong holds still release normally.\nRelease the handle before using the console.";
         }
-        if (_bindingHelp != null && _helpPage?.activeSelf == true && Time.unscaledTime >= _nextHelpRefresh)
-        { _bindingHelp.text = BindingsHelp(); _nextHelpRefresh = Time.unscaledTime + .25f; }
+        if (Time.unscaledTime >= _nextHelpRefresh)
+        {
+            if (_bindingHelp != null && _helpPage?.activeSelf == true) _bindingHelp.text = BindingsHelp();
+            if (_bindingsInfo != null && _bindingsPage?.activeSelf == true) _bindingsInfo.text = ThrottleBindingsHelp();
+            _nextHelpRefresh = Time.unscaledTime + .25f;
+        }
         if (_ejectPage?.activeSelf == true &&
             (!GameManager.GetLocalAircraft(out var confirmAircraft) || confirmAircraft != _ejectAircraft))
         {
@@ -109,7 +113,7 @@ internal sealed class WristMenu : MonoBehaviour
         _ejectPage?.SetActive(false);
         _consolePage?.SetActive(false);
         _setupPage?.SetActive(false);
-        _controlsPage?.SetActive(false); _helpPage?.SetActive(false);
+        _controlsPage?.SetActive(false); _helpPage?.SetActive(false); _bindingsPage?.SetActive(false);
         _flightPage?.SetActive(true);
     }
 
@@ -163,7 +167,7 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Toggle backplates", 0, 6, () => config.HudContrast.Value = !config.HudContrast.Value);
         AddButton("Toggle declutter", 1, 6, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
         AddButton("Flight controls", 0, 7, () => { _setupPage.SetActive(false); _controlsPage!.SetActive(true); });
-        AddButton("Controls help", 1, 7, () => { _setupPage.SetActive(false); _helpPage!.SetActive(true); });
+        AddButton("Controls help", 1, 7, () => ShowHelp(_setupPage));
         _flightPage = new GameObject("Flight and display", typeof(RectTransform));
         _flightPage.transform.SetParent(rect, false);
         _buttonParent = _flightPage.transform;
@@ -223,7 +227,7 @@ internal sealed class WristMenu : MonoBehaviour
         AddLiveButton(() => "Thumbstick yaw: " + (motion.ThumbstickYaw.Value ? "ON" : "OFF"), 0, 4,
             () => motion.ThumbstickYaw.Value = !motion.ThumbstickYaw.Value);
         AddButton("Reset response", 1, 4, () => { motion.StickAngle.Value = 25; motion.Deadzone.Value = .06f; motion.ResponseExponent.Value = 1.5f; motion.ThrottleTravel.Value = .25f; });
-        AddButton("Controls help", 0, 5, () => { _controlsPage.SetActive(false); _helpPage!.SetActive(true); });
+        AddButton("Button bindings", 0, 5, () => { _controlsPage.SetActive(false); _bindingsPage!.SetActive(true); _nextHelpRefresh = 0; });
         AddButton("Place handles (3s)", 1, 5, () => { motion.Enabled.Value = true; MotionFlightController.Instance?.SchedulePlacement(); Close(); });
         _controlsInfo = Label(_controlsPage.transform, "", new Vector2(0, -197), new Vector2(510, 105), 17);
         _controlsPage.SetActive(false);
@@ -231,15 +235,25 @@ internal sealed class WristMenu : MonoBehaviour
         _helpPage.transform.SetParent(rect, false);
         _bindingHelp = Label(_helpPage.transform, "", new Vector2(0, -8), new Vector2(510, 470), 20);
         _helpPage.SetActive(false);
+        _bindingsPage = new GameObject("Throttle button layouts", typeof(RectTransform));
+        _bindingsPage.transform.SetParent(rect, false); _buttonParent = _bindingsPage.transform;
+        AddButton("Trigger: CMs", 0, 0, () => { config.ControllerBindings.ApplyThrottleLayout(ThrottleBindingLayout.CountermeasureTrigger); _nextHelpRefresh = 0; });
+        AddButton("Trigger: brakes", 1, 0, () => { config.ControllerBindings.ApplyThrottleLayout(ThrottleBindingLayout.BrakeTrigger); _nextHelpRefresh = 0; });
+        _bindingsInfo = Label(_bindingsPage.transform, "", new Vector2(0, -15), new Vector2(510, 300), 20);
+        AddButton("Controls help", 0, 7, () => ShowHelp(_bindingsPage));
+        _bindingsPage.SetActive(false);
         _buttonParent = rect;
         AddLiveButton(() => _setupPage.activeSelf ? "Flight actions" : _flightPage.activeSelf ? "Cockpit setup" :
-            _ejectPage.activeSelf ? "Cancel eject" : _consolePage.activeSelf ? "Back to Flight" : "Back to Setup", 0, 8, () =>
+            _ejectPage.activeSelf ? "Cancel eject" : _consolePage.activeSelf ? "Back to Flight" :
+            _bindingsPage.activeSelf ? "Back to Controls" : _helpPage.activeSelf && _helpBackPage == _bindingsPage ? "Back to Bindings" : "Back to Setup", 0, 8, () =>
         {
             if (_ejectPage.activeSelf || _consolePage.activeSelf) { ShowFlightPage(); return; }
-            if (_controlsPage.activeSelf || _helpPage.activeSelf)
+            if (_helpPage.activeSelf)
             {
-                _controlsPage.SetActive(false); _helpPage.SetActive(false); _setupPage.SetActive(true); return;
+                _helpPage.SetActive(false); (_helpBackPage != null ? _helpBackPage : _setupPage).SetActive(true); return;
             }
+            if (_bindingsPage.activeSelf) { _bindingsPage.SetActive(false); _controlsPage.SetActive(true); return; }
+            if (_controlsPage.activeSelf) { _controlsPage.SetActive(false); _setupPage.SetActive(true); return; }
             var setup = _setupPage.activeSelf;
             _setupPage.SetActive(!setup); _flightPage.SetActive(setup);
         });
@@ -254,6 +268,29 @@ internal sealed class WristMenu : MonoBehaviour
         position.Value = new Vector3(Mathf.Clamp(p.x, -.5f, .5f), Mathf.Clamp(p.y, -.75f, .15f), Mathf.Clamp(p.z, .3f, 1.2f));
     }
 
+    private void ShowHelp(GameObject from)
+    {
+        from.SetActive(false); _helpBackPage = from; _helpPage!.SetActive(true); _nextHelpRefresh = 0;
+    }
+    private string ThrottleBindingsHelp()
+    {
+        var config = ModConfiguration.Instance;
+        var left = !config.MotionControls.LeftHanded.Value;
+        var frame = TrackedControllers.NativeFrame(left);
+        var buttons = config.ControllerBindings.ThrottleButtons;
+        var layout = ThrottleBindingProfiles.Identify(buttons);
+        var wristConflict = ThrottleBindingProfiles.SharesButton(config.ControllerBindings.WristMenu.Value, frame,
+            buttons.Brake, buttons.Countermeasures, buttons.Target, buttons.NextCountermeasure);
+        string Name(ControllerButton value) => ControllerButtonNames.Describe(value, left, frame);
+        return $"{(left ? "LEFT" : "RIGHT")} HAND • THROTTLE\n" +
+            "Layout: " + (layout == ThrottleBindingLayout.CountermeasureTrigger ? "Countermeasure trigger" : layout == ThrottleBindingLayout.BrakeTrigger ? "Brake trigger" : "Custom") +
+            $"\n\nBrake: {Name(buttons.Brake)} (hold)\nCountermeasures: {Name(buttons.Countermeasures)}\n" +
+            $"Select target: {Name(buttons.Target)} (release)\nCM type: {Name(buttons.NextCountermeasure)} (release)\n\n" +
+            (wristConflict ? "Wrist button overlaps; edit custom binding.\n" :
+                ThrottleBindingProfiles.Conflicts(buttons, frame) ? "Shared buttons detected; choose a layout.\n" : "") +
+            "Use these buttons while holding the throttle.\nThe two choices replace only this hand's\nbrake, CM and target-selection bindings.";
+    }
+
     private string BindingsHelp()
     {
         var config = ModConfiguration.Instance;
@@ -265,12 +302,13 @@ internal sealed class WristMenu : MonoBehaviour
             $"Next weapon: {Button(bindings.NextWeapon.Value, stickLeft)} (release)\n" +
             $"Clear targets: {Button(bindings.ClearTargets.Value, stickLeft)}\n\n" +
             $"{(stickLeft ? "RIGHT" : "LEFT")} HAND • THROTTLE\n" +
+            $"Brake: {Button(bindings.Brake.Value, !stickLeft)} (hold)\n" +
             $"Countermeasures: {Button(bindings.Countermeasures.Value, !stickLeft)}\n" +
             $"Select target: {Button(bindings.SelectTarget.Value, !stickLeft)} (release)\n" +
             $"CM type: {Button(bindings.NextCountermeasure.Value, !stickLeft)}\n\n" +
             $"Map: {(stickLeft ? "Left" : "Right")} {Button(bindings.Map.Value, stickLeft)}\n" +
             $"Wrist panel: {(stickLeft ? "Right" : "Left")} {Button(bindings.WristMenu.Value, !stickLeft)}\n\n" +
-            "Combat buttons need a held or latched handle.\nFree hand: point + trigger for menus/console.\nRelease triggers and grips after menus.\nHold both thumbstick clicks to place handles.";
+            "Combat buttons need a held or latched handle.\nFree hand: point + trigger for menus/console.\nRelease triggers and grips after menus.\nRelease handles; hold both thumbstick clicks to place.";
     }
 
     private void AddLiveButton(Func<string> text, int column, int row, Action action) =>

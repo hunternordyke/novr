@@ -195,6 +195,39 @@ Check("controller help resolves fallback bindings and unavailable controls", () 
     True(ControllerButtonNames.Describe(ControllerButton.Top, false, false) == "Unavailable");
     True(ControllerButtonNames.Describe(ControllerButton.None, false, true) == "Unassigned");
 });
+Check("both throttle presets have distinct buttons on Frame and Touch profiles", () =>
+{
+    foreach (var layout in new[] { ThrottleBindingLayout.CountermeasureTrigger, ThrottleBindingLayout.BrakeTrigger })
+    foreach (var frame in new[] { true, false })
+    {
+        var preset = ThrottleBindingProfiles.Get(layout);
+        True(!ThrottleBindingProfiles.Conflicts(preset, frame));
+        True(ThrottleBindingProfiles.Identify(preset) == layout);
+    }
+});
+Check("default brake is D-pad down on Frame and thumbstick click on Touch", () =>
+{
+    var button = ThrottleBindingProfiles.Get(ThrottleBindingLayout.CountermeasureTrigger).Brake;
+    True(ControllerButtonNames.Describe(button, true, true) == "D-pad down");
+    True(ControllerButtonNames.Describe(button, true, false) == "Thumbstick click");
+});
+Check("trigger brake preset separates braking from countermeasure deployment", () =>
+{
+    var buttons = ThrottleBindingProfiles.Get(ThrottleBindingLayout.BrakeTrigger);
+    True(buttons.Brake == ControllerButton.Trigger);
+    True(ControllerButtonNames.Resolve(buttons.Countermeasures, true) == ControllerButton.Shoulder);
+    True(ControllerButtonNames.Resolve(buttons.Countermeasures, false) == ControllerButton.Primary);
+    True(ControllerButtonNames.Resolve(buttons.Target, false) == ControllerButton.Secondary);
+});
+Check("custom throttle conflicts are detected without treating unassigned as a button", () =>
+{
+    var custom = new ThrottleButtons(ControllerButton.Trigger, ControllerButton.Trigger, ControllerButton.None, ControllerButton.None);
+    True(ThrottleBindingProfiles.Identify(custom) == ThrottleBindingLayout.Custom);
+    True(ThrottleBindingProfiles.Conflicts(custom, true));
+    True(!ThrottleBindingProfiles.SharesButton(ControllerButton.None, false, ControllerButton.None));
+    True(ThrottleBindingProfiles.SharesButton(ControllerButton.PrimaryOrStickClick, true, ControllerButton.Primary));
+    True(ThrottleBindingProfiles.SharesButton(ControllerButton.PrimaryOrStickClick, false, ControllerButton.StickClick));
+});
 Check("deadzone suppresses small movements", () =>
 {
     Near(FlightControlMath.Axis(0.05f, 0.06f, 1.5f), 0);

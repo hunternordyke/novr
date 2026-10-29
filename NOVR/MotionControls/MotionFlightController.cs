@@ -91,7 +91,9 @@ public sealed class MotionFlightController : MonoBehaviour
             PlaceAtHands();
         }
 
-        var placementGesture = _stickHand.Valid && _throttleHand.Valid &&
+        // Thumbstick clicks may be used for braking/CM selection while flying.
+        // Placement is only a hands-free gesture, never a side effect of those bindings.
+        var placementGesture = _stickHand.Valid && _throttleHand.Valid && !StickHeld && !ThrottleHeld &&
                                _stickHand.StickClick && _throttleHand.StickClick;
         if (placementGesture)
         {
