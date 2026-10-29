@@ -21,6 +21,12 @@ public sealed class MotionFlightController : MonoBehaviour
     private Quaternion _neutralStick;
     private float _throttleStartPosition;
     private float _throttleStartValue;
+    private float _milPower = 1f;
+    private bool _hasVtol;
+    private TiltWingController? _tiltWing;
+    private int _throttleZone;
+    private float _nextThrottlePulse;
+    private bool MilDetent => Settings.MilDetent.Value && !LiftCollective && _milPower < 1f;
     private float _calibrationHold;
     private bool _calibrationLatched;
     private Vector3 _lastCalibrationPosition;
@@ -56,8 +62,20 @@ public sealed class MotionFlightController : MonoBehaviour
     internal float Pitch { get; private set; }
     internal float Roll { get; private set; }
     internal float Yaw { get; private set; }
-    internal bool HasYaw => Settings.ThumbstickYaw.Value && _stickHand.HasAxis;
+    internal bool HasYaw => Settings.TwistYaw.Value || Settings.ThumbstickYaw.Value && _stickHand.HasAxis;
     internal float Throttle { get; private set; }
+    internal float VtolAxis
+    {
+        get
+        {
+            if (!FlightActive || !ThrottleHeld || !_throttleHand.Valid || !_throttleHand.HasAxis || !_hasVtol || (!Settings.LeftHanded.Value && UniversalCockpitPanel.LeftStickSlaved) ||
+                _aircraft?.IsAutoHoverEnabled() == true || Mathf.Abs(_throttleHand.Axis.y) < .35f) return 0;
+            // Native relative-axis semantics: +/-1 steps the command and also
+            // tells the nozzle controller to leave its automatic operating mode.
+            if (_tiltWing != null) HarmonyLib.AccessTools.Field(typeof(TiltWingController), "autoTilt")?.SetValue(_tiltWing, false);
+            return Mathf.Sign(_throttleHand.Axis.y);
+        }
+    }
     private Vector3 StickPosition => HandedPosition(CockpitProfiles.StickPosition);
     private Vector3 ThrottlePosition => HandedPosition(CockpitProfiles.ThrottlePosition);
     internal static bool UsesLiftCollective(Aircraft? aircraft) => aircraft != null && aircraft.GetControlsFilter() is HeloControlsFilter;
@@ -109,7 +127,7 @@ public sealed class MotionFlightController : MonoBehaviour
 
         // Thumbstick clicks may be used for braking/CM selection while flying.
         // Placement is only a hands-free gesture, never a side effect of those bindings.
-        var placementGesture = _stickHand.Valid && _throttleHand.Valid && !StickHeld && !ThrottleHeld &&
+        var placementGesture = !UniversalCockpitPanel.LeftStickSlaved && _stickHand.Valid && _throttleHand.Valid && !StickHeld && !ThrottleHeld &&
                                _stickHand.StickClick && _throttleHand.StickClick;
         if (placementGesture)
         {
@@ -137,7 +155,8 @@ public sealed class MotionFlightController : MonoBehaviour
             _throttleHand.Valid, _throttleHand.Position, _stickGrip.Latched, _throttleGrip.Latched,
             Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value, _aircraft != null && _aircraft.GetInputs().brake > .05f,
             _aircraft?.IsAutoHoverEnabled() == true ? "HOVER INPUT" :
-                _aircraft?.GetAircraftParameters().takeoffDistance == 0 ? "COLLECTIVE" : "THROTTLE", LiftCollective);
+                _aircraft?.GetAircraftParameters().takeoffDistance == 0 ? "COLLECTIVE" : "THROTTLE", LiftCollective,
+            Yaw * Settings.YawAngle.Value, MilDetent ? _milPower : -1f);
     }
 
     // Capture the pilot's command before native hover/flight filters turn it
@@ -188,6 +207,10 @@ public sealed class MotionFlightController : MonoBehaviour
             _visuals?.Dispose();
             _visuals = null;
             _aircraft = aircraft;
+            _milPower = MilitaryPower.Find(aircraft);
+            _tiltWing = aircraft.GetComponentInChildren<TiltWingController>(true);
+            _hasVtol = _tiltWing != null || aircraft.GetComponentInChildren<DuctedThrustSystem>(true) != null ||
+                aircraft.GetComponentInChildren<SwivelDuctSystem>(true) != null;
             try { _visuals = new MotionControlVisuals(trackingRoot); _visuals.UseAircraftModels(aircraft); }
             catch (System.Exception exception)
             {
@@ -214,7 +237,7 @@ public sealed class MotionFlightController : MonoBehaviour
 
         _ready = true;
         _visuals.SetVisible(true);
-        _visuals.Root.localPosition = CockpitProfiles.SeatOffset;
+        _visuals.Root.localPosition = Vector3.zero;
         _stickHand = TrackedControllers.Read(Settings.LeftHanded.Value);
         _throttleHand = TrackedControllers.Read(!Settings.LeftHanded.Value);
         if (!_throttleGrip.Held) Throttle = _throttleCommandAircraft == aircraft
@@ -231,14 +254,21 @@ public sealed class MotionFlightController : MonoBehaviour
             Pulse(_stickHand.Device);
         }
 
+        if (stickWasHeld && !_stickGrip.Held && _stickHand.Valid) InteractionHaptics.Pulse(_stickHand.Device, .12f, .02f, InteractionCue.Release);
+
         Pitch = Roll = Yaw = 0f;
         if (_stickGrip.Held)
         {
             // Relative rotation in cockpit axes, independent of the controller's grip orientation.
-            var tilt = (_stickHand.Rotation * Quaternion.Inverse(_neutralStick)) * Vector3.up;
+            var relative = _stickHand.Rotation * Quaternion.Inverse(_neutralStick);
+            var tilt = relative * Vector3.up;
             (Pitch, Roll) = FlightControlMath.Stick(tilt.x, tilt.y, tilt.z, Settings.StickAngle.Value,
                 Settings.Deadzone.Value, Settings.ResponseExponent.Value);
-            Yaw = FlightControlMath.Axis(_stickHand.Axis.x, 0.12f, 1f);
+            var twist = Settings.TwistYaw.Value ? FlightControlMath.StickTwist(relative.y, relative.w,
+                Settings.YawAngle.Value, Settings.Deadzone.Value, Settings.ResponseExponent.Value) : 0f;
+            var thumb = Settings.ThumbstickYaw.Value && _stickHand.HasAxis && !(Settings.LeftHanded.Value && UniversalCockpitPanel.LeftStickSlaved)
+                ? FlightControlMath.Axis(_stickHand.Axis.x, 0.12f, 1f) : 0f;
+            Yaw = Mathf.Clamp(twist + thumb, -1f, 1f);
         }
 
         var throttleWasHeld = _throttleGrip.Held;
@@ -248,12 +278,25 @@ public sealed class MotionFlightController : MonoBehaviour
         if (_throttleGrip.Held && !throttleWasHeld)
         {
             _throttleStartPosition = ThrottleHandPosition;
-            _throttleStartValue = Throttle;
+            _throttleStartValue = MilDetent ? ThrottleDetent.Input(Throttle, _milPower,
+                ThrottleDetent.TravelMeters / Settings.ThrottleTravel.Value) : Throttle;
+            _throttleZone = Throttle <= 0 ? -2 : Throttle >= 1 ? 2 : MilDetent && Throttle == _milPower ? 0 : MilDetent && Throttle > _milPower ? 1 : -1;
             Pulse(_throttleHand.Device);
         }
+        if (throttleWasHeld && !_throttleGrip.Held && _throttleHand.Valid) InteractionHaptics.Pulse(_throttleHand.Device, .12f, .02f, InteractionCue.Release);
         if (_throttleGrip.Held)
-            Throttle = FlightControlMath.Throttle(_throttleStartValue, _throttleStartPosition,
-                ThrottleHandPosition, Settings.ThrottleTravel.Value);
+        {
+            var input = _throttleStartValue + (ThrottleHandPosition - _throttleStartPosition) / Settings.ThrottleTravel.Value;
+            Throttle = MilDetent ? ThrottleDetent.Output(input, _milPower, ThrottleDetent.TravelMeters / Settings.ThrottleTravel.Value)
+                : Mathf.Clamp01(input);
+            var zone = Throttle <= 0 ? -2 : Throttle >= 1 ? 2 : MilDetent && Throttle == _milPower ? 0 : MilDetent && Throttle > _milPower ? 1 : -1;
+            if (zone != _throttleZone && (zone == 0 || zone == 1 || zone == -2 || zone == 2) && Time.unscaledTime >= _nextThrottlePulse)
+            {
+                InteractionHaptics.Pulse(_throttleHand.Device, zone == 1 ? .45f : .3f, .045f, InteractionCue.Detent);
+                _nextThrottlePulse = Time.unscaledTime + .12f;
+            }
+            _throttleZone = zone;
+        }
         if (!_stickHand.Valid || !_throttleHand.Valid)
             ReportStatus(!_stickHand.Valid && !_throttleHand.Valid ? "Both controllers need tracking" :
                 ((!_stickHand.Valid ? Settings.LeftHanded.Value : !Settings.LeftHanded.Value) ? "Left controller needs tracking" : "Right controller needs tracking"));
@@ -364,10 +407,6 @@ public sealed class MotionFlightController : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    private static void Pulse(UnityEngine.XR.InputDevice device)
-    {
-        if (device.isValid && device.TryGetHapticCapabilities(out var capabilities) && capabilities.supportsImpulse)
-            device.SendHapticImpulse(0, 0.25f, 0.035f);
-    }
+    private static void Pulse(UnityEngine.XR.InputDevice device) => InteractionHaptics.Pulse(device, cue: InteractionCue.Grab);
 
 }

@@ -147,6 +147,45 @@ internal sealed class CockpitPanelHud
     private readonly RawImage[] _feeds = new RawImage[2];
     private readonly Vector3[] _corners = new Vector3[4];
     private float _nextFind;
+    private int _slave = -1, _labelSlave = -2;
+    private MfdPage _labelLeft = (MfdPage)(-1), _labelRight = (MfdPage)(-1);
+    private Vector2 _mapPan;
+    private readonly ControllerButtonGate _recenter = new();
+    internal bool LeftStickSlaved => _slave >= 0;
+    internal Vector2 MapPan => _mapPan;
+    internal void ToggleSlave(bool left)
+    {
+        var index = left ? 0 : 1;
+        if (_slave == index) { _slave = -1; _mapPan = Vector2.zero; _recenter.Reset(); return; }
+        var config = ModConfiguration.Instance;
+        // Map is the first supported interactive page. Selecting the slave key
+        // brings it onto this MFD, swapping the other page if necessary.
+        if (left) { if (config.RightMfdPage.Value == MfdPage.Map) config.RightMfdPage.Value = config.LeftMfdPage.Value; config.LeftMfdPage.Value = MfdPage.Map; }
+        else { if (config.LeftMfdPage.Value == MfdPage.Map) config.LeftMfdPage.Value = config.RightMfdPage.Value; config.RightMfdPage.Value = MfdPage.Map; }
+        _slave = index; _mapPan = Vector2.zero; _recenter.Reset();
+    }
+    private void UpdateSlave()
+    {
+        if (_slave >= 0 && (_slave == 0 ? _left : _right) != MfdPage.Map) { _slave = -1; _mapPan = Vector2.zero; }
+        if (_labelSlave != _slave || _labelLeft != _left || _labelRight != _right)
+        {
+            _labelSlave = _slave; _labelLeft = _left; _labelRight = _right;
+            for (var i = 0; i < 2; i++)
+            {
+                var page = i == 0 ? _left : _right;
+                _headers[i].text = MfdPages.Title(page) + (_slave == i ? " · LEFT STICK" : "");
+                _numbers[i].text = _slave == i ? "SLAVED" : "L STK";
+            }
+        }
+        if (_slave < 0 || VrUi.WristMenu.IsOpen || CockpitLayout.Active || !TrackedControllers.Available) { _recenter.Reset(); return; }
+        var hand = TrackedControllers.Read(true);
+        _recenter.Update(hand.Valid, hand.StickClick ? 1 : 0);
+        if (_recenter.Pressed) { _mapPan = Vector2.zero; InteractionHaptics.Pulse(hand.Device); }
+        if (!hand.Valid || !hand.HasAxis) return;
+        var map = SceneSingleton<DynamicMap>.i; if (map == null || DynamicMap.mapMaximized) return;
+        var axis = new Vector2(FlightControlMath.Axis(hand.Axis.x, .2f, 1), FlightControlMath.Axis(hand.Axis.y, .2f, 1));
+        _mapPan = Vector2.ClampMagnitude(_mapPan - axis * (180 * Mathf.Min(Time.unscaledDeltaTime, .05f) / Mathf.Max(1, map.GetZoomLevel())), 2000);
+    }
     private Aircraft? _aircraft;
     private MfdPage _left = (MfdPage)(-1), _right = (MfdPage)(-1);
     private HUDApp[] _apps = Array.Empty<HUDApp>();
@@ -253,6 +292,7 @@ internal sealed class CockpitPanelHud
             _docks["map"] = new Dock((RectTransform)map.transform, _slots["map"]);
         foreach (var dock in _docks.Values) dock.Fit();
         foreach (var dock in _nativeDocks) dock.Fit();
+        UpdateSlave();
         for (var i = 0; i < 2; i++) UpdateFeed(i, i == 0 ? _left : _right);
     }
     private void PlacePage(RectTransform page, MfdPage kind)
@@ -339,6 +379,7 @@ internal sealed class CockpitPanelHud
     }
     internal void Restore()
     {
+        _slave = -1; _mapPan = Vector2.zero; _recenter.Reset();
         RestoreNative(); foreach (var dock in _docks.Values) dock.Restore(); _docks.Clear(); _nextFind = 0;
         _left = _right = (MfdPage)(-1); _aircraft = null; _apps = Array.Empty<HUDApp>(); _tac = null;
     }

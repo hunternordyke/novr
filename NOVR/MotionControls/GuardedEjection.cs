@@ -12,7 +12,7 @@ internal sealed class GuardedEjection
     public bool Pull(float displacement, float heldSeconds, bool direct)
     {
         if (!_pulling || !Open || !FlightControlMath.IsFinite(displacement) || !FlightControlMath.IsFinite(heldSeconds)) return false;
-        if (direct ? displacement < 0.045f : heldSeconds < 0.75f) return false;
+        if (direct && displacement < 0.045f) return false;
         Reset();
         return true;
     }

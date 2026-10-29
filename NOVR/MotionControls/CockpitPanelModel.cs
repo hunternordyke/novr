@@ -18,6 +18,9 @@ internal sealed class CockpitPanelModel : IDisposable
     private readonly List<Material> _materials = new();
     private readonly Dictionary<string, List<Renderer>> _renderers = new();
     private readonly MaterialPropertyBlock _colorBlock = new();
+    private readonly Dictionary<string, Color> _lastColors = new();
+    private readonly Dictionary<string, int> _lastHighlights = new();
+    private bool? _layoutState;
 
     internal CockpitPanelModel(Transform parent)
     {
@@ -93,6 +96,8 @@ internal sealed class CockpitPanelModel : IDisposable
     private LineRenderer? _layoutOutline;
     internal void SetLayoutMode(bool editing)
     {
+        if (_layoutState == editing) return;
+        _layoutState = editing;
         foreach (var group in _renderers.Values) foreach (var renderer in group) renderer.enabled = !editing;
         if (editing && _layoutOutline == null)
         {
@@ -110,12 +115,16 @@ internal sealed class CockpitPanelModel : IDisposable
     internal void SetGroupColor(string group, Color color)
     {
         if (!_renderers.TryGetValue(group, out var renderers)) return;
+        if (_lastColors.TryGetValue(group, out var previous) && previous == color) return;
+        _lastColors[group] = color; _lastHighlights.Remove(group);
         _colorBlock.SetColor("_BaseColor", color); _colorBlock.SetColor("_Color", color);
         foreach (var renderer in renderers) renderer.SetPropertyBlock(_colorBlock);
     }
 
     internal void Highlight(string group, int state)
     {
+        if (_lastHighlights.TryGetValue(group, out var previous) && previous == state) return;
+        _lastHighlights[group] = state; _lastColors.Remove(group);
         foreach (var renderer in _renderers[group])
         {
             if (state == 0) { renderer.SetPropertyBlock(null); continue; }

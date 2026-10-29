@@ -20,23 +20,50 @@ internal struct ControllerSample
 internal static class TrackedControllers
 {
     private static InputDevice? _reportedLeft, _reportedRight;
+    private static int _availableFrame = -1;
+    private static bool _available;
+    private static readonly int[] ReadFrames = { -1, -1 };
+    private static readonly ControllerSample[] Samples = new ControllerSample[2];
+    private static Vector3 _sampleSeat, _sampleAnchor, _sampleTranslation;
+    private static Quaternion _sampleRotation;
+    // One coherent runtime sample per hand per frame, shared by input, UI and visuals.
+    // Recenter/seat edits invalidate mapped samples immediately.
     public static bool Available
     {
         get
         {
+            if (_availableFrame != Time.frameCount) { _availableFrame = Time.frameCount; _available = CheckAvailable(); }
+            return _available;
+        }
+    }
+    private static bool CheckAvailable()
+    {
             // The desktop mirror can lose focus while the streamed headset still
             // owns the OpenXR session. The runtime, not the window, owns VR input.
             if (!XRSettings.enabled || !OpenXRUtility.IsSessionFocused) return false;
             var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
             return head.isValid && head.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) && tracked &&
                    (!head.TryGetFeatureValue(CommonUsages.userPresence, out var present) || present);
-        }
     }
 
     internal static bool NativeFrame(bool left) => (left ? XRController.leftHand : XRController.rightHand)
         is Valve.OpenXR.Utils.SteamFrameControllerProfile.SteamFrameController;
 
     public static ControllerSample Read(bool left)
+    {
+        var seat = CockpitProfiles.SeatOffset;
+        if (_sampleSeat != seat || _sampleAnchor != NOVRHeadsetData.TranslationAnchor ||
+            _sampleTranslation != NOVRHeadsetData.TranslationCalibrationOffset || _sampleRotation != NOVRHeadsetData.RotationCalibrationOffset)
+        {
+            ReadFrames[0] = ReadFrames[1] = -1; _sampleSeat = seat; _sampleAnchor = NOVRHeadsetData.TranslationAnchor;
+            _sampleTranslation = NOVRHeadsetData.TranslationCalibrationOffset; _sampleRotation = NOVRHeadsetData.RotationCalibrationOffset;
+        }
+        var i = left ? 0 : 1;
+        if (ReadFrames[i] == Time.frameCount) return Samples[i];
+        ReadFrames[i] = Time.frameCount;
+        return Samples[i] = ReadRuntime(left);
+    }
+    private static ControllerSample ReadRuntime(bool left)
     {
         if (!Available) return default;
         var device = InputDevices.GetDeviceAtXRNode(left ? XRNode.LeftHand : XRNode.RightHand);
@@ -83,7 +110,8 @@ internal static class TrackedControllers
         {
             Valid = FlightControlMath.IsFinite(grip) && FlightControlMath.IsFinite(trigger),
             Device = device, Grip = grip, Trigger = trigger, HasAxis = hasAxis,
-            Axis = hasAxis ? axis : Vector2.zero, StickClick = stickClick,
+            Axis = hasAxis ? axis : Vector2.zero,
+            StickClick = nativeFrame ? Button("thumbstickClicked") : stickClick,
             Primary = nativeFrame ? Button("faceButtonBottom") : primary,
             Secondary = nativeFrame ? Button("faceButtonInside") : secondary,
             Menu = nativeFrame ? Button("menu") : menu,
@@ -95,7 +123,7 @@ internal static class TrackedControllers
     }
 
     public static Vector3 MapPosition(Vector3 position) =>
-        NOVRHeadsetData.TranslationAnchor + NOVRHeadsetData.TranslationCalibrationOffset + position;
+        NOVRHeadsetData.MapTrackingPosition(position) + CockpitProfiles.SeatOffset;
 
     public static bool Finite(Vector3 value) => FlightControlMath.IsFinite(value.x) &&
         FlightControlMath.IsFinite(value.y) && FlightControlMath.IsFinite(value.z);

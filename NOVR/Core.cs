@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Reflection;
 using NOVR.VrCamera;
 using NOVR.VrTogglers;
 using NOVR.VrUi;
@@ -14,11 +13,9 @@ public class Core : MonoBehaviour
 {
     
     private bool _quitting;
-    private float _originalFixedDeltaTime;
 
     private NOVRHeadsetData? _headsetData;
     private NOUIManager? _vrUi;
-    private PropertyInfo? _refreshRateProperty;
     private VrTogglerManager? _vrTogglerManager;
     
     private Aircraft _aircraft;
@@ -35,8 +32,12 @@ public class Core : MonoBehaviour
         gameObject.AddComponent<VrCameraManager>();
         gameObject.AddComponent<APIBus>();
         gameObject.AddComponent<MotionControls.CockpitProfiles>();
+        gameObject.AddComponent<MotionControls.CockpitPanelPlacement>();
         gameObject.AddComponent<MotionControls.CockpitLayout>();
         gameObject.AddComponent<MotionControls.MotionFlightController>();
+        gameObject.AddComponent<MotionControls.HelmetNightVision>();
+        gameObject.AddComponent<MotionControls.PilotHandVisuals>();
+        gameObject.AddComponent<MotionControls.InteractionAudio>();
         gameObject.AddComponent<MotionControls.ControllerActions>();
         gameObject.AddComponent<MotionControls.CockpitViewZoom>();
         gameObject.AddComponent<VrUi.WristMenu>();
@@ -57,13 +58,6 @@ public class Core : MonoBehaviour
     {
         
         
-        var xrDeviceType = Type.GetType("UnityEngine.XR.XRDevice, UnityEngine.XRModule") ??
-                           Type.GetType("UnityEngine.XR.XRDevice, UnityEngine.VRModule") ??
-                           Type.GetType("UnityEngine.VR.VRDevice, UnityEngine.VRModule") ??
-                           Type.GetType("UnityEngine.VR.VRDevice, UnityEngine");
-
-        _refreshRateProperty = xrDeviceType?.GetProperty("refreshRate");
-        
         _headsetData = NOVRBehaviour.Create<NOVRHeadsetData>(transform);
         _vrUi = NOVRBehaviour.Create<NOUIManager>(transform);
         
@@ -73,27 +67,6 @@ public class Core : MonoBehaviour
 
 
 
-    private void Update()
-    {
-        UpdatePhysicsRate();
-    }
-
-    private void UpdatePhysicsRate()
-    {
-        if (_originalFixedDeltaTime == 0)
-        {
-            _originalFixedDeltaTime = Time.fixedDeltaTime;
-        }
-
-        if (_refreshRateProperty == null) return;
-
-        var headsetRefreshRate = (float)_refreshRateProperty.GetValue(null, null);
-        if (headsetRefreshRate <= 0) return;
-
-
-        Time.fixedDeltaTime = _originalFixedDeltaTime;
-        
-    }
     private void FixedUpdate()
     {
         _oldAircraft = _aircraft;

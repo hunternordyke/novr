@@ -34,11 +34,11 @@ public class ModConfiguration
         MotionControls = new MotionControls.MotionControlSettings(config);
         ControllerBindings = new MotionControls.ControllerBindings(config);
         CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");
-        CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Panel center relative to the recentered seat, in meters. Shared by every aircraft.");
+        CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Fallback cockpit position if a native dashboard surface is unavailable. Automatic dashboard fit and per-aircraft saved placements take precedence. Independent of seat adjustment.");
         CockpitPanelTilt = config.Bind("Universal Cockpit Panel", "Tilt", 20f, new ConfigDescription("Upward-facing panel tilt in degrees.", new AcceptableValueRange<float>(-90, 90)));
         CockpitPanelYaw = config.Bind("Universal Cockpit Panel", "Yaw", 0f, new ConfigDescription("Panel yaw in degrees, set by grabbing it in Edit layout.", new AcceptableValueRange<float>(-180, 180)));
         CockpitPanelRoll = config.Bind("Universal Cockpit Panel", "Roll", 0f, new ConfigDescription("Panel roll in degrees, set by grabbing it in Edit layout.", new AcceptableValueRange<float>(-180, 180)));
-        CockpitPanelScale = config.Bind("Universal Cockpit Panel", "Scale", 1f, new ConfigDescription("Shared panel size.", new AcceptableValueRange<float>(0.65f, 1.4f)));
+        CockpitPanelScale = config.Bind("Universal Cockpit Panel", "Scale", 1f, new ConfigDescription("Automatic dashboard-fit size multiplier, also used for fallback placement. Manual panel sizes are saved per aircraft.", new AcceptableValueRange<float>(0.65f, 1.4f)));
         LeftMfdPage = config.Bind("Universal Cockpit Panel", "Left MFD page", global::NOVR.MotionControls.MfdPage.Weapons, "Page on the left display.");
         RightMfdPage = config.Bind("Universal Cockpit Panel", "Right MFD page", global::NOVR.MotionControls.MfdPage.Map, "Page on the right display. Selecting an occupied page swaps the displays.");
         FocusedFlightHud = config.Bind("VR HUD", "Focused Flight HUD", true, "Compact flight instruments and a limited forward pitch ladder. Target and missile-warning projections remain independent.");

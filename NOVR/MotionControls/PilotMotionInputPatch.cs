@@ -4,6 +4,18 @@ namespace NOVR.MotionControls;
 
 internal static class PilotMotionInputPatch
 {
+    [HarmonyPatch(typeof(Rewired.Player), "GetAxisRaw", new[] { typeof(string) })]
+    private static class VtolThumbstick
+    {
+        [HarmonyPostfix]
+        private static void Postfix(Rewired.Player __instance, string __0, ref float __result)
+        {
+            if (__instance != GameManager.playerInput || __0 != "Custom Axis 1") return;
+            var axis = MotionFlightController.Instance?.VtolAxis ?? 0;
+            if (axis != 0) __result = axis;
+        }
+    }
+
     // Hook before the game's FilterInputs step, retaining flight assists and network replication.
     [HarmonyPatch(typeof(PilotPlayerState), "PlayerAxisControls")]
     private static class Axes

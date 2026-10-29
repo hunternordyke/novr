@@ -9,17 +9,17 @@ namespace NOVR.VrUi;
 // Standard UGUI pointer events keep buttons, dropdowns, scrolling and dragging working.
 internal sealed class ControllerUiPointer
 {
-    private readonly ControllerButtonGate _trigger = new();
+    private readonly PointerHandSelection _hands = new();
+    private ControllerButtonGate Trigger => _hands.Trigger;
     private PointerEventData? _event;
     private EventSystem? _system;
-    private bool _hasPose;
-    private Vector3 _position;
-    private Quaternion _rotation;
-    private bool _left;
+    private readonly bool[] _hasPose = new bool[2];
+    private readonly Vector3[] _positions = new Vector3[2];
+    private readonly Quaternion[] _rotations = new Quaternion[2];
     internal Ray Ray { get; private set; }
     internal Vector3 HitPosition { get; private set; }
-    internal bool Held => _trigger.Held;
-    internal bool Pressed => _trigger.Pressed;
+    internal bool Held => Trigger.Held;
+    internal bool Pressed => Trigger.Pressed;
     internal Vector2 Scroll { get; private set; }
     internal bool OverInteractive { get; private set; }
     internal bool OverMap { get; private set; }
@@ -27,31 +27,34 @@ internal sealed class ControllerUiPointer
     internal bool Update(Camera camera)
     {
         var settings = ModConfiguration.Instance;
-        var left = settings.MotionControls.LeftHanded.Value;
-        var hand = TrackedControllers.Read(left);
-        if (!settings.ControllerBindings.PointerEnabled.Value || !hand.Valid || EventSystem.current == null)
+        var leftHand = TrackedControllers.Read(true); var rightHand = TrackedControllers.Read(false);
+        var leftAvailable = leftHand.Valid && !HelmetNightVision.OwnsHand(true);
+        var rightAvailable = rightHand.Valid && !HelmetNightVision.OwnsHand(false);
+        if (!settings.ControllerBindings.PointerEnabled.Value || (!leftAvailable && !rightAvailable) || EventSystem.current == null)
         {
             Cancel();
             return false;
         }
-        if (_system != EventSystem.current || _left != left)
+        if (_system != EventSystem.current)
         {
             Cancel();
             _system = EventSystem.current;
-            _left = left;
             _event = new PointerEventData(_system) { pointerId = -101, button = PointerEventData.InputButton.Left };
         }
-        var root = camera.transform.parent;
-        var position = hand.AimPosition + CockpitProfiles.SeatOffset;
-        var rotation = hand.AimRotation;
-        if (root != null) { position = root.TransformPoint(position); rotation = root.rotation * rotation; }
-        var response = settings.ControllerBindings.PointerResponse.Value;
-        var blend = !_hasPose || response <= 0 ? 1 : FlightControlMath.SmoothingWeight(Time.unscaledDeltaTime, response);
-        _position = Vector3.Lerp(_position, position, blend);
-        _rotation = Quaternion.Slerp(_rotation, rotation, blend);
-        _hasPose = true;
-        Ray = new Ray(_position, _rotation * Vector3.forward);
-        var hit = Raycast(Ray, camera);
+        if (!leftAvailable) _hasPose[0] = false;
+        if (!rightAvailable) _hasPose[1] = false;
+        var leftRay = leftAvailable ? HandRay(camera, leftHand, 0) : default;
+        var rightRay = rightAvailable ? HandRay(camera, rightHand, 1) : default;
+        var leftHit = leftAvailable ? Raycast(leftRay, camera) : default;
+        var rightHit = rightAvailable ? Raycast(rightRay, camera) : default;
+        var previousLeft = _hands.Left;
+        _hands.Update(settings.MotionControls.LeftHanded.Value, leftAvailable, leftHand.Trigger, leftHit.gameObject != null,
+            rightAvailable, rightHand.Trigger, rightHit.gameObject != null);
+        if (previousLeft != _hands.Left) { Release(true); SetHover(null); }
+        if (!(_hands.Left ? leftAvailable : rightAvailable)) { Cancel(); return false; }
+        var hand = _hands.Left ? leftHand : rightHand;
+        Ray = _hands.Left ? leftRay : rightRay;
+        var hit = _hands.Left ? leftHit : rightHit;
         HitPosition = hit.gameObject != null ? hit.worldPosition : Ray.GetPoint(5);
         var screen = (Vector2)camera.WorldToScreenPoint(HitPosition, Camera.MonoOrStereoscopicEye.Mono);
         var data = _event!;
@@ -65,16 +68,32 @@ internal sealed class ControllerUiPointer
         OverMap = DynamicMap.mapMaximized && hit.gameObject != null && map != null &&
                   (hit.gameObject.transform.IsChildOf(map.transform) || hit.gameObject == map.mapBackground.gameObject);
         SetHover(hit.gameObject);
-        _trigger.Update(true, hand.Trigger);
         // UGUI scroll is in wheel steps. Use elapsed time, not frame count.
         Scroll = new Vector2(0, FlightControlMath.Axis(hand.Axis.y, 0.2f, 1) * 12f * Mathf.Min(Time.unscaledDeltaTime, 0.05f));
         data.scrollDelta = Scroll;
-        if (_trigger.Pressed) Press();
-        if (_trigger.Held) Drag();
-        if (_trigger.Released) Release(false);
+        if (Trigger.Pressed)
+        {
+            Press();
+            if (data.pointerPress != null || data.pointerDrag != null) InteractionHaptics.Pulse(hand.Device, .18f, .025f);
+        }
+        if (Trigger.Held) Drag();
+        if (Trigger.Released) Release(false);
         if (Scroll.sqrMagnitude > 0 && !OverMap)
             ExecuteEvents.ExecuteHierarchy(hit.gameObject, data, ExecuteEvents.scrollHandler);
         return true;
+    }
+
+    private Ray HandRay(Camera camera, ControllerSample hand, int index)
+    {
+        var root = camera.transform.parent;
+        var position = hand.AimPosition; var rotation = hand.AimRotation;
+        if (root != null) { position = root.TransformPoint(position); rotation = root.rotation * rotation; }
+        var response = ModConfiguration.Instance.ControllerBindings.PointerResponse.Value;
+        var blend = !_hasPose[index] || response <= 0 ? 1 : FlightControlMath.SmoothingWeight(Time.unscaledDeltaTime, response);
+        _positions[index] = Vector3.Lerp(_positions[index], position, blend);
+        _rotations[index] = Quaternion.Slerp(_rotations[index], rotation, blend);
+        _hasPose[index] = true;
+        return new Ray(_positions[index], _rotations[index] * Vector3.forward);
     }
 
     private void SetHover(GameObject? target)
@@ -156,8 +175,8 @@ internal sealed class ControllerUiPointer
     {
         Release(true);
         SetHover(null);
-        _trigger.Reset();
-        _hasPose = false;
+        _hands.Reset();
+        _hasPose[0] = _hasPose[1] = false;
         OverMap = OverInteractive = false;
         Scroll = Vector2.zero;
     }

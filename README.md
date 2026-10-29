@@ -4,7 +4,7 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-NOVR Motion Prototype **0.4.6.0** adds a tracked-controller stick and throttle,
+NOVR Motion Prototype **0.4.6.1** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
 The shared 3D console combines seven selectable MFD pages with physical gear,
 radar, engine, flight-assist and guarded eject controls. View → Edit cockpit layout
@@ -24,6 +24,16 @@ actual aircraft state. Throttle/collective readouts preserve the pilot’s comma
 while hover assist adjusts engine power. Unavailable controls explain why.
 Native target/landing-camera zoom and magnification are preserved.
 
+Version 0.4.6.1 adds per-aircraft dashboard anchoring and clearance fitting,
+a MIL detent, native VTOL nozzle-angle control, left-stick MFD map panning and a
+brow-trigger night-vision gesture. Rigged Valve gloves and locally reused pilot
+sleeves add visible hands, with adjustable wrist alignment and slimmer arms.
+Interaction sounds and haptics accompany physical controls. Either hand can use
+the menu/panel pointer. Default throttle travel is 22 cm; the VT-7 panel starts
+25% larger before clearance fitting. Seat changes leave cockpit controls in place.
+Hand, sleeve and sound settings live under **View → Flight controls → Button
+bindings → Hands & feedback**.
+
 Steam Frame **PC streaming through SteamVR** is the binding target, with a
 Touch-compatible fallback. The build targets Nuclear Option **0.34.3**.
 Offline input and display checks are documented in the guides below; physical
@@ -31,9 +41,9 @@ controller reach, stereo comfort and flight feel still need headset evaluation.
 
 - **F6** shows/hides the console; hiding it restores the original status HUD.
 - **F7** enables/disables motion flight controls (off initially).
-- Hold grip near the stick, then tilt your wrist for pitch/roll. The stick-hand thumbstick controls yaw.
+- Hold grip near the stick, then tilt your wrist for pitch/roll. Twist it for rudder/nosewheel steering; horizontal stick-hand thumbstick yaw is also available.
 - Hold grip near the throttle, then move forward/back. In helicopters, lift/lower the hinged collective instead. Releasing retains the command with neutral physical throttle input.
-- Hold the throttle and left D-pad down (Frame), or left thumbstick click (Touch), to brake. Choose a trigger-brake layout from **View → Flight controls → Button bindings**.
+- Hold the throttle and squeeze its trigger to brake with the VTOL-style preset. Choose throttle layouts from **View → Flight controls → Button bindings**.
 - **F8** enables motion controls and places the handles at your hands. Release both handles first; holding both thumbstick clicks for 0.8 seconds also places them when motion controls are enabled.
 - **View** on the throttle hand, or **F9**, opens the wrist panel. Enable motion controls there without a keyboard.
 - [Universal cockpit console: controls, displays and positioning](docs/UNIVERSAL_COCKPIT_PANEL.md).

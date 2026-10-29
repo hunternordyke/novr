@@ -52,7 +52,10 @@ internal sealed class ControllerActions : MonoBehaviour
         _fire.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.Fire.Value));
         _countermeasures.Update(throttleActive, bindings.ReadFlight(throttle, !config.MotionControls.LeftHanded.Value, bindings.Countermeasures.Value));
         _weapon.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.NextWeapon.Value));
-        _target.Update(throttleActive, bindings.ReadFlight(throttle, !config.MotionControls.LeftHanded.Value, bindings.SelectTarget.Value));
+        var targetOnStick = bindings.SelectTargetOnStick.Value;
+        _target.Update(!((bindings.SelectTargetOnStick.Value ? config.MotionControls.LeftHanded.Value : !config.MotionControls.LeftHanded.Value) && UniversalCockpitPanel.LeftStickSlaved) && (targetOnStick ? stickActive : throttleActive),
+            bindings.ReadFlight(targetOnStick ? stick : throttle,
+                targetOnStick ? config.MotionControls.LeftHanded.Value : !config.MotionControls.LeftHanded.Value, bindings.SelectTarget.Value));
         _nextCountermeasure.Update(throttleActive, bindings.ReadFlight(throttle, !config.MotionControls.LeftHanded.Value, bindings.NextCountermeasure.Value));
         _clear.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.ClearTargets.Value));
         _unlock.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.UnlockTarget.Value));

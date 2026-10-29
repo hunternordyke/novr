@@ -10,7 +10,7 @@ The shared console is an original Blender model; no VTOL VR assets are included.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.6.0` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.6.1` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -53,7 +53,7 @@ option is under **View → Flight controls**; F8 remains available.
 
 Helicopter collective travel is centered **15 cm below the default stick**
 (default grip coordinates: stick y −0.36 m, collective center y −0.51 m).
-With the default 25 cm travel, the top of the collective range stays slightly below
+With the default 22 cm travel, the top of the collective range stays slightly below
 the stick. Untouched old helicopter defaults migrate once; custom placements remain.
 **Reset aircraft setup** uses this lower default and also resets the seat position.
 Jets and the VT-7 keep their existing throttle height.
@@ -71,7 +71,7 @@ custom bindings are retained. Held or tap-latched handles both enable their butt
 | Next weapon | Right A, release | Stick held |
 | Wheel/air brakes | Left trigger, hold | Throttle held |
 | Countermeasures | Left D-pad down, hold | Throttle held |
-| Select target under head-directed cue | Left thumbstick click, release | Throttle held |
+| Select target under head-directed cue | Right thumbstick click, release | Stick held |
 | Remove latest selected target | Right X, release | Stick held |
 | Clear all selected targets | Right Y, release | Stick held |
 | Next countermeasure type | Left D-pad right, release | Throttle held |
@@ -81,7 +81,7 @@ custom bindings are retained. Held or tap-latched handles both enable their butt
 Target selection does not force a weapon lock: seeker, range, radar and weapon
 restrictions still apply. X removes the most recently selected target; Y clears
 all selected targets. Both actions are also on the wrist Flight actions page.
-For Touch fallback: A changes weapon, X deploys CMs, left thumbstick click selects,
+For Touch fallback: A changes weapon, X deploys CMs, right thumbstick click selects,
 and Y changes CM type; use wrist actions for unlock/clear. A controller without a
 shoulder button has no default inspection binding.
 
@@ -102,7 +102,7 @@ Open **View → Flight controls** to adjust the stick's sensitivity/deadzone and
 throttle travel without taking off the headset. The displayed travel is the wrist
 angle required for full stick input; increasing it makes the stick less sensitive.
 **Reset response** restores response defaults without changing saved seat/handle
-positions. The yaw switch lets rudder pedals keep control.
+positions. Turn both Stick twist yaw and Thumbstick yaw off to let rudder pedals keep control.
 
 **Hold** remains the default for each hand. Optional **Tap** mode works independently
 for stick and throttle: briefly squeeze and release grip to latch the handle, then
@@ -150,7 +150,7 @@ The VT-7 and fixed-wing aircraft keep their forward/back throttle rail.
 The motion direction does not change when hover assist is toggled.
 
 **View → Flight controls** calls this setting **Collective lift** in helicopters,
-with **Shorter lift / Longer lift** buttons. The default full range is 25 cm.
+with **Shorter lift / Longer lift** buttons. The default full range is 22 cm.
 Saved positions remain the middle of the range. **Place handles** aligns the
 visible grips with your hands at the current command, including a fully raised
 or lowered collective, and saves separately for each aircraft and handedness.
@@ -180,18 +180,19 @@ through the headset.
 
 ## Brakes and throttle buttons
 
-While holding or latching the throttle, hold **left D-pad down** on native Frame
-or **left thumbstick click** on a Touch-compatible profile to apply the game's
-wheel/air brakes. Releasing the button releases braking. These buttons follow
+The default VTOL-style layout uses the **left trigger** for wheel/air brakes while
+holding or latching the throttle. The older **Trigger: CMs** layout uses left
+D-pad down on Frame, or left thumbstick click on Touch fallback. Releasing the button releases braking. These buttons follow
 handedness. Brakes remain available when the motion combat-button layer is disabled.
 
-Open **View → Flight controls → Button bindings** for two complete throttle layouts.
+Open **View → Flight controls → Button bindings** for the VTOL-style preset and two older throttle layouts.
 **Trigger: CMs** preserves the existing countermeasure-trigger layout and adds a
 separate brake button. **Trigger: brakes** puts braking on the trigger and moves
 countermeasures to the shoulder (Frame) or primary face button (Touch). The page
 shows every resulting binding before you return to flight. Selecting a layout
-replaces only the four throttle-hand brake/CM/target bindings; custom settings on
-other controls are preserved. Existing custom throttle assignments are preserved
+changes the throttle brake/CM bindings and the target-select hand/button. The
+VTOL preset puts selection on the stick; the older presets put it on the throttle.
+Other controls are preserved when selecting an older throttle preset. Existing custom throttle assignments are preserved
 on upgrade; if the new default brake would conflict, it starts unassigned.
 
 Tracking loss or opening a menu cancels braking. Release and press the grip/button
@@ -209,10 +210,11 @@ above.
 | Right hand near stick, then press grip | Grab the stick; the current wrist orientation becomes neutral. |
 | Tilt the held stick backward/forward | Pitch up/down. |
 | Tilt the held stick right/left | Roll right/left. |
-| Move the stick-hand thumbstick horizontally | Yaw, while the stick is held. Disable `Thumbstick Yaw` to use pedals. |
+| Twist the held/latched stick left or right | Rudder in flight and native wheel steering on the ground; 30° twist gives full input by default. |
+| Move the stick-hand thumbstick horizontally | Optional additional yaw, summed with twist and clamped. Turn both `Stick Twist Yaw` and `Thumbstick Yaw` off to use pedals. |
 | Left hand near throttle, then press grip | Grab at the current throttle setting without jumping. |
-| Move held throttle forward/back | Increase/decrease throttle. Travel is 25 cm by default. |
-| Lift/lower the held helicopter collective | Increase/decrease collective command. Lift is 25 cm by default; sideways/forward motion is ignored. |
+| Move held throttle forward/back | Increase/decrease throttle. Travel is 22 cm by default. |
+| Lift/lower the held helicopter collective | Increase/decrease collective command. Lift is 22 cm by default; sideways/forward motion is ignored. |
 | Release stick grip | Return to the game's normal pitch/roll input. With neutral physical controls, the stick centers. |
 | Release throttle grip | Return to the native throttle accumulator at the last setting. Physical throttle input can take over. |
 | F8 | Enable motion controls and place handles when both hands are tracked. Release grips before grabbing again. |
@@ -275,9 +277,11 @@ All values are in `BepInEx/config/deltawing.novr.cfg`.
 | Motion Controls / Stick Angle | 25 degrees | Tilt for full deflection. |
 | Motion Controls / Stick Deadzone | 0.06 | Suppress small movements around neutral. |
 | Motion Controls / Stick Response | 1.5 | Higher values soften response near center. |
-| Motion Controls / Throttle Travel | 0.25 m | Travel from zero to full thrust. |
+| Motion Controls / Throttle Travel | 0.22 m | Travel from zero to full thrust. |
 | Motion Controls / Grab Radius | 0.12 m | Distance required for the initial grab. |
-| Motion Controls / Thumbstick Yaw | true | Use thumbstick yaw while holding the stick. |
+| Motion Controls / Stick Twist Yaw | true | Twist for native rudder/nosewheel steering while holding or latching the stick. |
+| Motion Controls / Stick Yaw Angle | 30° | Twist needed for full yaw; uses stick deadzone and response. |
+| Motion Controls / Thumbstick Yaw | true | Also allow horizontal thumbstick yaw while holding the stick. |
 | VR HUD / Head Follow Response | 10 | Head-following text response; higher is faster, 0 follows directly. |
 
 The loader registers Steam Frame, Oculus Touch, Index, Vive, and Microsoft motion-controller
@@ -391,3 +395,107 @@ unlock/clear and the replacement inspection magnifier. The latter verify both
 actual OpenXR eye projections remain unchanged while the image is visible.
 The helicopter's final lower default is compiled; its ergonomics remain for
 headset testing. Captures are inspection views, not stereo comfort validation.
+
+## 0.4.6.1 targeting, tracking and yaw
+
+The VTOL preset now selects on the **stick-hand thumbstick click**, matching the
+hand used by VTOL VR for SOI selection. Press and release while holding/latching
+the stick. Native Frame reads its explicit thumbstick-click control. The complete
+stock 0.4.6.0 preset migrates automatically; custom/legacy throttle presets and an
+explicit saved hand preference remain. The old config key `Select Target - throttle
+hand` is retained for compatibility; `Select Target On Stick Hand` selects its hand.
+
+Head, hand-grip and pointer positions now use the same recentered rotation and
+translation. Previously recentering rotated orientations but left positions in
+the old room axes. Saved seat, panel and handle placements are not rewritten.
+Use **View → Recenter view** while seated facing forward after updating, and
+check hand-marker alignment in the headset.
+
+Stick twist feeds the native yaw input, which also drives steerable landing gear.
+Each grab captures a neutral orientation. Pitch/roll swing is separated from twist;
+release, lost tracking and menus cancel motion input. The native stick model twists
+visually too. Both yaw options are available under **View → Flight controls**.
+
+## 0.4.6.1 throttle, dashboard and MFD additions
+
+- Grip the throttle and move its thumbstick forward/back to command VTOL angle
+  toward forward flight/hover. Native nozzle limits and hover assist retain priority.
+  On tilt-wing aircraft this selects manual nacelle tilt; toggling native Flight
+  Assist restores automatic tilt. Aircraft without a VTOL system ignore this axis.
+- Afterburning jets have a MIL shelf at their actual engine threshold (the installed
+  FS-12 uses 90%; some workshop jets differ). The physical shelf spans 1.6 cm of
+  extra hand travel. Push through for afterburner. A notch/MIL mark and haptic cues
+  identify it. Release/regrab preserves power. Helicopter collectives and engines
+  without afterburners do not receive a detent. Disable `MIL Throttle Detent` to
+  restore linear travel.
+- Press **L STK** under either MFD to bring up Map and slave the physical left
+  thumbstick to it. Move to pan, click to recenter, press **SLAVED** again to return
+  to flight control. This takes precedence over that same stick's nozzle, yaw and
+  target-click bindings. Tactical/Sensor feeds are display-only in this version.
+- Dashboard anchoring and saved manual panel positions are per aircraft. Moving
+  the seat does not move the panel or flight controls. **Anchor to dashboard**
+  restores the automatic placement. The clearance audit and exceptions are in
+  `UNIVERSAL_COCKPIT_PANEL.md`.
+- Physical eject pulls have no added timer; an armed pointer press now acts
+  immediately too. Release after opening the guard, then make a separate pull/press.
+  The game still runs its canopy and ejection-seat animation.
+- `Interaction Haptic Strength` controls short grab, release, button, lever and
+  throttle-detent cues; 0 disables them.
+
+Build checks: 91 automated checks pass; all 46 declared Harmony targets resolve. Live offline checks
+cover target-click release, native rudder/nosewheel steering, recenter transforms,
+seat-independent controls, dashboard/manual placement, native nozzle movement,
+map slaving and MIL power. See the packaged NOVR-validation-0.4.6.1.txt for run scope and limitations.
+
+## Pilot hands, helmet gesture and interaction feedback — 0.4.6.1
+
+Rigged gloves use Valve's BSD-licensed SteamVR slim meshes and reference poses.
+They keep proper UV seams and normal details, with a tint sampled from the installed
+pilot. The pilot's own sleeve geometry/materials remain local. A private texture
+copy (up to 2048 square) adds mild sharpening and subtle fabric detail once on
+aircraft entry; the original atlas is untouched. Native pilot animations and other players are untouched.
+Grip curls three fingers and thumb; trigger curls index. This is controller-driven
+posing, not optical finger tracking. The two gloves total 9,798 triangles.
+
+Sleeves default to 82% of native thickness with unchanged lengths and wrist targets.
+View → Flight controls → Button bindings → Hands & feedback includes Slimmer/Wider
+sleeves, Gloves/Sleeves toggles, wrist-angle and hand-offset adjustments. Sleeves hide beyond their reachable envelope. Config
+`Glove Wrist Offset` / `Glove Wrist Rotation` adjust visuals only; interaction points
+continue using the runtime's grip pose. These values need a headset fit check.
+
+Bring either free hand to the brow, then make a fresh trigger press to toggle native
+night vision. A small cue identifies the gesture area. Held-trigger arrival and
+tracking recovery cannot toggle it; menus, map, layout and occupied hands suppress it.
+
+`Interaction Sound Volume` (default 0.25) controls original spatial grip/release,
+button, detent, guard and helmet cues. The Hands & feedback page has sound-volume buttons.
+Zero mutes sound independently of `Interaction Haptic Strength`. Six pooled voices
+and seven pre-generated clips bound the audio cost; the aircraft mixer is reused
+where available.
+
+Runtime controller reads are shared per hand per frame, with immediate invalidation
+on calibration/seat changes. Panel state and MFD labels only refresh when changed.
+Pilot geometry reads and glove setup happen on aircraft entry, not every frame.
+No global game/SteamVR quality or streaming settings are changed. See NOVR-validation-0.4.6.1.txt
+for final checks; no headset FPS or stereo-comfort claim is made.
+
+## Final comfort adjustments
+
+- Either hand can operate menu and cockpit-panel pointers. Aim at a control and
+  make a fresh trigger press to take the pointer. Its owning hand retains a drag
+  through release; switching hands, entering a menu or recovering tracking cannot
+  turn a held trigger into a new click. Direct panel touch still works with either
+  free hand. Release a latched flight handle before using that hand on the panel.
+- Default throttle/collective travel is now 22 cm (previously 25 cm). Existing
+  untouched defaults migrate once; custom travel is preserved. Flight controls
+  still has Shorter/Longer travel buttons.
+- The default glove pitch is corrected downward by 25 degrees. In Hands & feedback,
+  Wrist tips down/up changes it in 5-degree steps; nearer/farther and lower/higher
+  move the visible wrist in 5 mm steps. These adjustments leave controller hit
+  positions and flight inputs unchanged. Physical comfort remains a headset check.
+- VT-7 dashboard fitting starts 25% larger, then checks surrounding clearance.
+  Existing manually placed VT-7 panels enlarge once (within the scale limit) and
+  move slightly toward the pilot to allow for the thicker scaled panel. Other
+  aircraft scales are unchanged. Edit layout and Console setup remain available.
+- The diagnostic input helper has been removed. The final game restart loads only
+  the production mod; no automatic aircraft switches or controller tests run.

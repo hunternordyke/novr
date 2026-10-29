@@ -18,7 +18,8 @@ internal sealed class CockpitLayout : MonoBehaviour
     }
     internal static CockpitLayout? Instance { get; private set; }
     internal static bool Active => Instance?._active == true;
-    private bool _active, _leftHanded;
+    private bool _active, _leftHanded, _panelChanged;
+    private float _panelScale;
     private Aircraft? _aircraft;
     private Vector3 _stick, _throttle, _panel, _calibration, _anchor;
     private Quaternion _panelRotation, _recenterRotation;
@@ -27,9 +28,9 @@ internal sealed class CockpitLayout : MonoBehaviour
     private Material? _rayMaterial;
     internal static Vector3? StickPreview => Active ? Instance!._stick : null;
     internal static Vector3? ThrottlePreview => Active ? Instance!._throttle : null;
-    internal static Vector3 PanelPosition => Active ? Instance!._panel : ModConfiguration.Instance.CockpitPanelPosition.Value;
-    internal static Quaternion PanelRotation => Active ? Instance!._panelRotation : Quaternion.Euler(
-        ModConfiguration.Instance.CockpitPanelTilt.Value, ModConfiguration.Instance.CockpitPanelYaw.Value, ModConfiguration.Instance.CockpitPanelRoll.Value);
+    internal static Vector3 PanelPosition => Active ? Instance!._panel : CockpitPanelPlacement.Position;
+    internal static Quaternion PanelRotation => Active ? Instance!._panelRotation : CockpitPanelPlacement.Rotation;
+    internal static float PanelScale => Active ? Instance!._panelScale : CockpitPanelPlacement.Scale;
     internal static string Hint => "EDIT LAYOUT  •  GRIP A HANDLE OR PANEL TO MOVE  •  VIEW → SAVE LAYOUT";
     internal static bool Held(Element element) => Active && (Instance!._hands[0].Element == element || Instance._hands[1].Element == element);
     internal static bool Hovered(Element element) => Active && (Instance!._hands[0].Hover == element || Instance._hands[1].Hover == element);
@@ -41,7 +42,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         if (_active || !GameManager.GetLocalAircraft(out var aircraft) || CameraStateManager.cameraMode != CameraMode.cockpit) return;
         CockpitProfiles.Instance?.Refresh();
         _stick = CockpitProfiles.StickPosition; _throttle = CockpitProfiles.ThrottlePosition;
-        _panel = BoundPanel(PanelPosition); _panelRotation = PanelRotation;
+        _panel = PanelPosition; _panelRotation = PanelRotation; _panelScale = PanelScale; _panelChanged = false;
         _aircraft = aircraft; _leftHanded = ModConfiguration.Instance.MotionControls.LeftHanded.Value;
         _calibration = NOVRHeadsetData.TranslationCalibrationOffset; _anchor = NOVRHeadsetData.TranslationAnchor;
         _recenterRotation = NOVRHeadsetData.RotationCalibrationOffset;
@@ -61,13 +62,8 @@ internal sealed class CockpitLayout : MonoBehaviour
         if (save && sameAircraft)
         {
             CockpitProfiles.Instance?.SaveHandles(_stick, _throttle);
-            var settings = ModConfiguration.Instance;
-            settings.CockpitPanelPosition.Value = _panel;
-            var angles = _panelRotation.eulerAngles;
-            settings.CockpitPanelTilt.Value = Mathf.DeltaAngle(0, angles.x);
-            settings.CockpitPanelYaw.Value = Mathf.DeltaAngle(0, angles.y);
-            settings.CockpitPanelRoll.Value = Mathf.DeltaAngle(0, angles.z);
-            settings.Config.Save();
+            if (_panelChanged) CockpitPanelPlacement.Instance?.Save(_panel, _panelRotation, _panelScale);
+            ModConfiguration.Instance.Config.Save();
         }
         MotionFlightController.Instance?.ResetGrips(); ControllerActions.Instance?.ResetButtons();
     }
@@ -105,7 +101,11 @@ internal sealed class CockpitLayout : MonoBehaviour
     {
         var drag = _hands[index];
         drag.Gate.Update(hand.Valid, hand.Grip);
-        if (!drag.Gate.Held) drag.Element = Element.None;
+        if (!drag.Gate.Held)
+        {
+            if (drag.Element != Element.None && hand.Valid) InteractionHaptics.Pulse(hand.Device, .12f, .02f, InteractionCue.Release);
+            drag.Element = Element.None;
+        }
         var ray = new Ray(hand.AimPosition, hand.AimRotation * Vector3.forward);
         drag.Hover = hand.Valid ? Select(hand.Position, ray, index, out _) : Element.None;
         if (drag.Gate.Pressed && drag.Hover != Element.None)
@@ -121,8 +121,10 @@ internal sealed class CockpitLayout : MonoBehaviour
             var delta = hand.Position - drag.StartHand;
             if (drag.Element == Element.Panel)
             {
-                _panel = BoundPanel(hand.Position + hand.Rotation * drag.Offset);
-                _panelRotation = hand.Rotation * drag.RotationOffset;
+                var position = BoundPanel(hand.Position + hand.Rotation * drag.Offset);
+                var rotation = hand.Rotation * drag.RotationOffset;
+                _panelChanged |= Vector3.Distance(position, _panel) > .0001f || Quaternion.Angle(rotation, _panelRotation) > .05f;
+                _panel = position; _panelRotation = rotation;
             }
             else
             {
@@ -157,7 +159,7 @@ internal sealed class CockpitLayout : MonoBehaviour
             {
                 var rotation = Quaternion.Inverse(_panelRotation);
                 var origin = rotation * (ray.origin - _panel); var direction = rotation * ray.direction;
-                var size = ModConfiguration.Instance.CockpitPanelScale.Value;
+                var size = PanelScale;
                 if (!PointerGeometry.IntersectRect(origin.x, origin.y, origin.z + .05f * size,
                     direction.x, direction.y, direction.z, -.385f * size, -.18f * size, .385f * size, .18f * size, out along)) continue;
             }
@@ -174,7 +176,7 @@ internal sealed class CockpitLayout : MonoBehaviour
     private float PanelDistance(Vector3 hand)
     {
         var p = Quaternion.Inverse(_panelRotation) * (hand - _panel);
-        var scale = ModConfiguration.Instance.CockpitPanelScale.Value;
+        var scale = PanelScale;
         var closest = new Vector3(Mathf.Clamp(p.x, -.385f * scale, .385f * scale), Mathf.Clamp(p.y, -.18f * scale, .18f * scale), -.05f * scale);
         return Vector3.Distance(p, closest);
     }
@@ -195,8 +197,8 @@ internal sealed class CockpitLayout : MonoBehaviour
             go.layer = (int)LayerHelper.GetVrUiLayer();
         }
         _rays[index]!.enabled = true;
-        _rays[index]!.SetPosition(0, root.TransformPoint(hand.AimPosition + CockpitProfiles.SeatOffset));
-        _rays[index]!.SetPosition(1, root.TransformPoint(GripPosition(element) + CockpitProfiles.SeatOffset));
+        _rays[index]!.SetPosition(0, root.TransformPoint(hand.AimPosition));
+        _rays[index]!.SetPosition(1, root.TransformPoint(GripPosition(element)));
     }
     private void Release()
     {
@@ -204,7 +206,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         foreach (var ray in _rays) if (ray != null) ray.enabled = false;
     }
     private static void Pulse(ControllerSample hand)
-    { if (hand.Device.isValid && hand.Device.TryGetHapticCapabilities(out var c) && c.supportsImpulse) hand.Device.SendHapticImpulse(0, .2f, .035f); }
+    { InteractionHaptics.Pulse(hand.Device, cue: InteractionCue.Grab); }
     private void OnDisable() => Finish(false);
     private void OnDestroy()
     {

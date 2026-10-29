@@ -6,8 +6,8 @@ using UnityEngine;
 
 namespace NOVR.MotionControls;
 
-// Profile coordinates are relative to the recentered play space. Seat translation
-// moves the headset and both hands together, preserving their relative geometry.
+// Handle coordinates are fixed in the cockpit. Seat translation moves only the
+// headset and tracked hands, preserving their relative geometry and reach.
 [DefaultExecutionOrder(-1300)]
 internal sealed class CockpitProfiles : MonoBehaviour
 {
@@ -72,6 +72,15 @@ internal sealed class CockpitProfiles : MonoBehaviour
             _current.Seat.Value = BoundSeat(_current.Seat.Value);
             if (!TrackedControllers.Finite(_current.Stick.Value)) _current.Stick.Value = (Vector3)settings.StickPosition.DefaultValue;
             if (!TrackedControllers.Finite(_current.Throttle.Value)) _current.Throttle.Value = defaultThrottle;
+            var cockpitAnchored = config.Bind(section, "Cockpit Anchored Handles Applied", false,
+                "One-time conversion of saved seat-relative handles to fixed cockpit positions. Seat adjustment no longer moves the handles.");
+            if (!cockpitAnchored.Value)
+            {
+                var offset = _current.Seat.Value;
+                if (settings.LeftHanded.Value) offset.x = -offset.x;
+                _current.Stick.Value += offset; _current.Throttle.Value += offset;
+                cockpitAnchored.Value = true;
+            }
             _profiles.Add(identity, _current);
         }
         MotionFlightController.Instance?.ResetGrips();

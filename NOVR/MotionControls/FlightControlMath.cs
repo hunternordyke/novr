@@ -49,6 +49,18 @@ internal static class FlightControlMath
                 Axis((float)Math.Atan2(tiltX, tiltY) * radiansToDegrees / angle, deadzone, exponent));
     }
 
+    public static float StickTwist(float rotationY, float rotationW, float angle, float deadzone, float exponent)
+    {
+        // Swing/twist decomposition around cockpit up: project the relative
+        // quaternion onto Y. Pure pitch/roll swing contributes no rudder.
+        if (!IsFinite(rotationY) || !IsFinite(rotationW) || !IsFinite(angle) || angle <= 0f ||
+            rotationY * rotationY + rotationW * rotationW < 0.000001f) return 0f;
+        var degrees = 2f * (float)Math.Atan2(rotationY, rotationW) * (180f / (float)Math.PI);
+        if (degrees > 180f) degrees -= 360f;
+        if (degrees < -180f) degrees += 360f;
+        return Axis(degrees / angle, deadzone, exponent);
+    }
+
     // The game's simulatedThrottle is in binding space, before negative-range/collective conversion.
     public static float ToSimulatedThrottle(float throttle, bool negativeRange, bool invertedCollective)
     {

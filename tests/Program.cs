@@ -1,11 +1,123 @@
 using NOVR.MotionControls;
 
 var passed = 0;
-Check("VTOL-style buttons keep throttle brakes, countermeasures and target selection separate", () =>
+Check("Either hand can acquire the pointer with a fresh trigger", () =>
+{
+    foreach (var preferLeft in new[] { false, true })
+    {
+        var p = new PointerHandSelection();
+        p.Update(preferLeft, true, 0, true, true, 0, true);
+        True(p.Left == preferLeft);
+        p.Update(preferLeft, true, preferLeft ? 0 : 1, true, true, preferLeft ? 1 : 0, true);
+        True(p.Left != preferLeft && p.Trigger.Pressed);
+    }
+});
+Check("Pointer drag ownership survives other-hand presses and its release frame", () =>
+{
+    var p = new PointerHandSelection();
+    p.Update(false, true, 0, true, true, 0, true);
+    p.Update(false, true, 1, true, true, 0, true);
+    p.Update(false, true, 1, true, true, 1, true);
+    True(p.Left && p.Trigger.Held && !p.Trigger.Pressed);
+    p.Update(false, true, 0, true, true, 1, true);
+    True(p.Left && p.Trigger.Released);
+    p.Update(false, true, 0, true, true, 1, true);
+    True(p.Left && !p.Trigger.Pressed);
+    p.Update(false, true, 0, true, true, 0, true);
+    p.Update(false, true, 0, true, true, 1, true);
+    True(!p.Left && p.Trigger.Pressed);
+});
+Check("Held triggers cannot acquire clicks when tracking or menus return", () =>
+{
+    var p = new PointerHandSelection();
+    p.Update(false, true, 1, true, true, 1, true);
+    True(!p.Trigger.Held && !p.Trigger.Pressed);
+    p.Update(false, true, 0, true, true, 0, true);
+    p.Update(false, true, 1, true, true, 0, true);
+    True(p.Left && p.Trigger.Pressed);
+    p.Reset();
+    p.Update(false, true, 1, true, true, 1, true);
+    True(!p.Trigger.Held && !p.Trigger.Pressed);
+});
+Check("Pointer tracking loss cancels without a release-click or held-hand takeover", () =>
+{
+    var p = new PointerHandSelection();
+    p.Update(false, true, 0, true, true, 0, true);
+    p.Update(false, true, 1, true, true, 0, true);
+    p.Update(false, true, 1, true, true, 1, true);
+    p.Update(false, false, 0, false, true, 1, true);
+    True(p.Left && !p.Trigger.Released && !p.Trigger.Held);
+    p.Update(false, true, 1, true, true, 0, true);
+    True(!p.Trigger.Pressed);
+    p.Update(false, true, 0, true, true, 0, true);
+    p.Update(false, true, 1, true, true, 0, true);
+    True(p.Left && p.Trigger.Pressed);
+});
+Check("Idle pointer follows the only targeted or available hand", () =>
+{
+    var p = new PointerHandSelection();
+    p.Update(false, true, 0, true, true, 0, false);
+    True(p.Left && !p.Trigger.Pressed);
+    p.Update(false, false, 0, false, true, 0, false);
+    True(!p.Left && !p.Trigger.Pressed);
+});
+Check("Arriving on a panel with a held trigger never creates a new press", () =>
+{
+    var p = new PointerHandSelection();
+    p.Update(false, true, 0, false, true, 0, false);
+    p.Update(false, true, 1, false, true, 0, false);
+    p.Update(false, true, 1, true, true, 0, false);
+    True(!p.Trigger.Pressed && !p.Left);
+    p.Update(false, true, 0, true, true, 0, false);
+    p.Update(false, true, 1, true, true, 0, false);
+    True(p.Left && p.Trigger.Pressed);
+});
+Check("Interaction cues are finite, brief, peak bounded and fade to silence", () =>
+{
+    foreach (var cue in Enum.GetValues<InteractionCue>())
+    {
+        var samples = InteractionSoundWave.Create(cue);
+        True(samples.Length >= 1000 && samples.Length <= 3000);
+        True(samples.All(x => float.IsFinite(x) && Math.Abs(x) <= 1));
+        Near(samples[0], 0); Near(samples[^1], 0);
+        True(samples.Any(x => Math.Abs(x) > .05f));
+        True(samples.TakeLast(100).Max(x => Math.Abs(x)) < .01f);
+    }
+});
+
+Check("Stick twist steers right and left with symmetric full travel", () =>
+{
+    foreach (var degrees in new[] { -60f, -30f, -15f, 0f, 15f, 30f, 60f })
+    {
+        var q = System.Numerics.Quaternion.CreateFromAxisAngle(System.Numerics.Vector3.UnitY, degrees * MathF.PI / 180f);
+        Near(FlightControlMath.StickTwist(q.Y, q.W, 30, 0, 1), Math.Clamp(degrees / 30f, -1, 1));
+        Near(FlightControlMath.StickTwist(-q.Y, -q.W, 30, 0, 1), Math.Clamp(degrees / 30f, -1, 1));
+    }
+});
+Check("Pitch and roll swing do not introduce stick twist", () =>
+{
+    foreach (var axis in new[] { System.Numerics.Vector3.UnitX, System.Numerics.Vector3.UnitZ, System.Numerics.Vector3.Normalize(new(1, 0, 1)) })
+    {
+        var swing = System.Numerics.Quaternion.CreateFromAxisAngle(axis, .6f);
+        Near(FlightControlMath.StickTwist(swing.Y, swing.W, 30, .06f, 1.5f), 0);
+        var twist = System.Numerics.Quaternion.CreateFromAxisAngle(System.Numerics.Vector3.UnitY, MathF.PI / 12);
+        var combined = swing * twist;
+        Near(FlightControlMath.StickTwist(combined.Y, combined.W, 30, 0, 1), .5f);
+    }
+});
+Check("Twist respects deadzone and handles invalid or ambiguous rotations", () =>
+{
+    Near(FlightControlMath.StickTwist(MathF.Sin(MathF.PI / 360), MathF.Cos(MathF.PI / 360), 30, .06f, 1.5f), 0);
+    Near(FlightControlMath.StickTwist(0, 0, 30, 0, 1), 0);
+    Near(FlightControlMath.StickTwist(float.NaN, 1, 30, 0, 1), 0);
+    Near(FlightControlMath.StickTwist(1, float.PositiveInfinity, 30, 0, 1), 0);
+    Near(FlightControlMath.StickTwist(1, 1, 0, 0, 1), 0);
+});
+Check("VTOL-style throttle leaves target selection to the stick hand", () =>
 {
     var layout = ThrottleBindingProfiles.Get(ThrottleBindingLayout.VtolStyle);
     True(layout.Brake == ControllerButton.Trigger && layout.Countermeasures == ControllerButton.Primary);
-    True(layout.Target == ControllerButton.StickClick && layout.NextCountermeasure == ControllerButton.Secondary);
+    True(layout.Target == ControllerButton.None && layout.NextCountermeasure == ControllerButton.Secondary);
     True(!ThrottleBindingProfiles.Conflicts(layout, true) && !ThrottleBindingProfiles.Conflicts(layout, false));
 });
 Check("Frame unlock button does not steal the Touch map button", () =>
@@ -520,6 +632,39 @@ Check("map zoom ignores invalid input and stays inside game limits", () =>
     True(PointerGeometry.Zoom(2, 1, 50) < 2.2f);
 });
 
+Check("helmet gesture is limited to the brow in head-relative meters", () =>
+{
+    True(HelmetGestureMath.AtBrow(.12f,.07f,.14f));
+    True(HelmetGestureMath.AtBrow(-.12f,.07f,.14f));
+    True(!HelmetGestureMath.AtBrow(0,-.3f,.14f));
+    True(!HelmetGestureMath.AtBrow(0,.07f,-.14f));
+    True(!HelmetGestureMath.AtBrow(.4f,.07f,.14f));
+    True(!HelmetGestureMath.AtBrow(float.NaN,0,0));
+});
+Check("helmet trigger requires release after arrival and tracking recovery", () =>
+{
+    var gate = new ControllerButtonGate();
+    gate.Update(false,1); gate.Update(true,1); True(!gate.Pressed);
+    gate.Update(true,0); gate.Update(true,1); True(gate.Pressed);
+    gate.Update(true,1); True(!gate.Pressed);
+    gate.Update(false,1); gate.Update(true,1); True(!gate.Pressed);
+});
+
+Check("MIL detent preserves every regrab command and reaches idle/full afterburner", () =>
+{
+    foreach (var mil in new[] {.8f, .9f, .998f})
+    foreach (var width in new[] {.016f/.05f, .016f/.25f, .016f/.6f})
+    {
+        for (var i = 0; i <= 100; i++) Near(ThrottleDetent.Output(ThrottleDetent.Input(i/100f, mil, width), mil, width), i/100f);
+        Near(ThrottleDetent.Output(mil+width*.01f, mil, width), mil);
+        Near(ThrottleDetent.Output(mil+width*.99f, mil, width), mil);
+        True(ThrottleDetent.Output(mil+width+.0001f, mil, width)>mil);
+        True(ThrottleDetent.Output(mil-.0001f, mil, width)<mil);
+        Near(ThrottleDetent.Output(-1, mil, width), 0);
+        Near(ThrottleDetent.Output(2, mil, width), 1);
+    }
+});
+
 Check("eject cover requires a separate released grip before pulling", () =>
 {
     var eject = new GuardedEjection();
@@ -533,15 +678,16 @@ Check("eject cover requires a separate released grip before pulling", () =>
     True(eject.Pull(.045f, 0, true));
     True(!eject.Open && !eject.Pull(1, 10, true));
 });
-Check("laser ejection needs a sustained hold, never a release or a cancelled pull", () =>
+Check("laser ejection is immediate after separate guard release and new press", () =>
 {
     var eject = new GuardedEjection();
     eject.LiftCover(); eject.Release(); True(eject.BeginPull());
-    True(!eject.Pull(10, .74f, false));
+    True(eject.Pull(0, 0, false));
+    eject.LiftCover(); eject.Release(); True(eject.BeginPull());
     eject.Release();
     True(!eject.Pull(10, 2, false));
     True(eject.BeginPull());
-    True(eject.Pull(0, .75f, false));
+    True(eject.Pull(0, 0, false));
 });
 Check("focus, aircraft and menu resets cannot leave ejection armed", () =>
 {
@@ -639,11 +785,11 @@ if (args.Length == 2)
         using var reader = new StreamReader(stream);
         var json = reader.ReadToEnd();
         var runtimeAsset = CockpitPanelAsset.Load(json);
-        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 19 && runtimeAsset.materials.Length > 3);
+        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 21 && runtimeAsset.materials.Length > 3);
         using var document = System.Text.Json.JsonDocument.Parse(json);
         var model = document.RootElement;
         var groups = model.GetProperty("groups").EnumerateArray().Select(g => g.GetProperty("name").GetString()).ToHashSet();
-        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "hover", "hover_lamp", "zoom_in", "zoom_out", "mfd_left_prev", "mfd_left_next", "mfd_right_prev", "mfd_right_next" })
+        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "hover", "hover_lamp", "zoom_in", "zoom_out", "mfd_left_prev", "mfd_left_next", "mfd_right_prev", "mfd_right_next", "mfd_left_slave", "mfd_right_slave" })
             True(groups.Contains(name));
         var materials = model.GetProperty("materials").GetArrayLength();
         var triangles = 0;
@@ -663,4 +809,22 @@ if (args.Length == 2)
         PatchCompatibility.Verify(args[0], args[1]));
 }
 
+if (args.Length >= 1)
+{
+    using var asm = Mono.Cecil.AssemblyDefinition.ReadAssembly(args[0]);
+    foreach (var side in new[] { "left", "right" })
+    Check("Embedded " + side + " glove retains valid skin, poses and a bounded geometry budget", () =>
+    {
+        var resource=asm.MainModule.Resources.OfType<Mono.Cecil.EmbeddedResource>().Single(r=>r.Name=="NOVR.Glove."+side+".json");
+        using var reader=new StreamReader(resource.GetResourceStream());
+        var a=Newtonsoft.Json.Linq.JObject.Parse(reader.ReadToEnd());
+        var vertices=a["vertices"]!.ToObject<float[]>()!; var weights=a["weights"]!.ToObject<float[]>()!;
+        var indices=a["indices"]!.ToObject<int[]>()!; var triangles=a["triangles"]!.ToObject<int[]>()!;
+        var bones=a["bones"]!;True(bones.Count()==31 && vertices.Length/3==3028 && triangles.Length/3==4899);
+        True(vertices.All(float.IsFinite) && weights.Length==vertices.Length/3*4 && indices.Length==weights.Length);
+        True(triangles.All(i=>i>=0 && i<vertices.Length/3) && indices.All(i=>i>=0 && i<31));
+        for(var i=0;i<weights.Length;i+=4)Near(weights[i]+weights[i+1]+weights[i+2]+weights[i+3],1,.0001f);
+        for(var i=0;i<31;i++){True((int)bones[i]!["parent"]!<i);foreach(var pose in new[]{"open","fist"}){var q=a[pose]![i]!.ToObject<float[]>()!;True(q.Length==4&&q.All(float.IsFinite));Near(q.Sum(x=>x*x),1,.001f);}}
+    });
+}
 Console.WriteLine($"{passed} checks passed.");

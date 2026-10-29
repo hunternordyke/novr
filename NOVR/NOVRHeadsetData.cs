@@ -19,11 +19,17 @@ public class NOVRHeadsetData : NOVRBehaviour
     public static Vector3 TranslationAnchor { get; private set; }
     public static Vector3 Translation { get; private set; }
     public static Vector3 TranslationCalibrationOffset { get; private set; }
-    public static Vector3 TranslationError => Translation - TranslationCalibrationOffset - TranslationAnchor;
+    public static Vector3 TranslationError => Quaternion.Inverse(RotationCalibrationOffset) * (Translation - TranslationAnchor) - TranslationCalibrationOffset;
 
     public static Quaternion Rotation { get; private set; }
     public static Quaternion RotationCalibrationOffset { get; private set; } = Quaternion.identity;
     public static Quaternion RotationError => Quaternion.Inverse(RotationCalibrationOffset) * Rotation;
+
+    // One rigid tracking-space transform for the head, grip and aim poses.
+    // Previously only orientations were rotated on recenter, leaving controller
+    // positions in the old room axes and moving their markers away from the hands.
+    internal static Vector3 MapTrackingPosition(Vector3 position) =>
+        TranslationAnchor + RotationCalibrationOffset * (TranslationCalibrationOffset + position);
     
     
     
@@ -130,7 +136,7 @@ public class NOVRHeadsetData : NOVRBehaviour
     {
         if (_trackingRotationMethod != null && _trackingPositionMethod != null)
         {
-            Translation = TranslationAnchor + TranslationCalibrationOffset + (Vector3)_trackingPositionMethod.Invoke(null, TrackingMethodArgs);
+            Translation = MapTrackingPosition((Vector3)_trackingPositionMethod.Invoke(null, TrackingMethodArgs));
             Rotation = RotationCalibrationOffset * (Quaternion)_trackingRotationMethod.Invoke(null, TrackingMethodArgs);
         }
     }

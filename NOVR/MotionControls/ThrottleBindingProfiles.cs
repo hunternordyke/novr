@@ -14,7 +14,7 @@ internal static class ThrottleBindingProfiles
     internal static ThrottleButtons Get(ThrottleBindingLayout layout) => layout switch
     {
         ThrottleBindingLayout.VtolStyle => new(ControllerButton.Trigger, ControllerButton.Primary,
-            ControllerButton.StickClick, ControllerButton.Secondary),
+            ControllerButton.None, ControllerButton.Secondary),
         ThrottleBindingLayout.CountermeasureTrigger => new(ControllerButton.PrimaryOrStickClick, ControllerButton.Trigger,
             ControllerButton.ShoulderOrPrimary, ControllerButton.Secondary),
         ThrottleBindingLayout.BrakeTrigger => new(ControllerButton.Trigger, ControllerButton.ShoulderOrPrimary,

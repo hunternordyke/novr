@@ -1,9 +1,11 @@
 # Universal cockpit console
 
-NOVR 0.4.5.0 adds one shared 3D console for every aircraft. It appears low in front
-of the seated pilot and stays fixed in cockpit space as the headset moves. Its
-layout, position, tilt and size are shared across aircraft. Existing per-aircraft
-seat offsets still apply.
+NOVR 0.4.6.1 uses one refined 3D console model in every aircraft. Its default
+position, tilt and size fit the native dashboard surface in physical cockpit meters.
+A one-time interior geometry check adds clearance where needed; broad dashboards
+choose the area in front of the pilot. Imported cockpit scale does not alter placement.
+Seat adjustment moves the view and tracked hands, leaving the stick, throttle and
+console fixed. Saved panel placement is per aircraft, shared across handedness.
 
 ## Displays
 
@@ -41,7 +43,7 @@ moving to another control; arriving with a held press does not activate it.
 If squeezing trigger and grip together, release both before a new grab.
 
 Hints describe the current interaction: pinch/grab instructions when close,
-trigger instructions when pointing, and progress during a laser eject pull.
+trigger instructions when pointing, and confirmation after an eject pull.
 These hints take priority over entry messages and tracking notices for the other
 hand. Result messages such as **GEAR LOCKED ON GROUND** remain visible for the
 control that produced them. Point at the front of the console to use its laser controls.
@@ -57,11 +59,13 @@ control that produced them. Point at the front of the console to use its laser c
 | < / > under each MFD | Previous/next page | Trigger or grip near the key |
 | MAP | Trigger expands tactical map | Trigger or grip near the key |
 | Red eject guard | Trigger lifts/closes cover | Trigger or grip near the cover |
-| Yellow eject handle | After opening the cover and releasing trigger, hold trigger on the handle for 0.75 s | After opening the cover and releasing your press, hold trigger or grip on the handle and pull it toward you at least 4.5 cm |
+| Yellow eject handle | After opening the cover and releasing trigger, press trigger on the handle | After opening the cover and releasing your press, hold trigger or grip on the handle and pull it toward you at least 4.5 cm |
 
 Version 0.4.5.6 measures direct gear and eject travel in physical centimeters,
 independent of console size or tilt. Pull the handle out toward you, perpendicular
 to the panel face; sideways motion and pushing away do not count as an eject pull.
+
+There is no added hold timer. The game still performs its native canopy/seat sequence.
 
 A completed pull shows **EJECT REQUESTED** while the game processes it, then
 **EJECTION STARTED** only after the aircraft confirms it. The console reserves
@@ -71,7 +75,7 @@ shows **EJECT NOT CONFIRMED**. Release, reopen the guard and make another delibe
 pull to retry. It never retries automatically.
 
 Ejection requires a fresh press after opening the cover. Leaving the handle during
-a laser hold cancels the pull. Pausing, menus, tracking/focus loss, recentering and
+a direct pull cancels it. Pausing, menus, tracking/focus loss, recentering and
 aircraft changes reset the guard. Aircraft without switchable ordinary flight assist show an explicit unavailable
 hint and a centered ASSIST lever; the wrist action is disabled with an explanation.
 The game still applies its own flight-input,
@@ -82,6 +86,26 @@ actual aircraft state. A radar action does nothing if that aircraft has no radar
 
 The native radial wheel still has no dedicated motion-controller binding. The
 console and wrist Flight page supply the supported actions, including ejection.
+
+## Left thumbstick on the MFD
+
+Press **L STK** between the page arrows on either display. It brings **Map** onto
+that MFD and marks it **SLAVED**. The physical left thumbstick pans the map;
+click it to recenter. Press **SLAVED** again to return the stick to flight controls.
+Changing away from Map, hiding the console or leaving the cockpit releases it.
+The +/− buttons change map zoom. This first interactive page is Map; the native
+Tactical and Sensor feeds remain display-only.
+
+MFD ownership suppresses the same thumbstick's VTOL adjustment and, with a
+left-handed stick, thumbstick yaw/target click. Stick-twist rudder remains available.
+No map input is applied while the wrist menu, layout editor or tracking is unavailable.
+
+## Haptic feedback
+
+Short pulses confirm grabs, releases, panel/menu presses, lever activation,
+throttle end stops and the military-power shelf. Afterburner entry uses a stronger
+pulse. `Motion Controls / Interaction Haptic Strength` scales these cues; 0 turns
+them off. Hardware support and perceived strength need headset testing.
 
 ## Hover assist
 
@@ -107,17 +131,18 @@ aircraft using collective input, or **THROTTLE** otherwise. Helicopters use lift
 Use **View → Edit cockpit layout** to move each handle and the console independently
 with grip. Rotate your wrist to rotate the panel. It becomes an outline while editing,
 so it cannot obscure handles. Reopen View to **Save layout** or **Cancel layout**.
-Panel position/rotation is global; handles are saved per aircraft and handedness.
+Panel position/rotation/size save per aircraft; handles save per aircraft and handedness.
+Moving only a handle leaves the panel automatically anchored.
 
 
 Open **View → Flight actions → Console setup** to adjust position in 2 cm steps,
 tilt in 5-degree steps, or size in 5% steps. Adjustments preview live on the console;
 its flight controls are inactive until the wrist menu closes.
-**Reset console** restores the shared defaults. **F6** shows/hides the console;
+**Anchor to dashboard** clears the saved panel override and restores automatic fitting. **F6** shows/hides the console;
 hiding it restores the previous forward status UI and minimap. The console is
 independent of F7's motion-stick/throttle enable setting.
 
-Defaults: 77 cm wide, 36 cm tall, centered 32 cm below and 65 cm forward of the
+Free-placement fallback before automatic fitting: 77 cm wide, 36 cm tall, centered 32 cm below and 65 cm forward of the
 recentered seat, tilted upward 20 degrees. Settings live in
 `[Universal Cockpit Panel]` in the NOVR configuration.
 
@@ -135,7 +160,7 @@ The design takes general inspiration from the grouped cockpit controls in the
 and the striped emergency handles described in
 [NASA's F-111 cockpit reference](https://www.nasa.gov/image-article/f-111-advanced-fighter-technology-integration-2/).
 It is an original, simplified universal layout, not a replica of either aircraft.
-No military/game model or texture is included. Direct trigger interaction and
+No Nuclear Option or military reference model/texture is included in the panel. The separately attributed Valve gloves are bundled under their own license. Direct trigger interaction and
 contextual hints follow the approach described in the
 [VTOL VR manual](https://cdn.steamstatic.com/steam/apps/667970/manuals/VTOL_VR_Manual.pdf?t=1649333292).
 
@@ -197,3 +222,76 @@ unlock/clear and the replacement inspection magnifier. The latter verify both
 actual OpenXR eye projections remain unchanged while the image is visible.
 The helicopter's final lower default is compiled; its ergonomics remain for
 headset testing. Captures are inspection views, not stereo comfort validation.
+
+## Dashboard clearance audit — 0.4.6.1
+
+The installed set contains 32 aircraft definitions, including workshop aircraft.
+A conservative panel-body/interior triangle test found clear automatic placements
+for 26. It excludes exterior and simplified LOD shells that are not rendered in
+the cockpit, plus the original handles replaced by NOVR. This is geometry analysis,
+not a claim that every cockpit was flown or inspected in stereo.
+
+The MiG-29's small angled display leaves a tight intersection with the cockpit tub
+after the bounded adjustment. Use Edit layout to bring it farther toward you or
+move it toward the center; a roughly 6 cm additional forward clearance cleared the
+body envelope in the scan. Five definitions lack a usable frontal display plane:
+Aryx F-16M, Aryx Interceptor, blacknight2u F-117A, EW-25, and P_Trisurface1.
+They use the free-placement fallback; save a custom per-aircraft placement.
+
+Wide multi-seat dashboards shift the fitted center toward the pilot. Narrow or
+recessed screens receive a small forward clearance, with a modest size reduction
+when needed. The model retains the same control layout. Native levers, canopy
+motion, personal reach and larger manual scale settings still need a headset check.
+
+## Pilot hands, helmet gesture and interaction feedback — 0.4.6.1
+
+Rigged gloves use Valve's BSD-licensed SteamVR slim meshes and reference poses.
+They keep proper UV seams and normal details, with a tint sampled from the installed
+pilot. The pilot's own sleeve geometry/materials remain local. A private texture
+copy (up to 2048 square) adds mild sharpening and subtle fabric detail once on
+aircraft entry; the original atlas is untouched. Native pilot animations and other players are untouched.
+Grip curls three fingers and thumb; trigger curls index. This is controller-driven
+posing, not optical finger tracking. The two gloves total 9,798 triangles.
+
+Sleeves default to 82% of native thickness with unchanged lengths and wrist targets.
+View → Flight controls → Button bindings → Hands & feedback includes Slimmer/Wider
+sleeves, Gloves/Sleeves toggles, wrist-angle and hand-offset adjustments. Sleeves hide beyond their reachable envelope. Config
+`Glove Wrist Offset` / `Glove Wrist Rotation` adjust visuals only; interaction points
+continue using the runtime's grip pose. These values need a headset fit check.
+
+Bring either free hand to the brow, then make a fresh trigger press to toggle native
+night vision. A small cue identifies the gesture area. Held-trigger arrival and
+tracking recovery cannot toggle it; menus, map, layout and occupied hands suppress it.
+
+`Interaction Sound Volume` (default 0.25) controls original spatial grip/release,
+button, detent, guard and helmet cues. The Hands & feedback page has sound-volume buttons.
+Zero mutes sound independently of `Interaction Haptic Strength`. Six pooled voices
+and seven pre-generated clips bound the audio cost; the aircraft mixer is reused
+where available.
+
+Runtime controller reads are shared per hand per frame, with immediate invalidation
+on calibration/seat changes. Panel state and MFD labels only refresh when changed.
+Pilot geometry reads and glove setup happen on aircraft entry, not every frame.
+No global game/SteamVR quality or streaming settings are changed. See NOVR-validation-0.4.6.1.txt
+for final checks; no headset FPS or stereo-comfort claim is made.
+
+## Final comfort adjustments
+
+- Either hand can operate menu and cockpit-panel pointers. Aim at a control and
+  make a fresh trigger press to take the pointer. Its owning hand retains a drag
+  through release; switching hands, entering a menu or recovering tracking cannot
+  turn a held trigger into a new click. Direct panel touch still works with either
+  free hand. Release a latched flight handle before using that hand on the panel.
+- Default throttle/collective travel is now 22 cm (previously 25 cm). Existing
+  untouched defaults migrate once; custom travel is preserved. Flight controls
+  still has Shorter/Longer travel buttons.
+- The default glove pitch is corrected downward by 25 degrees. In Hands & feedback,
+  Wrist tips down/up changes it in 5-degree steps; nearer/farther and lower/higher
+  move the visible wrist in 5 mm steps. These adjustments leave controller hit
+  positions and flight inputs unchanged. Physical comfort remains a headset check.
+- VT-7 dashboard fitting starts 25% larger, then checks surrounding clearance.
+  Existing manually placed VT-7 panels enlarge once (within the scale limit) and
+  move slightly toward the pilot to allow for the thicker scaled panel. Other
+  aircraft scales are unchanged. Edit layout and Console setup remain available.
+- The diagnostic input helper has been removed. The final game restart loads only
+  the production mod; no automatic aircraft switches or controller tests run.

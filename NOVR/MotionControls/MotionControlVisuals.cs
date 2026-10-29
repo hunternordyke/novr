@@ -14,6 +14,7 @@ internal sealed class MotionControlVisuals : IDisposable
     private readonly Transform _stickBase, _stickPivot, _throttleBase, _throttleHandle;
     private readonly Transform _stickHand, _throttleHand, _rail, _throttleCaption;
     private readonly Transform _sliderParts, _collectiveParts, _collectiveJoint, _collectiveShaft;
+    private readonly Transform _milMark;
     private readonly Transform[] _railTicks = new Transform[5];
     private readonly Renderer _stickGrip, _throttleGrip, _collectiveGrip;
     private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial, _textMaterial;
@@ -91,6 +92,11 @@ internal sealed class MotionControlVisuals : IDisposable
                 _railTicks[i] = Shape("Travel marker " + i, PrimitiveType.Cube, _throttleBase,
                     Vector3.zero, new Vector3(i % 2 == 0 ? .02f : .013f, .003f, .003f), _idleMaterial).transform;
 
+            _milMark = Child("MIL detent gate", _throttleBase);
+            Shape("Detent notch", PrimitiveType.Cube, _milMark, Vector3.zero, new Vector3(.025f, .004f, .007f), _hoverMaterial);
+            Shape("Detent notch edge", PrimitiveType.Cube, _milMark, new Vector3(.011f, .003f, .006f), new Vector3(.004f, .009f, .018f), _baseMaterial);
+            var milLabel = Label("MIL", _milMark, new Vector3(0, .018f, 0));
+            milLabel.characterSize = .0045f;
             _stickHand = Shape("Stick Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
             _throttleHand = Shape("Throttle Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
         }
@@ -118,10 +124,10 @@ internal sealed class MotionControlVisuals : IDisposable
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
         bool stickLatched = false, bool throttleLatched = false, bool stickTapMode = false, bool throttleTapMode = false,
-        bool brakesApplied = false, string throttleTitle = "THROTTLE", bool collective = false)
+        bool brakesApplied = false, string throttleTitle = "THROTTLE", bool collective = false, float yawDegrees = 0f, float milPower = -1f)
     {
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
-        _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
+        _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle) * Quaternion.Euler(0f, yawDegrees, 0f);
         _throttleBase.localPosition = throttle;
         // Keep captions near the pilot and just outside each grip: farther outboard
         // intersects cockpit walls, while centered text overlaps the HUD console.
@@ -169,9 +175,9 @@ internal sealed class MotionControlVisuals : IDisposable
         _stickGrip.sharedMaterial = stickHeld ? _heldMaterial : stickNear ? _hoverMaterial : _idleMaterial;
         _throttleGrip.sharedMaterial = throttleHeld ? _heldMaterial : throttleNear ? _hoverMaterial : _idleMaterial;
         _collectiveGrip.sharedMaterial = _throttleGrip.sharedMaterial;
-        _stickHand.gameObject.SetActive(stickTracked);
+        _stickHand.gameObject.SetActive(stickTracked && !PilotHandVisuals.Visible(ModConfiguration.Instance.MotionControls.LeftHanded.Value));
         _stickHand.localPosition = stickHand;
-        _throttleHand.gameObject.SetActive(throttleTracked);
+        _throttleHand.gameObject.SetActive(throttleTracked && !PilotHandVisuals.Visible(!ModConfiguration.Instance.MotionControls.LeftHanded.Value));
         _throttleHand.localPosition = throttleHand;
         var stickCaption = stickLatched ? "STICK LATCHED\nGRIP TO RELEASE" : stickHeld ? "STICK\nHELD" : stickTapMode ? "STICK\nTAP OR HOLD GRIP" : "STICK\nHOLD GRIP";
         if (_lastStickCaption != stickCaption) { _stickLabel.text = stickCaption; _lastStickCaption = stickCaption; }
@@ -181,6 +187,10 @@ internal sealed class MotionControlVisuals : IDisposable
             _brakeLabel.text = brakesApplied ? "BRAKES ON" : "BRAKES RELEASED";
             _brakeLabel.color = brakesApplied ? new Color(1f, .75f, .18f) : new Color(.65f, .72f, .78f);
         }
+        _milMark.gameObject.SetActive(!collective && milPower > 0 && milPower < 1);
+        _milMark.localPosition = new Vector3(-side * .07f, -.025f, (milPower - .5f) * travel);
+        var power = milPower > 0 && thrust >= milPower ? (thrust > milPower + .00001f ? " · AB" : " · MIL") : "";
+        throttleTitle += power;
         var percent = Mathf.RoundToInt(thrust * 100);
         var throttleCaption = throttleLatched ? "LATCHED\nGRIP TO RELEASE" : collective
             ? (throttleHeld ? "LIFT TO INCREASE" : throttleTapMode ? "TAP/HOLD + LIFT" : "GRIP + LIFT")

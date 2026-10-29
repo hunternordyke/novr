@@ -7,7 +7,7 @@ public sealed class ControllerBindings
     public readonly ConfigEntry<bool> PointerEnabled, CombatEnabled;
     public readonly ConfigEntry<ControllerButton> Fire, Countermeasures, NextWeapon, SelectTarget, NextCountermeasure, Map, WristMenu, ClearTargets, UnlockTarget, Brake;
     public readonly ConfigEntry<float> PointerResponse;
-    public readonly ConfigEntry<bool> RightBumperZoom;
+    public readonly ConfigEntry<bool> RightBumperZoom, SelectTargetOnStick;
     public readonly ConfigEntry<float> ViewZoomFactor;
     public ControllerBindings(ConfigFile config)
     {
@@ -20,7 +20,8 @@ public sealed class ControllerBindings
         Fire = config.Bind(section, "Fire - stick hand", ControllerButton.Trigger, "Hold while gripping the virtual stick to fire.");
         Countermeasures = config.Bind(section, "Countermeasures - throttle hand", ControllerButton.Primary, "Throttle action button: Frame D-pad down or Touch X. Hold while gripping to deploy selected countermeasures.");
         NextWeapon = config.Bind(section, "Next Weapon - stick hand", ControllerButton.Primary, "Stick action button: A in the right-handed layout. Release while gripping to cycle.");
-        SelectTarget = config.Bind(section, "Select Target - throttle hand", ControllerButton.StickClick, "Throttle thumbstick click selects under the existing head-directed target designator while gripping.");
+        // Keep the old key so existing custom button assignments survive the hand change.
+        SelectTarget = config.Bind(section, "Select Target - throttle hand", ControllerButton.StickClick, "Target-select button. Uses the stick hand when Select Target On Stick Hand is enabled; otherwise the throttle hand. Press and release while gripping to select under the head-directed designator.");
         NextCountermeasure = config.Bind(section, "Next Countermeasure - throttle hand", ControllerButton.Secondary, "Frame D-pad right, or Y on Touch-compatible controllers.");
         Map = config.Bind(section, "Map - stick hand", ControllerButton.OutsideOrSecondary, "Frame B, or B on Touch-compatible controllers. Opens/closes the tactical map.");
         WristMenu = config.Bind(section, "Wrist Menu - throttle hand", ControllerButton.Menu, "Frame View, or the Touch left menu button. F9 is a keyboard fallback.");
@@ -33,6 +34,15 @@ public sealed class ControllerBindings
             brakeDefault = ControllerButton.None;
         Brake = config.Bind(section, "Brake - throttle hand", brakeDefault,
             "Hold throttle trigger while gripping the throttle to use the game's wheel/air-brake input. Other layouts are available in the wrist Button bindings page.");
+        // Only move the recognized stock VTOL layout automatically. Older throttle
+        // presets, custom layouts and an explicitly saved hand choice are retained.
+        var stockVtol = Fire.Value == ControllerButton.Trigger && NextWeapon.Value == ControllerButton.Primary &&
+            ClearTargets.Value == ControllerButton.Top && UnlockTarget.Value == ControllerButton.SecondaryOrNone &&
+            Map.Value == ControllerButton.OutsideOrSecondary && WristMenu.Value == ControllerButton.Menu &&
+            Brake.Value == ControllerButton.Trigger && Countermeasures.Value == ControllerButton.Primary &&
+            SelectTarget.Value == ControllerButton.StickClick && NextCountermeasure.Value == ControllerButton.Secondary;
+        SelectTargetOnStick = config.Bind(section, "Select Target On Stick Hand", stockVtol,
+            "VTOL-style target selection uses the stick hand (right by default), while gripping or latched. Disable to keep a custom throttle-hand selection binding.");
         var upgraded = config.Bind(section, "VTOL Style Upgrade Applied", false, "One-time upgrade of the previous stock button layout; custom layouts are preserved.");
         if (!upgraded.Value)
         {
@@ -45,7 +55,8 @@ public sealed class ControllerBindings
         }
     }
 
-    internal ThrottleButtons ThrottleButtons => new(Brake.Value, Countermeasures.Value, SelectTarget.Value, NextCountermeasure.Value);
+    internal ThrottleButtons ThrottleButtons => new(Brake.Value, Countermeasures.Value,
+        SelectTargetOnStick.Value ? ControllerButton.None : SelectTarget.Value, NextCountermeasure.Value);
     internal void ApplyVtolStyle()
     {
         Fire.Value = ControllerButton.Trigger; NextWeapon.Value = ControllerButton.Primary;
@@ -61,7 +72,9 @@ public sealed class ControllerBindings
     {
         var preset = ThrottleBindingProfiles.Get(layout);
         Brake.Value = preset.Brake; Countermeasures.Value = preset.Countermeasures;
-        SelectTarget.Value = preset.Target; NextCountermeasure.Value = preset.NextCountermeasure;
+        SelectTargetOnStick.Value = layout == ThrottleBindingLayout.VtolStyle;
+        SelectTarget.Value = SelectTargetOnStick.Value ? ControllerButton.StickClick : preset.Target;
+        NextCountermeasure.Value = preset.NextCountermeasure;
         ControllerActions.Instance?.ResetButtons();
     }
 

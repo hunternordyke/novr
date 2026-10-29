@@ -20,13 +20,14 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private readonly GuardedEjection _ejection = new();
     private readonly EjectionRequest _ejectionRequest = new();
     private readonly ControllerButtonGate[] _directButtons = { new(), new() };
-    private readonly ControllerButtonGate _trigger = new();
+    private readonly PointerHandSelection _pointerHands = new();
+    private bool _rayLeft;
     private LineRenderer? _laser;
     private Transform? _dot;
     private Material? _pointerMaterial;
     private Text? _hint;
     private string? _active;
-    private int _owner = -1; // 0/1: direct left/right; 2: stick-hand laser
+    private int _owner = -1; // 0/1: direct left/right; 2: laser (hand retained in _rayLeft)
     private Vector3 _startHand;
     private float _pressTime;
     private bool _actionSent;
@@ -45,6 +46,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private readonly Dictionary<string, Vector3> _buttonRest = new();
     private readonly Dictionary<string, Vector3> _points = new()
     {
+        ["mfd_left_slave"] = Vector3.zero, ["mfd_right_slave"] = Vector3.zero,
         ["mfd_left_prev"] = Vector3.zero, ["mfd_left_next"] = Vector3.zero,
         ["mfd_right_prev"] = Vector3.zero, ["mfd_right_next"] = Vector3.zero,
         ["gear"] = new(0, 0, -.057f), ["radar"] = new(0, 0, -.036f),
@@ -54,9 +56,25 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         ["guard"] = new(0, -.05f, -.017f), ["eject"] = new(0, -.025f, 0)
     };
     internal static bool IsDocked(Transform widget) => Instance?._hud?.Contains(widget) == true;
+    internal static bool LeftStickSlaved => Instance?._visible == true && Instance._hud?.LeftStickSlaved == true && !WristMenu.IsOpen && !CockpitLayout.Active;
+    internal static Vector2 MapPan => Instance?._visible == true ? Instance._hud?.MapPan ?? Vector2.zero : Vector2.zero;
     internal static bool HasDisplays => Instance?._visible == true && Instance._hud?.HasStatus == true;
     private void Awake() => Instance = this;
     internal void ReleaseMap() => _hud?.ReleaseMap();
+
+    private void UpdatePlacement(Transform root)
+    {
+        if (_model == null) return;
+        _model.Root.SetPositionAndRotation(root.TransformPoint(CockpitLayout.PanelPosition), root.rotation * CockpitLayout.PanelRotation);
+        _model.Root.localScale = Vector3.one * CockpitLayout.PanelScale;
+    }
+    // Native cockpit-camera inertia/shake is updated after our input pass. Refresh
+    // the conversion before rendering so the projected panel stays on the dash.
+    private void RefreshPlacementBeforeRender()
+    {
+        if (_visible && APIBus.CockpitHudCamera?.transform.parent is Transform root) UpdatePlacement(root);
+    }
+    private void OnEnable() => Application.onBeforeRender += RefreshPlacementBeforeRender;
 
     private bool Ready(out Aircraft aircraft, out Transform root)
     {
@@ -108,9 +126,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         }
         if (!TryCreateModel()) { Hide(); return; }
         _visible = true; _model!.Root.gameObject.SetActive(true);
-        var offset = CockpitLayout.BoundPanel(CockpitLayout.PanelPosition);
-        _model.Root.SetPositionAndRotation(root.TransformPoint(CockpitProfiles.SeatOffset + offset), root.rotation * CockpitLayout.PanelRotation);
-        _model.Root.localScale = Vector3.one * settings.CockpitPanelScale.Value;
+        UpdatePlacement(root);
         _model.SetLayoutMode(CockpitLayout.Active);
         _hud!.SetVisible(!CockpitLayout.Active);
         if (CockpitLayout.Active)
@@ -125,7 +141,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         {
             CancelInteraction(); _laser!.enabled = false; _dot!.gameObject.SetActive(false);
             if (_hint != null) _hint.text = WristMenu.IsConsoleSetup
-                ? "CONSOLE SETUP  •  CHANGES APPLY TO EVERY AIRCRAFT"
+                ? "CONSOLE SETUP  •  PLACEMENT SAVED FOR THIS AIRCRAFT"
                 : "WRIST MENU OPEN  •  CONSOLE CONTROLS PAUSED";
             return;
         }
@@ -137,26 +153,37 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         var leftStick = settings.MotionControls.LeftHanded.Value;
         var left = TrackedControllers.Read(true); var right = TrackedControllers.Read(false);
         if (_ejection.Open && (_guardHand == 0 ? !left.Valid : !right.Valid)) { _ejection.Reset(); End(); }
-        var leftFree = !(leftStick ? motion?.StickHeld == true : motion?.ThrottleHeld == true);
-        var rightFree = !(leftStick ? motion?.ThrottleHeld == true : motion?.StickHeld == true);
+        var leftFree = !HelmetNightVision.OwnsHand(true) && !(leftStick ? motion?.StickHeld == true : motion?.ThrottleHeld == true);
+        var rightFree = !HelmetNightVision.OwnsHand(false) && !(leftStick ? motion?.ThrottleHeld == true : motion?.StickHeld == true);
         _nearLeft = Direct(left, leftFree, root, 0);
         _nearRight = Direct(right, rightFree, root, 1);
-        var hand = leftStick ? left : right;
-        var free = leftStick ? leftFree : rightFree;
-        var nearHand = leftStick ? _nearLeft : _nearRight;
-        var nearOtherHand = leftStick ? _nearRight : _nearLeft;
-        // Reaching takes precedence for that hand. The other free hand may still
-        // point until a control is grabbed; never accept an invisible laser click.
-        var pointerAllowed = !_ejectionRequest.BlocksInput && hand.Valid && free && nearHand == null &&
-            settings.ControllerBindings.PointerEnabled.Value && (_owner < 0 || _owner == 2);
-        var ray = new Ray(root.TransformPoint(hand.AimPosition + CockpitProfiles.SeatOffset), root.rotation * hand.AimRotation * Vector3.forward);
-        var target = _rayHover = pointerAllowed ? RayTarget(ray, out _) : null;
-        _trigger.Update(pointerAllowed, hand.Trigger);
-        if (_trigger.Pressed && _owner < 0 && target != null) Begin(target, 2, Vector3.zero, hand);
+        // Direct touch owns that hand. Either other free hand can point, with
+        // a single owner retained until release or cancellation.
+        var leftAllowed = !_ejectionRequest.BlocksInput && left.Valid && leftFree && _nearLeft == null &&
+            settings.ControllerBindings.PointerEnabled.Value && (_owner < 0 || _owner == 2 && _rayLeft);
+        var rightAllowed = !_ejectionRequest.BlocksInput && right.Valid && rightFree && _nearRight == null &&
+            settings.ControllerBindings.PointerEnabled.Value && (_owner < 0 || _owner == 2 && !_rayLeft);
+        var leftRay = new Ray(root.TransformPoint(left.AimPosition), root.rotation * left.AimRotation * Vector3.forward);
+        var rightRay = new Ray(root.TransformPoint(right.AimPosition), root.rotation * right.AimRotation * Vector3.forward);
+        var leftTarget = leftAllowed ? RayTarget(leftRay, out _) : null;
+        var rightTarget = rightAllowed ? RayTarget(rightRay, out _) : null;
+        _pointerHands.Update(leftStick, leftAllowed, left.Trigger, leftTarget != null, rightAllowed, right.Trigger, rightTarget != null);
+        var hand = _pointerHands.Left ? left : right;
+        var nearHand = _pointerHands.Left ? _nearLeft : _nearRight;
+        var nearOtherHand = _pointerHands.Left ? _nearRight : _nearLeft;
+        var pointerAllowed = _pointerHands.Left ? leftAllowed : rightAllowed;
+        var ray = _pointerHands.Left ? leftRay : rightRay;
+        var target = _rayHover = _pointerHands.Left ? leftTarget : rightTarget;
+        var trigger = _pointerHands.Trigger;
+        if (trigger.Pressed && _owner < 0 && target != null)
+        {
+            _rayLeft = _pointerHands.Left;
+            Begin(target, 2, Vector3.zero, hand);
+        }
         if (_owner == 2)
         {
             // Moving off the handle cancels the laser hold; it cannot resume while held.
-            if (!_trigger.Held || target != _active)
+            if (!trigger.Held || target != _active)
             {
                 if (!hand.Valid) _ejection.Reset();
                 End();
@@ -182,7 +209,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private string? Direct(ControllerSample hand, bool free, Transform root, int index)
     {
         var available = !_ejectionRequest.BlocksInput && hand.Valid && free && (_owner < 0 || _owner == index);
-        var position = root.TransformPoint(hand.Position + CockpitProfiles.SeatOffset);
+        var position = root.TransformPoint(hand.Position);
         var target = available ? Near(position) : null;
         // Either pinch (trigger) or grip can operate a nearby physical control.
         // Track the combined press even away from the panel so arriving with a
@@ -246,12 +273,12 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             else
             {
                 _ejection.LiftCover();
-                _guardHand = owner == 2 ? (ModConfiguration.Instance.MotionControls.LeftHanded.Value ? 0 : 1) : owner;
+                _guardHand = owner == 2 ? (_rayLeft ? 0 : 1) : owner;
             }
         }
         else if (control == "eject") _ejection.BeginPull();
         else if (control != "gear" || owner == 2) Activate(control);
-        Pulse(hand);
+        InteractionHaptics.Pulse(hand.Device, cue: control == "guard" ? InteractionCue.Guard : InteractionCue.Click);
     }
     private void Held(Vector3 position, ControllerSample hand)
     {
@@ -266,7 +293,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             }
         }
         if (_active == "eject" && _ejection.Pull(_startHand.z - position.z, Time.unscaledTime - _pressTime, _owner != 2))
-        { Activate("eject"); Pulse(hand); End(); }
+        { Activate("eject"); InteractionHaptics.Pulse(hand.Device, .5f, .065f, InteractionCue.Eject); End(); }
     }
     private void End()
     {
@@ -282,7 +309,12 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (control == "radar" && _aircraft?.radar == null) { Feedback(control, "RADAR NOT FITTED TO THIS AIRCRAFT"); return; }
         if (control == "gear" && _aircraft != null && _aircraft.radarAlt <= .2f)
         { Feedback(control, "GEAR LOCKED ON GROUND"); return; }
-        if (control.StartsWith("mfd_"))
+        if (control.EndsWith("_slave"))
+        {
+            _hud?.ToggleSlave(control.StartsWith("mfd_left"));
+            Feedback(control, LeftStickSlaved ? "LEFT STICK → MAP  •  CLICK STICK TO RECENTER  •  PRESS SLAVED TO RELEASE" : "LEFT STICK RETURNED TO FLIGHT CONTROLS");
+        }
+        else if (control.StartsWith("mfd_"))
         {
             _hud?.Cycle(control.StartsWith("mfd_left"), control.EndsWith("prev") ? -1 : 1);
             Feedback(control, "MFD PAGE CHANGED");
@@ -307,11 +339,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     }
     private void Feedback(string control, string message)
     { _feedbackControl = control; _feedback = message; _feedbackUntil = Time.unscaledTime + 2f; }
-    private static void Pulse(ControllerSample hand)
-    {
-        if (hand.Device.isValid && hand.Device.TryGetHapticCapabilities(out var caps) && caps.supportsImpulse)
-            hand.Device.SendHapticImpulse(0, .22f, .035f);
-    }
+    private static void Pulse(ControllerSample hand) => InteractionHaptics.Pulse(hand.Device);
     private string? RequestHint() => _ejectionRequest.State switch
     {
         EjectionRequestState.Pending => "EJECT REQUESTED",
@@ -324,6 +352,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         var press = _hoverDirect ? "TRIGGER / GRIP" : "TRIGGER";
         return control switch
         {
+            "mfd_left_slave" or "mfd_right_slave" => "L STK  •  SLAVE LEFT THUMBSTICK TO THIS MAP DISPLAY / RELEASE",
             "gear" => _hoverDirect ? "GEAR  •  HOLD TRIGGER / GRIP + MOVE UP OR DOWN" : "GEAR  •  TRIGGER TO TOGGLE",
             "radar" => _aircraft?.radar == null ? "RADAR  •  NOT FITTED" : $"RADAR  •  {(_aircraft.radar.activated ? "ON" : "OFF")}  •  {press} TO TOGGLE",
             "engine" => $"ENGINE  •  {(_aircraft?.Ignition == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
@@ -338,8 +367,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             "zoom_in" => $"MAP ZOOM IN  •  {press}", "zoom_out" => $"MAP ZOOM OUT  •  {press}", "map" => $"OPEN TACTICAL MAP  •  {press}",
             "guard" => $"{(_ejection.Open ? "CLOSE" : "LIFT")} EJECT GUARD  •  {press}",
             "eject" => _hoverDirect ? "EJECT  •  HOLD TRIGGER / GRIP + PULL TOWARD YOU" :
-                _active == "eject" ? $"EJECT  •  KEEP HOLDING  {Mathf.Clamp01((Time.unscaledTime - _pressTime) / .75f) * 100:0}%" :
-                "EJECT  •  HOLD TRIGGER ON HANDLE FOR 0.75s",
+                "EJECT  •  PRESS TRIGGER ON HANDLE",
             _ => _ejection.Open ? "EJECT GUARD OPEN" : ""
         };
     }
@@ -395,7 +423,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_model != null) return;
         _model = new CockpitPanelModel(transform); _ejectRest = _model.Groups["eject"].localPosition;
         _hud = new CockpitPanelHud(_model.Root);
-        foreach (var key in new[] { "weapon", "map", "cm", "hover", "zoom_in", "zoom_out", "mfd_left_prev", "mfd_left_next", "mfd_right_prev", "mfd_right_next" })
+        foreach (var key in new[] { "weapon", "map", "cm", "hover", "zoom_in", "zoom_out", "mfd_left_prev", "mfd_left_next", "mfd_right_prev", "mfd_right_next", "mfd_left_slave", "mfd_right_slave" })
             _buttonRest[key] = _model.Groups[key].localPosition;
         var hintObject = new GameObject("Console interaction hint", typeof(RectTransform), typeof(Canvas));
         hintObject.transform.SetParent(_model.Root, false); hintObject.transform.localScale = Vector3.one * .001f;
@@ -452,9 +480,9 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     {
         _ejection.Reset(); _active = _hover = null; _owner = _guardHand = -1;
         _nearLeft = _nearRight = _rayHover = null;
-        _trigger.Reset(); foreach (var button in _directButtons) button.Reset();
+        _pointerHands.Reset(); foreach (var button in _directButtons) button.Reset();
     }
-    private void OnDisable() => Hide();
+    private void OnDisable() { Application.onBeforeRender -= RefreshPlacementBeforeRender; Hide(); }
     private void OnDestroy()
     {
         Hide(); _model?.Dispose();

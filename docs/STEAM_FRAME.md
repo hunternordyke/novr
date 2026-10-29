@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.6.0**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.6.1**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -111,7 +111,7 @@ for grip mode, sensitivity, deadzone, throttle travel and yaw settings. **Contro
 help** shows the bindings currently in use, including Frame/Touch fallback and
 handedness. Missing tracking and failed handle placement have visible feedback.
 
-Version **0.4.5.2** adds wheel/air-brake input and a throttle-layout page:
+Historical layout (superseded by the current VTOL-style preset above): version **0.4.5.2** added wheel/air-brake input and a throttle-layout page:
 **View → Flight controls → Button bindings**. Braking uses D-pad down on native
 Frame, or the throttle-hand thumbstick click on Touch fallback. Hold the throttle
 (or latch it) while using that button. The optional **Trigger: brakes** layout
@@ -181,8 +181,11 @@ caption stays above the lift range. Saved seat and handle placements are retaine
 
 ## Default bindings
 
-The 0.4.6.0 VTOL-style preset uses the following right-handed Frame layout.
+The 0.4.6.1 VTOL-style preset uses the following right-handed Frame layout.
 Combat/flight buttons work only with the corresponding handle held or latched.
+Twist the stick for rudder in flight and native wheel steering on the ground;
+30° twist gives full input. Horizontal thumbstick yaw remains optional. Turn both
+yaw options off under View → Flight controls when using pedals.
 
 | Action | Frame | Touch fallback |
 | --- | --- | --- |
@@ -190,7 +193,7 @@ Combat/flight buttons work only with the corresponding handle held or latched.
 | Next weapon | Right A | Right A |
 | Wheel/air brake | Left trigger | Left trigger |
 | Deploy countermeasures | Left D-pad down | Left X |
-| Select target at head-directed cue | Left thumbstick click | Left thumbstick click |
+| Select target at head-directed cue, stick held | Right thumbstick click | Right thumbstick click |
 | Unlock latest target | Right X | Wrist Flight actions |
 | Clear all targets | Right Y | Wrist Flight actions |
 | Next CM type | Left D-pad right | Left Y |
@@ -295,3 +298,75 @@ input methods. Aircraft-specific collective/auto-hover, multiplayer, streaming l
 render performance and physical Steam Frame behavior remain unverified. Streaming
 quality, eye tracking and foveation are controlled by the runtime and are not configured
 by this change.
+
+The 0.4.6.1 update also fixes recentered controller-position mapping. Recenter from
+View while seated facing forward, then check the hand markers against your controllers.
+The update preserves saved cockpit placements. The stock VTOL target binding moves
+from the throttle click to the stick click; custom throttle layouts are preserved.
+
+### New cockpit controls in 0.4.6.1
+
+With the throttle gripped, left thumbstick forward/back commands VTOL angle when
+fitted. Push through the MIL shelf for afterburner on equipped jets. Press **L STK**
+on either MFD to route the physical left thumbstick to its Map page instead; click
+that stick to recenter the map and press **SLAVED** to return to flight controls.
+The right stick click still selects a target while gripping the flight stick.
+
+The console now fits the aircraft dashboard by default. Seat adjustments leave
+all three controls fixed. Use **Edit cockpit layout** for individual placement or
+**Console setup → Anchor to dashboard** to restore its automatic position.
+Brief haptic cues accompany physical interactions. Tune `Interaction Haptic
+Strength` in the NOVR configuration if needed.
+
+## Pilot hands, helmet gesture and interaction feedback — 0.4.6.1
+
+Rigged gloves use Valve's BSD-licensed SteamVR slim meshes and reference poses.
+They keep proper UV seams and normal details, with a tint sampled from the installed
+pilot. The pilot's own sleeve geometry/materials remain local. A private texture
+copy (up to 2048 square) adds mild sharpening and subtle fabric detail once on
+aircraft entry; the original atlas is untouched. Native pilot animations and other players are untouched.
+Grip curls three fingers and thumb; trigger curls index. This is controller-driven
+posing, not optical finger tracking. The two gloves total 9,798 triangles.
+
+Sleeves default to 82% of native thickness with unchanged lengths and wrist targets.
+View → Flight controls → Button bindings → Hands & feedback includes Slimmer/Wider
+sleeves, Gloves/Sleeves toggles, wrist-angle and hand-offset adjustments. Sleeves hide beyond their reachable envelope. Config
+`Glove Wrist Offset` / `Glove Wrist Rotation` adjust visuals only; interaction points
+continue using the runtime's grip pose. These values need a headset fit check.
+
+Bring either free hand to the brow, then make a fresh trigger press to toggle native
+night vision. A small cue identifies the gesture area. Held-trigger arrival and
+tracking recovery cannot toggle it; menus, map, layout and occupied hands suppress it.
+
+`Interaction Sound Volume` (default 0.25) controls original spatial grip/release,
+button, detent, guard and helmet cues. The Hands & feedback page has sound-volume buttons.
+Zero mutes sound independently of `Interaction Haptic Strength`. Six pooled voices
+and seven pre-generated clips bound the audio cost; the aircraft mixer is reused
+where available.
+
+Runtime controller reads are shared per hand per frame, with immediate invalidation
+on calibration/seat changes. Panel state and MFD labels only refresh when changed.
+Pilot geometry reads and glove setup happen on aircraft entry, not every frame.
+No global game/SteamVR quality or streaming settings are changed. See NOVR-validation-0.4.6.1.txt
+for final checks; no headset FPS or stereo-comfort claim is made.
+
+## Final comfort adjustments
+
+- Either hand can operate menu and cockpit-panel pointers. Aim at a control and
+  make a fresh trigger press to take the pointer. Its owning hand retains a drag
+  through release; switching hands, entering a menu or recovering tracking cannot
+  turn a held trigger into a new click. Direct panel touch still works with either
+  free hand. Release a latched flight handle before using that hand on the panel.
+- Default throttle/collective travel is now 22 cm (previously 25 cm). Existing
+  untouched defaults migrate once; custom travel is preserved. Flight controls
+  still has Shorter/Longer travel buttons.
+- The default glove pitch is corrected downward by 25 degrees. In Hands & feedback,
+  Wrist tips down/up changes it in 5-degree steps; nearer/farther and lower/higher
+  move the visible wrist in 5 mm steps. These adjustments leave controller hit
+  positions and flight inputs unchanged. Physical comfort remains a headset check.
+- VT-7 dashboard fitting starts 25% larger, then checks surrounding clearance.
+  Existing manually placed VT-7 panels enlarge once (within the scale limit) and
+  move slightly toward the pilot to allow for the thicker scaled panel. Other
+  aircraft scales are unchanged. Edit layout and Console setup remain available.
+- The diagnostic input helper has been removed. The final game restart loads only
+  the production mod; no automatic aircraft switches or controller tests run.
