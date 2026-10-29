@@ -42,6 +42,10 @@ internal static class PatchCompatibility
         using var game = AssemblyDefinition.ReadAssembly(Path.Combine(gameManagedDirectory, "Assembly-CSharp.dll"));
         foreach (var contract in new[] {
             (owner: "CombatHUD", field: "weaponState", type: "HUDWeaponState"),
+            (owner: "TacScreen", field: "cam", type: "UnityEngine.Camera"),
+            (owner: "TacScreen", field: "canvas", type: "UnityEngine.Canvas"),
+            (owner: "TacScreen", field: "screenMaterial", type: "UnityEngine.Material"),
+            (owner: "TargetCam", field: "cam", type: "UnityEngine.Camera"),
             (owner: "HUDMissileState", field: "hint", type: "TMPro.TextMeshProUGUI"),
             (owner: "HUDLaserGuidedState", field: "hint", type: "TMPro.TextMeshProUGUI") })
         {

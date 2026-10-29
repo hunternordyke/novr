@@ -508,3 +508,58 @@ and failure recovery. An offline collective study checks mirrored low/mid/high
 poses using representative arm lengths. It is not a native pilot or headset fit
 check. No simulated input, mission changes or flight actions are needed for these
 checks.
+
+## 0.4.6.6 — dashboard replacement, aiming HUD and grip fit
+
+The console fits the nearby coplanar dashboard skin as well as the native screen.
+Its housing and MFD apertures can widen independently of height; lettering and
+physical switches retain their proportions. Automatic placement checks the wider
+footprint against cockpit geometry. Seat position and flight-control anchors are
+unchanged. Existing manual placements are preserved: use **View → Cockpit setup →
+Console position → Anchor to dashboard** to apply the new fit to a saved manual layout.
+The bounded automatic fit is not a handcrafted fascia for every aircraft; tight
+or unusual dashboards still need manual adjustment.
+
+While the VR console is visible, native tactical/sensor screen surfaces stop
+rendering. For a combined cockpit mesh, only matching display material submeshes
+are removed from a temporary render copy; surrounding cockpit geometry remains.
+When the console is hidden, edited, disabled or left behind, native presentation
+restores. No native aircraft, instrument logic, camera sensor state or assets are
+destroyed. No game meshes are exported or included in the package.
+
+If neither MFD shows Tactical, the native tactical display camera and canvas are
+suspended, its display animation update is skipped, and the native MFD manager
+refreshes only visible docked instruments. Tactical resumes its shared display
+feed; Sensor retains the game's active target/landing camera. Radar/optical scan
+events and sensor cameras remain available. This reduces redundant rendering and
+instrument work; no measured Steam Frame FPS gain is claimed.
+
+**View → Comfort & display → HUD & display → All HUD smaller/larger** now adjusts
+flight instruments, target/location symbols, labels, reticles and range readouts.
+**Aiming & markers** offers separate controls. Defaults are symbols 45%, labels
+55%, reticles 45%, weapon readouts 50%. Aiming points keep their world alignment;
+lead and bombing lines retain their lengths while their thickness changes. Range
+and guidance widgets are compact readouts; weapon limits and lock logic do not
+change. Missile warning brightness remains independent.
+
+The right-bumper magnifier has no labelled border. Native targeting graphics are
+copied as render-only meshes, clipped to the image: world anchors follow the zoom,
+glyph size stays constant, and weapon readouts occupy a compact right-hand slot.
+The image remains mono on a 3 m stereo surface, with unchanged XR eye projection.
+There is still an extra scene camera while held, plus HUD mesh-copy work.
+
+Native stick grip centers sit farther below the button head. Sliding throttle
+palms rest on the upper grip; collective grips keep their cylindrical center.
+The glove socket moved from 78 mm to 43 mm along the fingers, toward the space
+between palm and curled fingers. This reduces penetration in the offline
+representative-handle study; exact native mesh contact and comfort still need a
+wearer check. Held hands remain attached; free-hand calibration is unchanged.
+
+Validation: 111 automated checks, 48 declared Harmony targets and seven private
+field contracts pass against the installed assemblies. The new checks exercise
+anchor preservation, zoom glyph sizing, world-line projection, readout fitting
+and proportional panel widening. Seventeen menu pages and 115 page buttons pass
+a static layout audit. No simulated game input or flight-action tests were run.
+The prior 32-aircraft clearance audit predates this larger fit and does not
+validate the new dashboard footprints. In-headset rendering, restoration,
+clipping, hand comfort and streaming performance remain to be tested.

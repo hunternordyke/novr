@@ -21,6 +21,9 @@ internal sealed class CockpitPanelModel : IDisposable
     private readonly Dictionary<string, Color> _lastColors = new();
     private readonly Dictionary<string, int> _lastHighlights = new();
     private bool? _layoutState;
+    private float _aspect = 1;
+    private readonly List<(Mesh mesh, Vector3[] original, float[] centers, bool[] stretch)> _widthMeshes = new();
+    private readonly Dictionary<Transform, Vector3> _groupPositions = new();
 
     internal CockpitPanelModel(Transform parent)
     {
@@ -57,17 +60,22 @@ internal sealed class CockpitPanelModel : IDisposable
                 var node = new GameObject(group.name).transform;
                 node.SetParent(Root, false);
                 node.localPosition = new Vector3(group.position[0], group.position[1], group.position[2]);
-                Groups.Add(group.name, node);
+                Groups.Add(group.name, node); _groupPositions[node] = node.localPosition;
                 _renderers[group.name] = new List<Renderer>();
                 foreach (var batch in model.parts.Where(p => p.group == group.name).GroupBy(p => p.material))
                 {
                     var vertices = new List<Vector3>();
                     var triangles = new List<int>();
+                    var centers = new List<float>(); var stretch = new List<bool>();
                     foreach (var part in batch)
                     {
                         var offset = vertices.Count;
+                        var xs = Enumerable.Range(0, part.vertices.Length / 3).Select(i => part.vertices[i * 3]).ToArray();
+                        var center = (xs.Min() + xs.Max()) * .5f;
+                        var wide = part.name.StartsWith("Chassis") || part.name.StartsWith("Face") || part.name.StartsWith("Edge rail") ||
+                            part.name.Contains("MFD gasket") || part.name.Contains("MFD bezel") || part.name.Contains("MFD screen") || part.name.StartsWith("Switch bank");
                         for (var i = 0; i < part.vertices.Length; i += 3)
-                            vertices.Add(new Vector3(part.vertices[i], part.vertices[i + 1], part.vertices[i + 2]));
+                        { vertices.Add(new Vector3(part.vertices[i], part.vertices[i + 1], part.vertices[i + 2])); centers.Add(center); stretch.Add(group.name == "static" && wide); }
                         triangles.AddRange(part.triangles.Select(index => index + offset));
                     }
                     var mesh = new Mesh { name = "Console " + group.name, indexFormat = IndexFormat.UInt32 };
@@ -79,6 +87,7 @@ internal sealed class CockpitPanelModel : IDisposable
                         return new Color(shade, shade, shade, 1);
                     }).ToArray();
                     _meshes.Add(mesh);
+                    if (group.name == "static") _widthMeshes.Add((mesh, vertices.ToArray(), centers.ToArray(), stretch.ToArray()));
                     var go = new GameObject("Console surface", typeof(MeshFilter), typeof(MeshRenderer));
                     go.transform.SetParent(node, false);
                     go.GetComponent<MeshFilter>().sharedMesh = mesh;
@@ -93,6 +102,24 @@ internal sealed class CockpitPanelModel : IDisposable
         catch { Dispose(); throw; }
     }
 
+    // Change the housing and display apertures, preserving lettering and
+    // switch/handle dimensions. The MFD canvas is laid out at the same width.
+    internal void SetAspect(float aspect)
+    {
+        aspect = Mathf.Clamp(aspect, .85f, 1.75f);
+        if (Mathf.Abs(aspect - _aspect) < .001f) return;
+        _aspect = aspect;
+        foreach (var entry in _widthMeshes)
+        {
+            var vertices = (Vector3[])entry.original.Clone();
+            for (var i = 0; i < vertices.Length; i++) vertices[i].x = NOVR.VrUi.SpecialBehavior.HudPresentationMath.PanelVertex(vertices[i].x, entry.centers[i], aspect, entry.stretch[i]);
+            entry.mesh.vertices = vertices; entry.mesh.RecalculateBounds(); entry.mesh.RecalculateNormals();
+        }
+        foreach (var pair in _groupPositions)
+        { var p = pair.Key.localPosition; p.x = pair.Value.x * aspect; pair.Key.localPosition = p; }
+        if (_layoutOutline != null) _layoutOutline.transform.localScale = new Vector3(aspect, 1, 1);
+    }
+
     private LineRenderer? _layoutOutline;
     internal void SetLayoutMode(bool editing)
     {
@@ -102,7 +129,7 @@ internal sealed class CockpitPanelModel : IDisposable
         if (editing && _layoutOutline == null)
         {
             var go = new GameObject("Panel layout outline", typeof(LineRenderer)); go.transform.SetParent(Root, false);
-            _layoutOutline = go.GetComponent<LineRenderer>(); _layoutOutline.useWorldSpace = false;
+            _layoutOutline = go.GetComponent<LineRenderer>(); _layoutOutline.useWorldSpace = false; go.transform.localScale = new Vector3(_aspect, 1, 1);
             _layoutOutline.sharedMaterial = _materials[6]; _layoutOutline.widthMultiplier = .004f;
             _layoutOutline.positionCount = 5;
             _layoutOutline.SetPositions(new[] { new Vector3(-.385f,-.18f,-.05f), new Vector3(-.385f,.18f,-.05f),

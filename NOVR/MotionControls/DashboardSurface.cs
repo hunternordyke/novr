@@ -10,8 +10,11 @@ namespace NOVR.MotionControls;
 internal sealed class DashboardSurface
 {
     internal readonly Renderer Renderer;
-    private readonly Vector3 _center, _normal, _up;
-    private readonly float _width, _height;
+    private Vector3 _center;
+    private readonly Vector3 _normal, _up;
+    private float _width, _height;
+    private bool _fascia;
+    internal float Aspect => Mathf.Clamp(_width / (.77f * Mathf.Clamp(_height / .36f, .55f, 1.35f)), .85f, 1.75f);
     private float _clearance = .012f, _fitMultiplier = 1f, _aircraftScale = 1f;
     internal bool ClearanceLimited { get; private set; }
     private DashboardSurface(Renderer renderer, Vector3 center, Vector3 normal, Vector3 up, float width, float height)
@@ -87,13 +90,58 @@ internal sealed class DashboardSurface
         rotation = Quaternion.LookRotation(forward, up);
         // Fit the same model to both dashboard dimensions. A minimum readable
         // size may extend over a small native screen; manual placement remains.
-        scale = Mathf.Clamp(Mathf.Min(_width / .77f, _height / .36f), .55f, 1.2f) * ModConfiguration.Instance.CockpitPanelScale.Value * _fitMultiplier * _aircraftScale;
+        scale = Mathf.Clamp(_height / .36f, .55f, 1.35f) * ModConfiguration.Instance.CockpitPanelScale.Value * _fitMultiplier * _aircraftScale;
         center = Renderer.transform.TransformPoint(_center) - forward * (.0395f * scale + _clearance);
+    }
+
+    // Extend the screen seed to nearby, coplanar dashboard skin. Bounds are
+    // deliberately limited: no canopy, side consoles, or another pilot's half.
+    private void ExpandToFascia(Aircraft aircraft)
+    {
+        var source = Renderer.transform;
+        var center = source.TransformPoint(_center);
+        var normal = source.worldToLocalMatrix.transpose.MultiplyVector(_normal).normalized;
+        var up = Vector3.ProjectOnPlane(source.TransformVector(_up), normal).normalized;
+        var right = Vector3.Cross(up, normal).normalized;
+        var min = new Vector2(-_width * .5f, -_height * .5f); var max = -min;
+        var limit = new Vector2(Mathf.Min(.65f, _width * .5f + .20f), Mathf.Min(.30f, _height * .5f + .065f));
+        var budget = 350000; var visited = new HashSet<Renderer>();
+        foreach (var root in new[] { aircraft.transform, aircraft.cockpit.transform })
+        foreach (var renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            if (renderer == Renderer || !visited.Add(renderer) || !renderer.enabled || renderer.gameObject.layer != (int)LayerHelper.Layers.Cockpit) continue;
+            var mesh = renderer.GetComponent<MeshFilter>()?.sharedMesh;
+            if (mesh == null || mesh.vertexCount > budget || Vector3.Distance(renderer.bounds.ClosestPoint(center), center) > .8f) continue;
+            budget -= mesh.vertexCount;
+            try
+            {
+                var points = Read(mesh, VertexAttribute.Position); var normals = Read(mesh, VertexAttribute.Normal);
+                if (points == null || normals == null) continue;
+                for (var i = 0; i < points.Length; i++)
+                {
+                    var p = renderer.transform.TransformPoint(points[i]) - center;
+                    if (Mathf.Abs(Vector3.Dot(p, normal)) > .028f) continue;
+                    var n = renderer.transform.worldToLocalMatrix.transpose.MultiplyVector(normals[i]).normalized;
+                    if (Mathf.Abs(Vector3.Dot(n, normal)) < .94f) continue;
+                    var q = new Vector2(Vector3.Dot(p, right), Vector3.Dot(p, up));
+                    if (Mathf.Abs(q.x) > limit.x || Mathf.Abs(q.y) > limit.y) continue;
+                    min = Vector2.Min(min, q); max = Vector2.Max(max, q);
+                }
+            }
+            catch (Exception e) { Debug.LogWarning("[NOVR] Dashboard skin unavailable: " + renderer.name + ": " + e.Message); }
+        }
+        // Add a small seam overlap so luminous native screen edges cannot leak.
+        _fascia = max.x - min.x > _width + .025f;
+        _width = Mathf.Min(1.30f, max.x - min.x + .012f);
+        _height = Mathf.Min(.60f, max.y - min.y + .008f);
+        _center = source.InverseTransformPoint(center + right * ((min.x + max.x) * .5f) + up * ((min.y + max.y) * .5f));
+        Debug.Log($"[NOVR] Dashboard face fit {_width:0.000} x {_height:0.000} m; aspect {Aspect:0.00}; fascia={_fascia}.");
     }
 
     internal void FitClearance(Aircraft aircraft)
     {
-        _aircraftScale = CockpitPanelPlacement.IsVt7(aircraft) ? 1.25f : 1f;
+        ExpandToFascia(aircraft);
+        _aircraftScale = !_fascia && CockpitPanelPlacement.IsVt7(aircraft) ? 1.25f : 1f;
         using var geometry = new DashboardClearance(aircraft);
         foreach (var multiplier in new[] { 1f, .9f })
         {
@@ -102,7 +150,7 @@ internal sealed class DashboardSurface
             {
                 _clearance = .012f + .02f * step;
                 Pose(out var center, out var rotation, out var scale);
-                if (!geometry.Intersects(center, rotation, scale)) return;
+                if (!geometry.Intersects(center, rotation, scale, Aspect)) return;
             }
         }
         ClearanceLimited = true;

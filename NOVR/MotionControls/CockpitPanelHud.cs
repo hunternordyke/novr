@@ -239,6 +239,23 @@ internal sealed class CockpitPanelHud
         Slot("map", _map, Vector2.zero, new Vector2(215, 180));
         LayerHelper.SetLayerRecursive(_canvas, LayerHelper.GetVrUiLayer());
     }
+    private float _aspect = 1;
+    internal void SetAspect(float aspect)
+    {
+        if (Mathf.Abs(_aspect - aspect) < .001f) return;
+        _aspect = aspect;
+        for (var i = 0; i < 2; i++)
+        {
+            var x = (i == 0 ? -130 : 130) * aspect;
+            _screens[i].sizeDelta = new Vector2(215 * aspect, 180);
+            foreach (var rect in new[] { _screens[i], _headers[i].rectTransform, _numbers[i].rectTransform })
+            { var p = rect.localPosition; p.x = x; rect.localPosition = p; }
+        }
+        _map.sizeDelta = new Vector2(215 * aspect, 180);
+        _slots["map"].sizeDelta = _map.sizeDelta;
+        RestoreNative(); _nextFind = 0;
+    }
+
     private static RectTransform Rect(string name, Transform parent, Vector2 center, Vector2 size)
     {
         var go = new GameObject(name, typeof(RectTransform)); var rect = (RectTransform)go.transform;
@@ -397,7 +414,7 @@ internal sealed class CockpitPanelHud
         for (var i = 0; i < apps.Length; i++)
         {
             if (apps[i].transform is not RectTransform widget) continue;
-            var size = new Vector2(207f / columns, 174f / rows);
+            var size = new Vector2((215f * _aspect - 8) / columns, 174f / rows);
             var position = new Vector2((i % columns - (columns - 1) / 2f) * size.x, ((rows - 1) / 2f - i / columns) * size.y);
             var slot = Rect("Native instrument slot", _screens[index], position, size);
             _nativeSlots.Add(slot.gameObject); _nativeDocks.Add(new Dock(widget, slot));
@@ -442,7 +459,7 @@ internal sealed class CockpitPanelHud
         _messages[index].text = texture != null ? "" : page == MfdPage.Sensor ? "NO ACTIVE SENSOR IMAGE\nSelect a target or landing view" : "TACTICAL DISPLAY UNAVAILABLE";
         if (texture == null) return;
         var ratio = texture.width * uv.width / Mathf.Max(1, texture.height * uv.height);
-        image.rectTransform.sizeDelta = ratio > 215f / 180 ? new Vector2(215, 215 / ratio) : new Vector2(180 * ratio, 180);
+        image.rectTransform.sizeDelta = ratio > 215f * _aspect / 180 ? new Vector2(215 * _aspect, 215 * _aspect / ratio) : new Vector2(180 * ratio, 180);
     }
     private static Transform? Find(Transform root, string prefix)
     {

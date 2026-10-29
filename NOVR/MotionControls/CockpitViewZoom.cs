@@ -1,4 +1,5 @@
 using NOVR.VrUi;
+using NOVR.VrUi.SpecialBehavior;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
@@ -18,7 +19,7 @@ internal sealed class CockpitViewZoom : MonoBehaviour
     private Camera? _camera;
     private RenderTexture? _texture;
     private GameObject? _window;
-    private Text? _label;
+    private ZoomTargetingHud? _hud;
     private bool _held;
     private const float Distance = 3f, Width = 1.2f, Height = .75f;
 
@@ -56,7 +57,7 @@ internal sealed class CockpitViewZoom : MonoBehaviour
         _camera.enabled = true;
         _window!.transform.SetPositionAndRotation(ui.transform.position + ui.transform.forward * Distance, ui.transform.rotation);
         _window.SetActive(true);
-        _label!.text = $"INSPECTION  {magnification:0.0}×   •   RELEASE RB TO CLOSE";
+        _hud!.Magnification = magnification;
     }
     private void EnsureView(Camera main, Camera ui)
     {
@@ -77,20 +78,19 @@ internal sealed class CockpitViewZoom : MonoBehaviour
         if (sourceData != null) { data.renderPostProcessing = sourceData.renderPostProcessing; data.volumeLayerMask = sourceData.volumeLayerMask; }
         _window = new GameObject("NOVR inspection window", typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
         _window.transform.SetParent(transform, false); _window.transform.localScale = Vector3.one * .001f;
-        var canvas = _window.GetComponent<Canvas>(); canvas.renderMode = RenderMode.WorldSpace; canvas.worldCamera = ui;
+        var canvas = _window.GetComponent<Canvas>(); canvas.renderMode = RenderMode.WorldSpace; canvas.worldCamera = ui; canvas.overrideSorting = true; canvas.sortingOrder = 200;
+        canvas.additionalShaderChannels = AdditionalCanvasShaderChannels.TexCoord1 | AdditionalCanvasShaderChannels.TexCoord2 | AdditionalCanvasShaderChannels.Normal | AdditionalCanvasShaderChannels.Tangent;
         _window.GetComponent<CanvasGroup>().blocksRaycasts = false;
         RectTransform Rect(string name, Vector2 size, Vector2 position)
         {
             var rect = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
             rect.SetParent(_window.transform, false); rect.sizeDelta = size; rect.anchoredPosition = position; return rect;
         }
-        var background = Rect("Frame", new Vector2(Width * 1000 + 14, Height * 1000 + 56), new Vector2(0, -17)).gameObject.AddComponent<Image>();
-        background.color = new Color(.015f, .025f, .035f, 1); background.raycastTarget = false;
         var picture = Rect("Magnified scene", new Vector2(Width * 1000, Height * 1000), Vector2.zero).gameObject.AddComponent<RawImage>();
         picture.texture = _texture; picture.raycastTarget = false;
-        _label = Rect("Instructions", new Vector2(Width * 1000, 35), new Vector2(0, -Height * 500 - 21)).gameObject.AddComponent<Text>();
-        _label.font = Resources.GetBuiltinResource<Font>("Arial.ttf"); _label.fontSize = 22; _label.alignment = TextAnchor.MiddleCenter;
-        _label.color = new Color(.65f, .9f, .8f); _label.raycastTarget = false;
+        var overlay = Rect("Magnified targeting HUD", new Vector2(Width * 1000, Height * 1000), Vector2.zero);
+        overlay.gameObject.AddComponent<RectMask2D>();
+        _hud = overlay.gameObject.AddComponent<ZoomTargetingHud>();
         LayerHelper.SetLayerRecursive(_window.transform, LayerHelper.GetVrUiLayer());
     }
     private void Hide()

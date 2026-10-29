@@ -21,6 +21,7 @@ public class ModConfiguration
     public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
     public readonly ConfigEntry<bool> HudContrast, HudDeclutter, FocusedFlightHud;
     public readonly ConfigEntry<float> FlightHudScale, InstrumentBrightness, MfdBrightness;
+    public readonly ConfigEntry<float> MarkerScale, MarkerLabelScale, ReticleScale, WeaponHudScale;
     internal readonly ConfigEntry<MotionControls.MfdPage> LeftMfdPage, RightMfdPage;
     public readonly ConfigEntry<bool> CockpitPanelEnabled;
     public readonly ConfigEntry<Vector3> CockpitPanelPosition;
@@ -47,6 +48,10 @@ public class ModConfiguration
             new ConfigDescription("Brightness of MFD content, including native instrument/camera pages. Headers, page choices, weapon safety/readout and external warning indicators stay readable.", new AcceptableValueRange<float>(.35f, 1f)));
         FocusedFlightHud = config.Bind("VR HUD", "Focused Flight HUD", true, "Compact flight instruments and a limited forward pitch ladder. Target and missile-warning projections remain independent.");
         FlightHudScale = config.Bind("VR HUD", "Flight HUD Scale", .38f, new ConfigDescription("Size of the focused flight instruments and pitch-ladder window.", new AcceptableValueRange<float>(.22f, .75f)));
+        MarkerScale = config.Bind("VR HUD", "Marker Scale", .45f, new ConfigDescription("Size of target diamonds and location symbols, preserving their world alignment.", new AcceptableValueRange<float>(.2f, 1f)));
+        MarkerLabelScale = config.Bind("VR HUD", "Marker Label Scale", .55f, new ConfigDescription("Size of target, location and aiming labels.", new AcceptableValueRange<float>(.2f, 1f)));
+        ReticleScale = config.Bind("VR HUD", "Reticle Scale", .45f, new ConfigDescription("Crosshair and bombing-pipper size; connecting lines retain their aim geometry.", new AcceptableValueRange<float>(.2f, 1f)));
+        WeaponHudScale = config.Bind("VR HUD", "Weapon Readout Scale", .5f, new ConfigDescription("Compact weapon-range and guidance readouts. Does not alter weapon limits or lock state.", new AcceptableValueRange<float>(.2f, 1f)));
         HudPanelScale = config.Bind("VR HUD", "Status Panel Scale", 1.15f,
             new ConfigDescription("Size of cockpit status panels; aiming markers keep their angular alignment.", new AcceptableValueRange<float>(0.8f, 1.6f)));
         HudPanelDistance = config.Bind("VR HUD", "Status Panel Distance", 4f,

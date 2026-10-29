@@ -28,6 +28,8 @@ public class NOVRFlightHudBehavior : UIRenderedCanvasBehavior
             gameObject.AddComponent<PitchCompassBehavior>();
         }
 
+        if (!gameObject.TryGetComponent<TargetingHudStyle>(out _)) gameObject.AddComponent<TargetingHudStyle>();
+
         if (!gameObject.TryGetComponent<FocusedFlightHud>(out _)) gameObject.AddComponent<FocusedFlightHud>();
 
         // var velocityVector = FindChildStartingWith(transform, "velocityVector");

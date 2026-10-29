@@ -19,7 +19,7 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage;
+    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage, _aimingPage;
     private readonly Dictionary<GameObject, string> _pageTitles = new();
     private MenuHistory<GameObject>? _history;
     private Button? _backButton;
@@ -38,6 +38,13 @@ internal sealed class WristMenu : MonoBehaviour
     internal static bool IsConsoleSetup => IsOpen && _instance?._consolePage?.activeSelf == true;
     private static bool CollectiveControls => GameManager.GetLocalAircraft(out var aircraft) && MotionFlightController.UsesLiftCollective(aircraft);
     private void Awake() => _instance = this;
+
+    private static void ResizeHud(float amount)
+    {
+        var c = ModConfiguration.Instance; c.FocusedFlightHud.Value = true;
+        c.FlightHudScale.Value += amount; c.MarkerScale.Value += amount;
+        c.MarkerLabelScale.Value += amount; c.ReticleScale.Value += amount; c.WeaponHudScale.Value += amount;
+    }
 
     private void Update()
     {
@@ -369,16 +376,29 @@ internal sealed class WristMenu : MonoBehaviour
         _liveLabels.Add((alignmentInfo, () => $"Tilt {motion.GloveRotation.Value.x:0}° · Palm roll {motion.GloveRotation.Value.z:0}°\nFree-hand visuals only; hold a handle to attach.\nClose View to inspect alignment.\nPointer and flight inputs keep their real positions."));
 
         _displayPage = Page("DISPLAY");
-        AddButton("Flight HUD smaller", 0, 0, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value -= .04f; });
-        AddButton("Flight HUD larger", 1, 0, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value += .04f; });
+        AddButton("All HUD smaller", 0, 0, () => ResizeHud(-.04f));
+        AddButton("All HUD larger", 1, 0, () => ResizeHud(.04f));
         AddButton("HUD nearer", 0, 1, () => config.HudPanelDistance.Value -= .5f);
         AddButton("HUD farther", 1, 1, () => config.HudPanelDistance.Value += .5f);
         AddLiveButton(() => "Backplates: " + (config.HudContrast.Value ? "ON" : "OFF"), 0, 2, () => config.HudContrast.Value = !config.HudContrast.Value);
         AddLiveButton(() => "Declutter: " + (config.HudDeclutter.Value ? "ON" : "OFF"), 1, 2, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
         AddButton("Brightness", 0, 3, () => ShowPage(_brightnessPage!));
-        AddButton("Reset HUD", 0, 4, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
+        AddButton("Aiming & markers", 1, 3, () => ShowPage(_aimingPage!));
+        AddButton("Reset HUD", 0, 4, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.MarkerScale.Value = .45f; config.MarkerLabelScale.Value = .55f; config.ReticleScale.Value = .45f; config.WeaponHudScale.Value = .5f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
         var displayInfo = Label(_displayPage.transform, "", new Vector2(0,-180), new Vector2(510,125), 19);
-        _liveLabels.Add((displayInfo, () => $"Flight HUD size {config.FlightHudScale.Value*100:0}%\nStatus-panel depth {config.HudPanelDistance.Value:0.0} m\nDepth changes preserve apparent size."));
+        _liveLabels.Add((displayInfo, () => $"Flight {config.FlightHudScale.Value*100:0}% • Symbols {config.MarkerScale.Value*100:0}%\nStatus-panel depth {config.HudPanelDistance.Value:0.0} m\nDepth changes preserve apparent size."));
+
+        _aimingPage = Page("AIMING & MARKERS");
+        AddButton("Symbols smaller", 0, 0, () => config.MarkerScale.Value -= .05f);
+        AddButton("Symbols larger", 1, 0, () => config.MarkerScale.Value += .05f);
+        AddButton("Labels smaller", 0, 1, () => config.MarkerLabelScale.Value -= .05f);
+        AddButton("Labels larger", 1, 1, () => config.MarkerLabelScale.Value += .05f);
+        AddButton("Reticle smaller", 0, 2, () => config.ReticleScale.Value -= .05f);
+        AddButton("Reticle larger", 1, 2, () => config.ReticleScale.Value += .05f);
+        AddButton("Range UI smaller", 0, 3, () => config.WeaponHudScale.Value -= .05f);
+        AddButton("Range UI larger", 1, 3, () => config.WeaponHudScale.Value += .05f);
+        var aimingInfo = Label(_aimingPage.transform, "", new Vector2(0, -175), new Vector2(510, 100), 19);
+        _liveLabels.Add((aimingInfo, () => $"Symbols {config.MarkerScale.Value*100:0}% • Labels {config.MarkerLabelScale.Value*100:0}%\nReticle {config.ReticleScale.Value*100:0}% • Range {config.WeaponHudScale.Value*100:0}%\nAim points stay aligned with the world."));
 
         _brightnessPage = Page("BRIGHTNESS");
         AddButton("MFD dimmer", 0, 0, () => config.MfdBrightness.Value -= .1f);

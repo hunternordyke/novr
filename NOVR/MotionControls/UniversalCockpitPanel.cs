@@ -16,6 +16,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     internal static UniversalCockpitPanel? Instance { get; private set; }
     private CockpitPanelModel? _model;
     private CockpitPanelHud? _hud;
+    private readonly NativeInstrumentPresentation _nativeInstruments = new();
     private Aircraft? _aircraft;
     private readonly GuardedEjection _ejection = new();
     private readonly EjectionRequest _ejectionRequest = new();
@@ -67,6 +68,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_model == null) return;
         _model.Root.SetPositionAndRotation(root.TransformPoint(CockpitLayout.PanelPosition), root.rotation * CockpitLayout.PanelRotation);
         _model.Root.localScale = Vector3.one * CockpitLayout.PanelScale;
+        _model.SetAspect(CockpitPanelPlacement.Aspect); _hud?.SetAspect(CockpitPanelPlacement.Aspect);
     }
     // Native cockpit-camera inertia/shake is updated after our input pass. Refresh
     // the conversion before rendering so the projected panel stays on the dash.
@@ -409,10 +411,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         });
         _model.SetGroupColor("hover_lamp", _aircraft.IsAutoHoverEnabled()
             ? new Color(.3f, 1f, .5f) : new Color(.025f, .04f, .03f));
-        _model.Groups["eject"].localPosition = _ejectRest + Vector3.back * (_active == "eject" ? .02f : 0);
+        _model.Groups["eject"].localPosition = new Vector3(_ejectRest.x * CockpitPanelPlacement.Aspect, _ejectRest.y, _ejectRest.z) + Vector3.back * (_active == "eject" ? .02f : 0);
         foreach (var button in _buttonRest)
-            _model.Groups[button.Key].localPosition = button.Value + Vector3.forward * (_active == button.Key ? .003f : 0);
+            _model.Groups[button.Key].localPosition = new Vector3(button.Value.x * CockpitPanelPlacement.Aspect, button.Value.y, button.Value.z) + Vector3.forward * (_active == button.Key ? .003f : 0);
         if (!CockpitLayout.Active) _hud!.Update();
+        _nativeInstruments.Update(_aircraft, !CockpitLayout.Active && !WristMenu.IsOpen && _model.Root.gameObject.activeInHierarchy);
     }
     private bool TryCreateModel()
     {
@@ -479,6 +482,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     }
     private void Hide()
     {
+        _nativeInstruments.SetVisible(false);
         _hud?.Restore(); _visible = false; CancelInteraction();
         if (_model != null) _model.Root.gameObject.SetActive(false);
     }
@@ -496,7 +500,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private void OnDisable() { Application.onBeforeRender -= RefreshPlacementBeforeRender; Hide(); }
     private void OnDestroy()
     {
-        Hide(); _model?.Dispose();
+        Hide(); _nativeInstruments.Dispose(); _model?.Dispose();
         if (_pointerMaterial != null) Destroy(_pointerMaterial);
         if (Instance == this) Instance = null;
     }

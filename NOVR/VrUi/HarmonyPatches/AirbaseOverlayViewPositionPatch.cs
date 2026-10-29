@@ -1,4 +1,6 @@
 using HarmonyLib;
+using NOVR.VrUi.SpecialBehavior;
+using UnityEngine.UI;
 using System;
 using System.Reflection;
 using UnityEngine;
@@ -30,6 +32,9 @@ internal static class AirbaseOverlayViewPositionPatch
             if (aircraft == null || mainCamera == null || cockpitHudCamera == null)
                 return;
 
+            HudElementStyle.Add(AirbaseMarkerField.GetValue(__instance) as Graphic, HudElementKind.Marker);
+            HudElementStyle.Add(AirbaseLabelField.GetValue(__instance) as Graphic, HudElementKind.Label);
+            HudElementStyle.Add(GlideslopeAimPointField.GetValue(__instance) as Graphic, HudElementKind.Reticle);
             __instance.transform.rotation = cockpitHudCamera.transform.rotation;
             
             UpdateAirbaseMarker(__instance, aircraft);

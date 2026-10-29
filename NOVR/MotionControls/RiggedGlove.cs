@@ -81,13 +81,14 @@ internal sealed class RiggedGlove : IDisposable
         if (held)
         {
             // Asset axes: fingers +Z, back of hand +Y, thumb toward +/-X.
-            // The socket is inside the partially curled fingers, not at the wrist.
+            // The socket sits between the palm and curled fingers. The old
+            // 78 mm offset ran the handle through the finger pads.
             // Collective cuffs point up and inboard toward the shoulder; rolling
             // around the handle axis preserves the finger wrap as it is lifted.
             var grip = attachment!.Value;
             var rotation = grip.rotation * (stick ? Quaternion.Euler(0, 0, _left ? 90 : -90)
                 : collective ? Quaternion.Euler(0, 0, _left ? 60 : -60) * Quaternion.Euler(0, _left ? -90 : 90, 0) : Quaternion.identity);
-            Root.SetPositionAndRotation(grip.position - rotation * new Vector3(0, -.018f, .078f), rotation);
+            Root.SetPositionAndRotation(grip.position - rotation * new Vector3(0, -.019f, .043f), rotation);
         }
         else
         {

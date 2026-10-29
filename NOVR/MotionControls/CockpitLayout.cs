@@ -161,7 +161,7 @@ internal sealed class CockpitLayout : MonoBehaviour
                 var origin = rotation * (ray.origin - _panel); var direction = rotation * ray.direction;
                 var size = PanelScale;
                 if (!PointerGeometry.IntersectRect(origin.x, origin.y, origin.z + .05f * size,
-                    direction.x, direction.y, direction.z, -.385f * size, -.18f * size, .385f * size, .18f * size, out along)) continue;
+                    direction.x, direction.y, direction.z, -.385f * CockpitPanelPlacement.Aspect * size, -.18f * size, .385f * size * CockpitPanelPlacement.Aspect, .18f * size, out along)) continue;
             }
             else
             {
@@ -177,7 +177,7 @@ internal sealed class CockpitLayout : MonoBehaviour
     {
         var p = Quaternion.Inverse(_panelRotation) * (hand - _panel);
         var scale = PanelScale;
-        var closest = new Vector3(Mathf.Clamp(p.x, -.385f * scale, .385f * scale), Mathf.Clamp(p.y, -.18f * scale, .18f * scale), -.05f * scale);
+        var closest = new Vector3(Mathf.Clamp(p.x, -.385f * scale * CockpitPanelPlacement.Aspect, .385f * scale * CockpitPanelPlacement.Aspect), Mathf.Clamp(p.y, -.18f * scale, .18f * scale), -.05f * scale);
         return Vector3.Distance(p, closest);
     }
     internal static Vector3 BoundPanel(Vector3 p) => !TrackedControllers.Finite(p) ? new Vector3(0, -.32f, .65f) :

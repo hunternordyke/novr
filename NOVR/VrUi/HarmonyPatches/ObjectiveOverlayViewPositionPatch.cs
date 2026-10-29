@@ -1,5 +1,6 @@
 using System.Reflection;
 using HarmonyLib;
+using NOVR.VrUi.SpecialBehavior;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -42,6 +43,10 @@ internal static class ObjectiveOverlayViewPositionPatch
             if (objectivePointer == null || objectiveDot == null || sizeIndicator == null || objectiveInfo == null || pointerTail == null)
                 return true;
 
+            HudElementStyle.Add(objectivePointer, HudElementKind.Marker);
+            HudElementStyle.Add(objectiveDot, HudElementKind.Marker);
+            HudElementStyle.Add(objectiveInfo, HudElementKind.Label);
+            HudElementStyle.Add(sizeIndicator, HudElementKind.WorldGeometry);
             PrepareForVr(__instance, objectiveInfo);
             HiddenField.SetValue(__instance, false);
             objectiveInfo.enabled = true;
@@ -60,7 +65,7 @@ internal static class ObjectiveOverlayViewPositionPatch
             objectiveDot.enabled = dotMode;
 
             objectiveInfo.transform.position = dotMode
-                ? hudPosition - cockpitHudCamera.transform.up * VrHudProjection.ReferencePixelsToHudDistance(DotLabelOffsetPixels)
+                ? hudPosition - cockpitHudCamera.transform.up * VrHudProjection.ReferencePixelsToHudDistance(DotLabelOffsetPixels * ModConfiguration.Instance.MarkerScale.Value)
                 : pointerTail.position;
             objectiveInfo.transform.rotation = hudRotation;
 

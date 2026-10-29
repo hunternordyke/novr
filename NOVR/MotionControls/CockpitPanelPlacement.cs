@@ -16,7 +16,7 @@ internal sealed class CockpitPanelPlacement : MonoBehaviour
     {
         internal ConfigEntry<bool> Manual = null!;
         internal ConfigEntry<Vector3> Position = null!, Angles = null!;
-        internal ConfigEntry<float> Scale = null!;
+        internal ConfigEntry<float> Scale = null!, Aspect = null!;
     }
     private readonly Dictionary<string, Profile> _profiles = new();
     private Profile? _profile;
@@ -28,6 +28,7 @@ internal sealed class CockpitPanelPlacement : MonoBehaviour
     internal static Vector3 Position { get { GetPose(out var p, out _, out _); return p; } }
     internal static Quaternion Rotation { get { GetPose(out _, out var r, out _); return r; } }
     internal static float Scale { get { GetPose(out _, out _, out var s); return s; } }
+    internal static float Aspect => Instance?._profile?.Manual.Value == true ? Instance._profile.Aspect.Value : Instance?._surface?.Aspect ?? 1f;
     internal static string Status => Instance?._profile?.Manual.Value == true ? "Saved placement for this aircraft" :
         Instance?._surface?.ClearanceLimited == true ? "Tight dashboard • use Edit layout to refine" :
         Instance?._surface?.Renderer != null ? "Anchored to the aircraft dashboard" : "No usable dashboard surface • free placement";
@@ -56,6 +57,7 @@ internal sealed class CockpitPanelPlacement : MonoBehaviour
                     Manual = config.Bind(section, "Manual Placement", false, "Use the saved panel placement for " + key + "; otherwise fit to the native dashboard. Shared between handedness layouts."),
                     Position = config.Bind(section, "Position", Vector3.zero, "Saved panel center relative to the aircraft cockpit viewpoint, independent of seat adjustment."),
                     Angles = config.Bind(section, "Rotation", Vector3.zero, "Saved panel rotation relative to the aircraft cockpit viewpoint."),
+                    Aspect = config.Bind(section, "Aspect", 1f, new ConfigDescription("Saved dashboard width relative to its height.", new AcceptableValueRange<float>(.85f, 1.75f))),
                     Scale = config.Bind(section, "Scale", 1f, new ConfigDescription("Saved panel scale.", new AcceptableValueRange<float>(.4f, 1.8f)))
                 };
                 if (!TrackedControllers.Finite(_profile.Position.Value) || !TrackedControllers.Finite(_profile.Angles.Value)) _profile.Manual.Value = false;
@@ -126,6 +128,7 @@ internal sealed class CockpitPanelPlacement : MonoBehaviour
         if (_profile == null || root == null || eye == null || !TrackedControllers.Finite(position)) return;
         _profile.Position.Value = Quaternion.Inverse(eye.rotation) * (root.TransformPoint(position) - eye.position);
         _profile.Angles.Value = (Quaternion.Inverse(eye.rotation) * root.rotation * rotation).eulerAngles;
+        _profile.Aspect.Value = Aspect;
         _profile.Scale.Value = Mathf.Clamp(scale, .4f, 1.8f); _profile.Manual.Value = true;
         ModConfiguration.Instance.Config.Save();
     }

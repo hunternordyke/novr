@@ -65,10 +65,13 @@ internal sealed class NativeControlModel : IDisposable
             }
             if (model._copies.Count == 0) { model.Dispose(); return null; }
             var bounds = model.Bounds();
-            // The stick grab point sits in the upper grip. Throttles use the
-            // handle's center; very remote native animation pivots are excluded.
+            // Seat the palm below the stick button head. A sliding throttle
+            // supports the palm on its upper grip, not through the lever body.
+            // Collective grips keep their cylindrical center.
             var grip = bounds.center;
-            if (stick) grip.y = bounds.max.y - Mathf.Min(.055f, bounds.size.y * .25f);
+            if (stick) grip.y = bounds.max.y - Mathf.Min(.080f, bounds.size.y * .36f);
+            else if (!MotionFlightController.UsesLiftCollective(aircraft))
+                grip.y = bounds.max.y - Mathf.Min(.028f, bounds.size.y * .22f);
             geometry.localPosition = -grip;
             if (stick) model._root.localPosition = Vector3.up * .12f;
             foreach (var source in sources)

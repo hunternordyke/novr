@@ -63,12 +63,12 @@ internal sealed class DashboardClearance : IDisposable
             catch (Exception e) { Debug.LogWarning("[NOVR] Dashboard clearance mesh unavailable: " + renderer.name + ": " + e.Message); }
         }
     }
-    internal bool Intersects(Vector3 center, Quaternion rotation, float scale)
+    internal bool Intersects(Vector3 center, Quaternion rotation, float scale, float aspect = 1)
     {
         var inverse = Quaternion.Inverse(rotation);
         // Full faceplate/chassis plus a small safety margin. Native moving grips
         // are excluded above because NOVR replaces them with repositionable ones.
-        var half = new Vector3(.39f, .185f, .048f) * scale;
+        var half = new Vector3(.39f * aspect, .185f, .048f) * scale;
         foreach (var mesh in _meshes)
         {
             var points = Array.ConvertAll(mesh.points, p => inverse * (p - center));
