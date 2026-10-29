@@ -55,11 +55,13 @@ internal static class TrackedControllers
         device.TryGetFeatureValue(CommonUsages.menuButton, out var menu);
 
         var inputDevice = left ? XRController.leftHand : XRController.rightHand;
-        var nativeFrame = inputDevice?.layout == "SteamFrameController";
+        // OpenXR generates device-specific layouts derived from the registered
+        // profile, so their layout names need not equal the base layout name.
+        var nativeFrame = inputDevice is Valve.OpenXR.Utils.SteamFrameControllerProfile.SteamFrameController;
         if ((left ? _reportedLeft : _reportedRight)?.Equals(device) != true)
         {
             if (left) _reportedLeft = device; else _reportedRight = device;
-            Debug.Log($"[NOVR] {(left ? "Left" : "Right")} controller: {device.name}; {(nativeFrame ? "native Steam Frame bindings" : "generic XR / Touch-compatible bindings")}.");
+            Debug.Log($"[NOVR] {(left ? "Left" : "Right")} controller: {device.name}; layout {inputDevice?.layout ?? "unavailable"}; {(nativeFrame ? "native Steam Frame bindings" : "generic XR / Touch-compatible bindings")}.");
         }
         bool Button(string name) => inputDevice?.TryGetChildControl<ButtonControl>(name)?.isPressed == true;
         var aimPosition = position;

@@ -1,10 +1,11 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.4.3**, targeting Nuclear Option **0.34.1**, Steam build
+NOVR Motion Prototype **0.4.4.4**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
-compiled and checked against a local game installation. It has **not** been flight
-tested on Steam Frame or verified in a live SteamVR streaming session.
+compiled and checked against a local game installation. A live Steam Frame session
+now starts through SteamVR/OpenXR using DirectX 11 on the Linux/Proton test host.
+Flight controls and in-headset UI interactions still need hands-on validation.
 
 ## Install and start
 
@@ -12,7 +13,10 @@ tested on Steam Frame or verified in a live SteamVR streaming session.
 2. With BepInEx 5 already installed, extract `NOVR-steam-frame-experimental.zip`
    into the game's **BepInEx directory**, replacing the matching files in both folders.
 3. Use SteamVR as the PC's OpenXR runtime and connect Frame through your PC streaming
-   setup. Launch Nuclear Option using your existing NOVR setup.
+   setup. Establish the VR session first, then launch Nuclear Option. On the tested
+   Linux/Proton host, use the normal DirectX 11 launch, not the Vulkan launch option.
+   An explicit `-force-d3d11` launch succeeded; the Vulkan launch exited during
+   OpenXR initialization.
 4. In a cockpit, press the throttle-hand **View** button to open the wrist panel.
    Toggle **Motion controls**, then choose **Place handles (3s)**. The panel closes;
    place both hands comfortably and wait three seconds. A short haptic pulse confirms
@@ -50,10 +54,20 @@ configuration change, not a setting included in this ZIP. See Valve's
 [platform support guidance](https://help.steampowered.com/en/faqs/view/2668-0B6E-79E0-A85B)
 and the [Linux streaming issue report](https://github.com/ValveSoftware/SteamVR-for-Linux/issues/962).
 
-Version **0.4.4.3** also fixes repeat-start payload installation: identical runtime
+Version **0.4.4.3** fixed repeat-start payload installation: identical runtime
 DLLs are left untouched when Unity has already loaded them. MultiPass is now set
 explicitly before OpenXR initialization, including on the first install. Neither
 change replaces the need for an active VR streaming connection.
+
+The test headset initially could not connect directly over local Wi-Fi while its
+Tailscale connection was enabled. With Tailscale disabled on Frame, the direct Wi-Fi
+connection and SteamVR session worked. The wireless adapter has not been independently
+validated; successful home Wi-Fi streaming does not establish adapter health.
+
+Version **0.4.4.4** fixes a menu pointer exception: Unity UI's graphic collection
+supports indexed access but throws when enumerated. That exception interrupted the
+controller update before the cursor/laser could be drawn. Frame detection also now
+recognizes the runtime-generated layouts derived from Valve's controller profile.
 
 ## Default bindings
 
@@ -138,8 +152,8 @@ The fork registers Valve's
 [`XR_VALVE_frame_controller_interaction` profile](https://github.com/ValveSoftware/Unity/blob/7e842352310fc2cb458ac6b127ce1afc233173a1/com.valvesoftware.openxr.utils/Documentation~/index.md)
 before initializing OpenXR. The profile exposes the additional shoulder/face buttons
 and the native aim pose. If the runtime does not enable that extension, the profile is
-skipped and the existing Touch-compatible profile remains available. Availability of
-the native profile in the user's SteamVR streaming session remains to be verified.
+skipped and the existing Touch-compatible profile remains available. Both controllers are now detected with native Steam Frame bindings in the live
+SteamVR streaming session; physical button behavior still needs hands-on validation.
 The BepInEx log reports each controller and whether NOVR selected native Steam Frame
 bindings or the generic fallback. See [third-party notices](THIRD_PARTY_NOTICES.md) for the Valve source and license.
 

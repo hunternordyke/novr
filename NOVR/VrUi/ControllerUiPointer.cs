@@ -170,8 +170,12 @@ internal sealed class ControllerUiPointer
             var canvas = graphics.GetComponent<Canvas>();
             if (canvas == null || canvas.renderMode != RenderMode.WorldSpace || canvas.gameObject.layer != (int)LayerHelper.GetVrUiLayer()) continue;
             var eventCamera = graphics.eventCamera ?? camera;
-            foreach (var graphic in GraphicRegistry.GetGraphicsForCanvas(canvas))
+            // Unity's IndexedSet implements IList but deliberately throws from
+            // GetEnumerator. Match GraphicRaycaster's indexed traversal.
+            var registeredGraphics = GraphicRegistry.GetGraphicsForCanvas(canvas);
+            for (var i = 0; i < registeredGraphics.Count; i++)
             {
+                var graphic = registeredGraphics[i];
                 if (graphic == null || !graphic.isActiveAndEnabled || !graphic.raycastTarget || graphic.depth < 0 || graphic.canvasRenderer.cull) continue;
                 if (graphics.ignoreReversedGraphics && Vector3.Dot(ray.direction, graphic.transform.forward) <= 0) continue;
                 if (!HitRect(ray, graphic.rectTransform, out var distance, out var point)) continue;
