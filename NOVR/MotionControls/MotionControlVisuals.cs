@@ -113,6 +113,7 @@ internal sealed class MotionControlVisuals : IDisposable
         _nativeThrottle = NativeControlModel.TryCreate(aircraft, false, _throttleHandle);
         if (_nativeStick != null) foreach (var renderer in _fallbackStick) renderer.enabled = false;
         if (_nativeThrottle != null) foreach (var renderer in _fallbackThrottle) renderer.enabled = false;
+        CockpitForeground.Register(Root);
     }
     internal void SetVisible(bool visible)
     {
@@ -282,6 +283,7 @@ internal sealed class MotionControlVisuals : IDisposable
 
     public void Dispose()
     {
+        if (Root != null) CockpitForeground.Unregister(Root);
         _nativeStick?.Dispose(); _nativeThrottle?.Dispose();
         Font.textureRebuilt -= RefreshFontTexture;
         if (Root != null) Object.Destroy(Root.gameObject);

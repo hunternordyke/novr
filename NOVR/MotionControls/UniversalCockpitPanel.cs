@@ -14,6 +14,7 @@ namespace NOVR.MotionControls;
 internal sealed class UniversalCockpitPanel : MonoBehaviour
 {
     internal static UniversalCockpitPanel? Instance { get; private set; }
+    internal static bool DrawsPanel => Instance?._visible == true && Instance._model?.Root.gameObject.activeInHierarchy == true;
     private CockpitPanelModel? _model;
     private CockpitPanelHud? _hud;
     private readonly NativeInstrumentPresentation _nativeInstruments = new();
@@ -83,7 +84,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         aircraft = null!; root = null!;
         if (!ModConfiguration.Instance.CockpitPanelEnabled.Value || !TrackedControllers.Available ||
             CameraStateManager.cameraMode != CameraMode.cockpit || !GameManager.GetLocalAircraft(out aircraft) ||
-            aircraft.cockpit == null || aircraft.cockpit.IsDetached() || !GameManager.flightControlsEnabled ||
+            Fs20NativeCockpit.IsAircraft(aircraft) || aircraft.cockpit == null || aircraft.cockpit.IsDetached() || !GameManager.flightControlsEnabled ||
             Time.timeScale <= 0 || DynamicMap.mapMaximized || CursorManager.GetFlag(CursorFlags.GameMenu) ||
             (SceneSingleton<RadialMenuMain>.i != null && RadialMenuMain.IsInUse()) ||
             (GameManager.controlMapper != null && GameManager.controlMapper.isOpen)) return false;
@@ -107,8 +108,12 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (Keyboard.current?.f6Key.wasPressedThisFrame == true)
         {
             CockpitLayout.Instance?.Finish(false);
-            settings.CockpitPanelEnabled.Value = !settings.CockpitPanelEnabled.Value;
-            if (settings.CockpitPanelEnabled.Value) _modelFailed = false;
+            if (Fs20NativeCockpit.Selected) settings.Fs20NativeCockpitEnabled.Value = !settings.Fs20NativeCockpitEnabled.Value;
+            else
+            {
+                settings.CockpitPanelEnabled.Value = !settings.CockpitPanelEnabled.Value;
+                if (settings.CockpitPanelEnabled.Value) _modelFailed = false;
+            }
         }
         if (!Ready(out var aircraft, out var root)) { Hide(); return; }
         if (_aircraft != aircraft)

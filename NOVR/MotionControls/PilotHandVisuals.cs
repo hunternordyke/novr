@@ -96,6 +96,7 @@ internal sealed class PilotHandVisuals : MonoBehaviour
             catch(Exception e) { Debug.LogWarning("[NOVR] Pilot sleeves unavailable; tracked gloves remain available: "+e.Message); }
         }
         for(var side=0;side<2;side++) _gloves[side]=new RiggedGlove(side==0,_root,_materials.Glove(material,patches[side]),patches[side]);
+        CockpitForeground.Register(_root);
         Debug.Log("[NOVR] Rigged Valve gloves ready; pilot material="+material.name+", sleeve renderers="+_sleeves.Count(s=>s!=null)+". Controller grip/trigger pose fingers; no finger-tracking claim.");
     }
     private void CreateSleeves(Mesh source,BoneWeight[] weights,Vector2[] uv)
@@ -160,6 +161,7 @@ internal sealed class PilotHandVisuals : MonoBehaviour
     private static float Weight(BoneWeight w,int index)=>(w.boneIndex0==index?w.weight0:0)+(w.boneIndex1==index?w.weight1:0)+(w.boneIndex2==index?w.weight2:0)+(w.boneIndex3==index?w.weight3:0);
     private void ReleaseVisuals()
     {
+        if (_root != null) CockpitForeground.Unregister(_root);
         for(var i=0;i<2;i++){_gloves[i]?.Dispose();_gloves[i]=null;_sleeves[i]=null;}
         foreach(var mesh in _ownedMeshes)Object.Destroy(mesh);_ownedMeshes.Clear();
         _materials?.Dispose();_materials=null;

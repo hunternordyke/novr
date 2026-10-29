@@ -46,6 +46,8 @@ public class Core : MonoBehaviour
         gameObject.AddComponent<MotionControls.PcVrCapabilities>();
         gameObject.AddComponent<VrUi.WristMenu>();
         gameObject.AddComponent<MotionControls.UniversalCockpitPanel>();
+        gameObject.AddComponent<MotionControls.CockpitForeground>();
+        gameObject.AddComponent<MotionControls.Fs20NativeCockpit>();
     }
 
     private void OnApplicationQuit() => _quitting = true;

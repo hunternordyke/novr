@@ -1,11 +1,17 @@
 # Universal cockpit console
 
-NOVR 0.4.6.2 uses one refined 3D console model in every aircraft. Its default
+From NOVR 0.4.7.0, the FS-20 Vortex uses its own [integrated native cockpit](FS20_NATIVE_COCKPIT.md). It never creates the movable console.
+
+Other aircraft use the shared 3D console model introduced in 0.4.6.2. Its default
 position, tilt and size fit the native dashboard surface in physical cockpit meters.
 A one-time interior geometry check adds clearance where needed; broad dashboards
 choose the area in front of the pilot. Imported cockpit scale does not alter placement.
 Seat adjustment moves the view and tracked hands, leaving the stick, throttle and
 console fixed. Saved panel placement is per aircraft, shared across handedness.
+
+The stick, throttle and attached hands render after the movable console, so the
+console cannot cover them. This foreground pass only runs while the shared console
+is visible; the FS-20 uses normal cockpit depth.
 
 ## Displays
 

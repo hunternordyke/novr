@@ -27,7 +27,7 @@ public class ModConfiguration
     public readonly ConfigEntry<float> FlightHudScale, InstrumentBrightness, MfdBrightness;
     public readonly ConfigEntry<float> MarkerScale, MarkerLabelScale, ReticleScale, WeaponHudScale;
     internal readonly ConfigEntry<MotionControls.MfdPage> LeftMfdPage, RightMfdPage;
-    public readonly ConfigEntry<bool> CockpitPanelEnabled;
+    public readonly ConfigEntry<bool> CockpitPanelEnabled, Fs20NativeCockpitEnabled;
     public readonly ConfigEntry<Vector3> CockpitPanelPosition;
     public readonly ConfigEntry<float> CockpitPanelTilt, CockpitPanelScale, CockpitPanelYaw, CockpitPanelRoll;
 
@@ -44,6 +44,7 @@ public class ModConfiguration
         CockpitAlerts = new VrUi.SpecialBehavior.CockpitAlertSettings(config);
         TargetCue = config.Bind("VR HUD", "Target Aim Cue", global::NOVR.MotionControls.TargetCueMode.Context,
             "Context shows a small target cue only near a selectable target or while selecting. Always keeps a faint dot visible. Off hides the aim cue. Target diamonds and weapon sights are unchanged.");
+        Fs20NativeCockpitEnabled = config.Bind("FS-20 Native Cockpit", "Interactive Controls", true, "Operate the FS-20 original cockpit controls in VR. Its native cluster is fixed to the aircraft and always replaces the universal movable panel. Disabling this leaves the original cockpit visible.");
         CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");
         CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Fallback cockpit position if a native dashboard surface is unavailable. Automatic dashboard fit and per-aircraft saved placements take precedence. Independent of seat adjustment.");
         CockpitPanelTilt = config.Bind("Universal Cockpit Panel", "Tilt", 20f, new ConfigDescription("Upward-facing panel tilt in degrees.", new AcceptableValueRange<float>(-90, 90)));

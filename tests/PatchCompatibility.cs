@@ -57,6 +57,9 @@ internal static class PatchCompatibility
         foreach (var contract in new[] {
             (owner: "CombatHUD", field: "weaponState", type: "HUDWeaponState"),
             (owner: "CombatHUD", field: "markers", type: "System.Collections.Generic.List`1<HUDUnitMarker>"),
+            (owner: "TacScreen", field: "displaySize", type: "System.Single"),
+            (owner: "TacScreen", field: "metersPerPixel", type: "System.Single"),
+            (owner: "TacScreen", field: "iconLayer", type: "UnityEngine.Transform"),
             (owner: "TacScreen", field: "cam", type: "UnityEngine.Camera"),
             (owner: "TacScreen", field: "canvas", type: "UnityEngine.Canvas"),
             (owner: "TacScreen", field: "screenMaterial", type: "UnityEngine.Material"),
@@ -79,6 +82,9 @@ internal static class PatchCompatibility
             var field = game.MainModule.Types.Single(t => t.FullName == contract.owner).Fields.SingleOrDefault(f => f.Name == contract.field);
             if (field?.FieldType.FullName != contract.type) failures.Add($"Native readout field mismatch {contract.owner}.{contract.field}");
         }
+        using var urp = AssemblyDefinition.ReadAssembly(Path.Combine(gameManagedDirectory, "Unity.RenderPipelines.Universal.Runtime.dll"));
+        if (urp.MainModule.Types.Single(t => t.Name == "UniversalAdditionalCameraData").Fields.SingleOrDefault(f => f.Name == "m_ClearDepth")?.FieldType.FullName != "System.Boolean")
+            failures.Add("Foreground overlay depth-clear contract changed.");
         if (verified < 20) throw new Exception($"Only {verified} patch targets were checked; wrong build?");
         // These nested native types are private, so their Harmony targets are
         // resolved dynamically. Verify return values and injected fields too.

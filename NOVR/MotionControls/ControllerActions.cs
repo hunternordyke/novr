@@ -24,7 +24,8 @@ internal sealed class ControllerActions : MonoBehaviour
     internal void QueuePanelAction(string action)
     {
         if (action != "Gear" && action != "Radar" && action != "Toggle Engine" && action != "Flight Assist" &&
-            action != "Next Weapon" && action != "Next Countermeasure" && action != "Eject" && action != "Auto Hover") return;
+            action != "Next Weapon" && action != "Previous Weapon" && action != "Next Countermeasure" && action != "Eject" && action != "Auto Hover" &&
+            action != "Nav Lights" && action != "Link Guns") return;
         if (!GameManager.GetLocalAircraft(out var aircraft)) return;
         _queuedAction = action;
         _queuedFrame = Time.frameCount + 1;
@@ -82,7 +83,7 @@ internal sealed class ControllerActions : MonoBehaviour
 
     internal bool Held(string action) => TrackedControllers.Available && !WristMenu.IsOpen && !Cursor.visible && action switch
     {
-        "Brake" => _brake.Held,
+        "Brake" => _brake.Held || Fs20NativeCockpit.BrakeHeld,
         "Fire" => _fire.Held,
         "Countermeasures" => _countermeasures.Held,
         _ => false

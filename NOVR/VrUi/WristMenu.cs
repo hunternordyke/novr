@@ -19,7 +19,7 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _alertsPage;
+    private GameObject? _alertsPage, _nativeCockpitPage;
     private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage, _aimingPage, _opticalPage;
     private readonly Dictionary<GameObject, string> _pageTitles = new();
     private GameObject? _performancePage;
@@ -242,7 +242,7 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Recenter view", 1, 2, () => { NOVRHeadsetData.CalibrateTranslation(); NOVRHeadsetData.CalibrateRotation(); Close(); });
         AddLiveButton(() => "AOTS HUD: " + (config.OpticalHud.Enabled.Value ? "ON" : "OFF"), 0, 3, () => { OpticalTargetingHud.Toggle(); Close(); });
         AddButton("AOTS setup", 1, 3, () => ShowPage(_opticalPage!));
-        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Edit cockpit layout", 0, 4, ToggleLayout);
+        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : Fs20NativeCockpit.Selected ? "Edit handle layout" : "Edit cockpit layout", 0, 4, ToggleLayout);
         AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Motion: " + (motion.Enabled.Value ? "ON" : "OFF"), 1, 4, () =>
         {
             if (CockpitLayout.Active) { CockpitLayout.Instance?.Finish(false); Close(); }
@@ -252,8 +252,9 @@ internal sealed class WristMenu : MonoBehaviour
 
         _setupPage = Page("COCKPIT");
         AddButton("Seat position", 0, 0, () => ShowPage(_seatPage!));
-        AddButton("Console position", 1, 0, () => ShowPage(_consolePage!));
-        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Edit cockpit layout", 0, 1, ToggleLayout);
+        AddLiveButton(() => Fs20NativeCockpit.Selected ? "FS-20 cockpit" : "Console position", 1, 0,
+            () => ShowPage(Fs20NativeCockpit.Selected ? _nativeCockpitPage! : _consolePage!));
+        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : Fs20NativeCockpit.Selected ? "Edit handle layout" : "Edit cockpit layout", 0, 1, ToggleLayout);
         AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Place handles (3s)", 1, 1, () =>
         {
             if (CockpitLayout.Active) CockpitLayout.Instance?.Finish(false);
@@ -317,6 +318,14 @@ internal sealed class WristMenu : MonoBehaviour
         AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Grab to position", 0, 6, ToggleLayout);
         var placementInfo = Label(_consolePage.transform, "", new Vector2(0, -223), new Vector2(510, 65), 16);
         _liveLabels.Add((placementInfo, () => CockpitPanelPlacement.Status + "\nPanel placement is saved per aircraft.\nSeat movement leaves panel and handles in place."));
+
+        _nativeCockpitPage = Page("FS-20 NATIVE COCKPIT");
+        AddLiveButton(() => "Interactions: " + (config.Fs20NativeCockpitEnabled.Value ? "ON" : "OFF"), 0, 0,
+            () => config.Fs20NativeCockpitEnabled.Value = !config.Fs20NativeCockpitEnabled.Value);
+        AddButton("Flight actions", 1, 0, () => ShowPage(_flightPage!));
+        Label(_nativeCockpitPage.transform,
+            "Original cluster · fixed to the aircraft\nFree hand: reach + trigger/grip, or point + trigger\n\nLeft: gear lever, weapon dial, hold PARK for brakes\nRight APU switch: engine · adjacent switch: radar\nCenter: AUTO TRIM assist · lower switch: hover\nUpper bezel: range +/− · map · lights · AOTS / head\nLower left: previous/next weapon · CM · linked guns\nLower right: unlock last / clear all targets\n\nEject: lift guard below center cluster, release,\nthen grab the loop and pull toward you.\nNative screens and warning lights stay live.\nSeat adjustment never moves this cluster.",
+            new Vector2(0,-48), new Vector2(510,350), 18);
 
         _controlsPage = Page("CONTROLS");
         AddLiveButton(() => "Stick grip: " + (motion.StickTapGrip.Value ? "TAP" : "HOLD"), 0, 0,

@@ -31,7 +31,7 @@ internal sealed class CockpitLayout : MonoBehaviour
     internal static Vector3 PanelPosition => Active ? Instance!._panel : CockpitPanelPlacement.Position;
     internal static Quaternion PanelRotation => Active ? Instance!._panelRotation : CockpitPanelPlacement.Rotation;
     internal static float PanelScale => Active ? Instance!._panelScale : CockpitPanelPlacement.Scale;
-    internal static string Hint => "EDIT LAYOUT  •  GRIP A HANDLE OR PANEL TO MOVE  •  VIEW → SAVE LAYOUT";
+    internal static string Hint => Fs20NativeCockpit.Selected ? "EDIT HANDLES  •  FS-20 CLUSTER IS FIXED  •  VIEW → SAVE LAYOUT" : "EDIT LAYOUT  •  GRIP A HANDLE OR PANEL TO MOVE  •  VIEW → SAVE LAYOUT";
     internal static bool Held(Element element) => Active && (Instance!._hands[0].Element == element || Instance._hands[1].Element == element);
     internal static bool Hovered(Element element) => Active && (Instance!._hands[0].Hover == element || Instance._hands[1].Hover == element);
     private Vector3 Mirror(Vector3 p) => _leftHanded ? new Vector3(-p.x, p.y, p.z) : p;
@@ -142,7 +142,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         // Reach takes precedence over pointing. Either hand may move any item.
         foreach (var element in new[] { Element.Stick, Element.Throttle, Element.Panel })
         {
-            if (_hands[1 - index].Element == element) continue;
+            if (_hands[1 - index].Element == element || element == Element.Panel && Fs20NativeCockpit.Selected) continue;
             var d = element == Element.Panel ? PanelDistance(hand) : Vector3.Distance(hand, GripPosition(element));
             if (d < (element == Element.Panel ? .065f : ModConfiguration.Instance.MotionControls.GrabRadius.Value) && d < distance)
             { best = element; distance = d; }
@@ -150,7 +150,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         if (best != Element.None) return best;
         foreach (var element in new[] { Element.Stick, Element.Throttle, Element.Panel })
         {
-            if (_hands[1 - index].Element == element) continue;
+            if (_hands[1 - index].Element == element || element == Element.Panel && Fs20NativeCockpit.Selected) continue;
             // In edit mode the panel is transparent. A ray aimed at a handle
             // behind it must still select the handle, rather than its outline.
             if (element == Element.Panel && best != Element.None) return best;
