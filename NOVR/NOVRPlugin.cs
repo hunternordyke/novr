@@ -18,7 +18,7 @@ namespace NOVR;
 [BepInPlugin(
     "deltawing.novr",
     "NOVR (Motion Prototype)",
-    "0.4.6.7")]
+    "0.4.6.8")]
 public class NOVRPlugin : BaseUnityPlugin
 {
     
@@ -33,6 +33,7 @@ public class NOVRPlugin : BaseUnityPlugin
         ModFolderPath = Path.GetDirectoryName(Assembly.GetAssembly(typeof(NOVRPlugin)).Location);
         
         new ModConfiguration(Config);
+        Compatibility.ProtonControllerCompatibility.Initialize();
         Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly());
         Core.Create();
     }

@@ -2,6 +2,20 @@ using Mono.Cecil;
 
 internal static class PatchCompatibility
 {
+    public static void VerifyInputBackend(string gameManagedDirectory)
+    {
+        using var assembly = AssemblyDefinition.ReadAssembly(Path.Combine(gameManagedDirectory, "Rewired_Core.dll"));
+        var input = assembly.MainModule.Types.Single(t => t.FullName == "Rewired.ReInput");
+        var initialized = input.Events.Single(e => e.Name == "InitializedEvent");
+        var ready = input.Properties.Single(p => p.Name == "isReady");
+        var config = input.NestedTypes.Single(t => t.Name == "ConfigHelper");
+        var xinput = config.Properties.Single(p => p.Name == "useXInput");
+        if (initialized.EventType.FullName != "System.Action" || !initialized.AddMethod.IsPublic || !initialized.AddMethod.IsStatic ||
+            ready.PropertyType.FullName != "System.Boolean" || !ready.GetMethod.IsPublic || !ready.GetMethod.IsStatic ||
+            xinput.PropertyType.FullName != "System.Boolean" || xinput.SetMethod?.IsPublic != true || xinput.GetMethod?.IsPublic != true)
+            throw new Exception("Rewired initialization/configuration API changed; Proton compatibility needs review.");
+    }
+
     public static void Verify(string modPath, string gameManagedDirectory)
     {
         var resolver = new DefaultAssemblyResolver();

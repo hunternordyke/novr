@@ -917,6 +917,8 @@ if (args.Length == 2)
     });
     Check("Harmony patch targets and injected fields match the installed game", () =>
         PatchCompatibility.Verify(args[0], args[1]));
+    Check("Proton input workaround uses supported Rewired initialization and configuration APIs", () =>
+        PatchCompatibility.VerifyInputBackend(args[1]));
 }
 
 if (args.Length >= 1)

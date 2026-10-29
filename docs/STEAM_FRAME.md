@@ -563,3 +563,22 @@ a static layout audit. No simulated game input or flight-action tests were run.
 The prior 32-aircraft clearance audit predates this larger fit and does not
 validate the new dashboard footprints. In-headset rendering, restoration,
 clipping, hand comfort and streaming performance remain to be tested.
+
+## Proton mission-menu freeze workaround (0.4.6.8)
+
+A local frozen-session capture showed the game main thread waiting inside Wine's
+`XInputGetState`, on its controller-list critical section, after the mission menu
+loaded. NOVR now disables Rewired's optional legacy XInput backend when running
+under Wine/Proton, using Rewired's initialization event and supported configuration
+setter. This targets the observed wait; it is not a general cure for all freezes.
+
+OpenXR motion-controller polling and haptics remain separate. The workaround does
+not change Steam Input, graphics settings, saved game bindings or other mods.
+Native Windows is unaffected. Other Rewired input backends remain available, but
+Xbox-style gamepads may require alternate bindings. Set **Compatibility → Disable
+Legacy XInput on Proton** to false in NOVR's config and restart to opt out.
+
+Version 0.4.6.8 retains the [AOTS HUD and contextual aiming cue](OPTICAL_HUD.md).
+PC dynamic foveated rendering is still not active; see [capability limits](PC_FOVEATION.md).
+The build and 118 automated checks pass, including the installed Rewired API
+contract. Actual mission-menu recovery and controller behavior require a user test.
