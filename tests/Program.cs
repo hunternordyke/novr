@@ -483,6 +483,64 @@ Check("invalid hand samples cannot trigger ejection", () =>
     True(!eject.Pull(-1, 1, true));
 });
 
+Check("an eject request blocks competing input while awaiting native acknowledgement", () =>
+{
+    var request = new EjectionRequest();
+    request.Begin(10, 100);
+    True(request.State == EjectionRequestState.Pending && request.BlocksInput);
+    request.Update(false, 10.9f, 104);
+    True(request.State == EjectionRequestState.Pending);
+});
+Check("a stalled next frame still gets to consume an eject request", () =>
+{
+    var request = new EjectionRequest();
+    request.Begin(10, 100);
+    request.Update(false, 15, 101);
+    True(request.State == EjectionRequestState.Pending);
+    request.Update(true, 15, 101);
+    True(request.State == EjectionRequestState.Accepted);
+});
+Check("a missed eject request becomes unconfirmed without automatically retrying", () =>
+{
+    var request = new EjectionRequest();
+    request.Begin(10, 100);
+    request.Update(false, 11, 102);
+    True(request.State == EjectionRequestState.Unconfirmed && !request.BlocksInput);
+    request.Update(false, 12.9f, 120);
+    True(request.State == EjectionRequestState.Unconfirmed);
+    request.Update(false, 13, 121);
+    True(request.State == EjectionRequestState.Idle && !request.BlocksInput);
+});
+Check("native acceptance wins over timeout and remains acknowledged until context reset", () =>
+{
+    var request = new EjectionRequest();
+    request.Begin(10, 100);
+    request.Update(true, 12, 104);
+    True(request.State == EjectionRequestState.Accepted && request.BlocksInput);
+    request.Update(false, 20, 200);
+    True(request.State == EjectionRequestState.Accepted);
+    request.Reset();
+    True(request.State == EjectionRequestState.Idle && !request.BlocksInput);
+});
+Check("an unconfirmed request can be acknowledged late or deliberately retried", () =>
+{
+    var request = new EjectionRequest();
+    request.Begin(10, 100); request.Update(false, 11, 102);
+    request.Update(true, 11.1f, 103);
+    True(request.State == EjectionRequestState.Accepted);
+    request.Reset(); request.Begin(20, 200);
+    True(request.State == EjectionRequestState.Pending);
+    request.Update(false, 20.5f, 202);
+    True(request.State == EjectionRequestState.Pending);
+});
+Check("context reset discards pending feedback and does not adopt unrelated native ejection", () =>
+{
+    var request = new EjectionRequest();
+    request.Begin(10, 100); request.Reset();
+    request.Update(true, 11, 102);
+    True(request.State == EjectionRequestState.Idle && !request.BlocksInput);
+});
+
 Check("an incomplete console asset fails before creating scene objects", () =>
 {
     foreach (var json in new[] { "{}", "null", "{\"materials\":null,\"groups\":[],\"parts\":[]}" })

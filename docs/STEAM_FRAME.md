@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.5**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.6**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -154,8 +154,11 @@ size. **F6** shows/hides it and restores the previous HUD layout when hidden.
 Version 0.4.5.5 keeps the other free hand’s pointer visible when one hand is near
 the console. Nearby controls take priority for their own hand; hints follow the
 control being used, including eject progress. Release a held control before
-operating another. Console interactions and display fitting still require
-in-headset validation.
+operating another. Version 0.4.5.6 keeps direct gear/eject travel consistent at
+all console sizes. Ejection feedback distinguishes a request from the aircraft’s
+confirmation. If it is not accepted, release, reopen the guard and pull again;
+there is no automatic retry. Console interactions and display fitting still
+require in-headset validation.
 
 ## Default bindings
 

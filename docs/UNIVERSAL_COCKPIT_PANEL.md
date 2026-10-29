@@ -47,6 +47,17 @@ control that produced them. Point at the front of the console to use its laser c
 | Red eject guard | Trigger lifts/closes cover | Trigger or grip near the cover |
 | Yellow eject handle | After opening the cover and releasing trigger, hold trigger on the handle for 0.75 s | After opening the cover and releasing your press, hold trigger or grip on the handle and pull it toward you at least 4.5 cm |
 
+Version 0.4.5.6 measures direct gear and eject travel in physical centimeters,
+independent of console size or tilt. Pull the handle out toward you, perpendicular
+to the panel face; sideways motion and pushing away do not count as an eject pull.
+
+A completed pull shows **EJECT REQUESTED** while the game processes it, then
+**EJECTION STARTED** only after the aircraft confirms it. The console reserves
+input during that request so another hand cannot replace it with a different
+action. If the game does not accept it, the guard closes and the hint briefly
+shows **EJECT NOT CONFIRMED**. Release, reopen the guard and make another deliberate
+pull to retry. It never retries automatically.
+
 Ejection requires a fresh press after opening the cover. Leaving the handle during
 a laser hold cancels the pull. Pausing, menus, tracking/focus loss, recentering and
 aircraft changes reset the guard. The game still applies its own flight-input,
@@ -91,7 +102,7 @@ contextual hints follow the approach described in the
 
 ## Validation status
 
-62 automated checks pass, including pitch polarity, diagonal stick input,
+68 automated checks pass, including pitch polarity, diagonal stick input,
 guarded-ejection transitions, embedded mesh integrity and 44 Harmony target
 metadata checks against Nuclear Option 0.34.3. The game builds with no errors.
 22 live checks in a disposable offline FS-12 mission verify initialization, widget
@@ -105,6 +116,13 @@ weapon/CM/engine/assist actions, the visible pointer, control hints, tracking
 recovery, handedness, scaled/tilted positioning, map transitions, the ground gear
 restriction and a full direct-trigger guarded eject pull. The previous build
 reproduced six interaction failures; all six pass with these changes.
+For 0.4.5.6, 38 additional controller-driven checks exercise fixed physical gear
+and eject travel across five size/tilt combinations, reject sideways motion and
+pushes away from the pilot, verify pending/unconfirmed/accepted feedback, protect a request from a
+simultaneous other-hand press, and complete native ejection. The preceding build
+failed 15 assertions in this sequence; the updated build passes all 38. These
+checks wait for an established cockpit before beginning the interactions. The
+32 earlier controller-interaction checks were also repeated and passed on 0.4.5.6.
 Live fixed-camera captures verify the model, readable weapon/countermeasure
 widgets and minimized map. These captures use a
 temporary diagnostic camera; they do not establish stereo comfort or physical

@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.5` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.6` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -61,7 +61,7 @@ using native Frame labels or the active fallback and the selected handedness.
 Missing hand tracking and unsuccessful placement now show a message on the console.
 F8 also closes the wrist menu before placing handles.
 
-Validation: 62 automated checks and 18 live offline checks with
+Validation: 68 automated checks and 18 live offline checks with
 simulated tracked hands. The live checks exercise native pitch/throttle input,
 latching/release, tracking recovery, breakaway, wrist cancellation, settings and
 profile-aware binding help. Fixed-camera captures check the wrist layout and

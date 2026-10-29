@@ -18,6 +18,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private CockpitPanelHud? _hud;
     private Aircraft? _aircraft;
     private readonly GuardedEjection _ejection = new();
+    private readonly EjectionRequest _ejectionRequest = new();
     private readonly ControllerButtonGate[] _directButtons = { new(), new() };
     private readonly ControllerButtonGate _trigger = new();
     private LineRenderer? _laser;
@@ -120,6 +121,10 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
                 : "WRIST MENU OPEN  •  CONSOLE CONTROLS PAUSED";
             return;
         }
+        var previousRequest = _ejectionRequest.State;
+        _ejectionRequest.Update(aircraft.HasEjected(), Time.unscaledTime, Time.frameCount);
+        if (previousRequest != EjectionRequestState.Unconfirmed && _ejectionRequest.State == EjectionRequestState.Unconfirmed)
+            ClearInteraction();
         var motion = MotionFlightController.Instance;
         var leftStick = settings.MotionControls.LeftHanded.Value;
         var left = TrackedControllers.Read(true); var right = TrackedControllers.Read(false);
@@ -134,7 +139,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         var nearOtherHand = leftStick ? _nearRight : _nearLeft;
         // Reaching takes precedence for that hand. The other free hand may still
         // point until a control is grabbed; never accept an invisible laser click.
-        var pointerAllowed = hand.Valid && free && nearHand == null &&
+        var pointerAllowed = !_ejectionRequest.BlocksInput && hand.Valid && free && nearHand == null &&
             settings.ControllerBindings.PointerEnabled.Value && (_owner < 0 || _owner == 2);
         var ray = new Ray(root.TransformPoint(hand.AimPosition + CockpitProfiles.SeatOffset), root.rotation * hand.AimRotation * Vector3.forward);
         var target = _rayHover = pointerAllowed ? RayTarget(ray, out _) : null;
@@ -160,15 +165,15 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             // An unrelated tracking notice or welcome message must not cover them.
             var resultFeedback = Time.unscaledTime < _feedbackUntil && _feedbackControl != null &&
                 (_hover == _feedbackControl || _hover == null);
-            _hint.text = _active == "eject" ? Hint(_active) : resultFeedback ? _feedback :
+            _hint.text = RequestHint() ?? (_active == "eject" ? Hint(_active) : resultFeedback ? _feedback :
                 _hover != null ? Hint(_hover) : motion?.PlacementHint ?? motion?.TrackingHint ??
-                (Time.unscaledTime < _feedbackUntil ? _feedback : Hint(null));
+                (Time.unscaledTime < _feedbackUntil ? _feedback : Hint(null)));
         }
     }
 
     private string? Direct(ControllerSample hand, bool free, Transform root, int index)
     {
-        var available = hand.Valid && free && (_owner < 0 || _owner == index);
+        var available = !_ejectionRequest.BlocksInput && hand.Valid && free && (_owner < 0 || _owner == index);
         var position = root.TransformPoint(hand.Position + CockpitProfiles.SeatOffset);
         var target = available ? Near(position) : null;
         // Either pinch (trigger) or grip can operate a nearby physical control.
@@ -176,7 +181,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         // held button cannot activate a switch or begin an eject pull.
         _directButtons[index].Update(available, Mathf.Max(hand.Grip, hand.Trigger));
         if (_directButtons[index].Pressed && _owner < 0 && target != null)
-            Begin(target, index, _model!.Root.InverseTransformPoint(position), hand);
+            Begin(target, index, GesturePosition(position), hand);
         if (_owner == index)
         {
             if (!_directButtons[index].Held)
@@ -184,10 +189,15 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
                 if (!available) _ejection.Reset();
                 End();
             }
-            else Held(_model!.Root.InverseTransformPoint(position), hand);
+            else Held(GesturePosition(position), hand);
         }
         return target;
     }
+
+    // Rotate into panel axes without dividing by its visual scale. The gear and
+    // eject thresholds stay in physical meters at every console size and tilt.
+    private Vector3 GesturePosition(Vector3 worldPosition) =>
+        Quaternion.Inverse(_model!.Root.rotation) * (worldPosition - _model.Root.position);
 
     private Vector3 Point(string key) => _model!.Groups[key].TransformPoint(_points[key]);
     private bool CanTarget(string key) => key != "eject" || _ejection.Open;
@@ -222,6 +232,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         _active = control; _owner = owner; _startHand = position; _pressTime = Time.unscaledTime; _actionSent = false;
         if (control == "guard")
         {
+            if (_ejectionRequest.State == EjectionRequestState.Unconfirmed) _ejectionRequest.Reset();
             if (_ejection.Open) _ejection.Reset();
             else
             {
@@ -268,7 +279,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             }
         }
         else if (control == "map") ControllerActions.ToggleMap();
-        else if (action != null) ControllerActions.Instance?.QueuePanelAction(action);
+        else if (action != null && ControllerActions.Instance != null)
+        {
+            ControllerActions.Instance.QueuePanelAction(action);
+            if (control == "eject") _ejectionRequest.Begin(Time.unscaledTime, Time.frameCount);
+        }
         Debug.Log($"[NOVR] Universal cockpit panel: {control}.");
         _actionSent = true;
     }
@@ -279,6 +294,13 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (hand.Device.isValid && hand.Device.TryGetHapticCapabilities(out var caps) && caps.supportsImpulse)
             hand.Device.SendHapticImpulse(0, .22f, .035f);
     }
+    private string? RequestHint() => _ejectionRequest.State switch
+    {
+        EjectionRequestState.Pending => "EJECT REQUESTED",
+        EjectionRequestState.Accepted => "EJECTION STARTED",
+        EjectionRequestState.Unconfirmed => "EJECT NOT CONFIRMED  •  RELEASE, THEN LIFT GUARD TO RETRY",
+        _ => null
+    };
     private string Hint(string? control)
     {
         var press = _hoverDirect ? "TRIGGER / GRIP" : "TRIGGER";
@@ -300,6 +322,13 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private void LateUpdate()
     {
         if (!_visible || _model == null || _aircraft == null) return;
+        // Native flight input runs after this component's Update. Reflect its
+        // acknowledgement in the same rendered frame, including a ground egress.
+        if (_ejectionRequest.BlocksInput && _aircraft.HasEjected())
+        {
+            _ejectionRequest.Update(true, Time.unscaledTime, Time.frameCount);
+            if (_hint != null) _hint.text = RequestHint();
+        }
         var blend = FlightControlMath.SmoothingWeight(Time.unscaledDeltaTime, 18);
         Rotate("gear", _aircraft.gearDeployed ? -30 : 30, blend);
         Rotate("radar", _aircraft.radar?.activated == true ? 25 : -25, blend);
@@ -389,6 +418,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_model != null) _model.Root.gameObject.SetActive(false);
     }
     private void CancelInteraction()
+    {
+        _ejectionRequest.Reset();
+        ClearInteraction();
+    }
+    private void ClearInteraction()
     {
         _ejection.Reset(); _active = _hover = null; _owner = _guardHand = -1;
         _nearLeft = _nearRight = _rayHover = null;
