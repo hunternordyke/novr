@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.4.5**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.4.6**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -73,6 +73,13 @@ Version **0.4.4.5** restores automatic mission tags before the VR menu filters
 missions. Without this step, valid missions could all be hidden from Single Player
 and multiplayer hosting. Both lists refresh when reopened to include missions added
 later during startup. Mission header errors skip only the affected entry.
+
+Version **0.4.4.6** uses OpenXR session focus for controller input instead of
+requiring focus on the desktop mirror. Visible native VR menus also keep their
+pointer active independently of the desktop cursor flag after loading transitions.
+The game runs in the background while VR is enabled. Opening the runtime dashboard
+still cancels VR input; the mouse fallback requires desktop focus. `Player.log` now
+reports pointer state changes, tracking/focus information and controller UI presses.
 
 ## Default bindings
 

@@ -24,7 +24,9 @@ internal static class TrackedControllers
     {
         get
         {
-            if (!Application.isFocused || !XRSettings.enabled || !OpenXRUtility.IsSessionFocused) return false;
+            // The desktop mirror can lose focus while the streamed headset still
+            // owns the OpenXR session. The runtime, not the window, owns VR input.
+            if (!XRSettings.enabled || !OpenXRUtility.IsSessionFocused) return false;
             var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
             return head.isValid && head.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) && tracked &&
                    (!head.TryGetFeatureValue(CommonUsages.userPresence, out var present) || present);

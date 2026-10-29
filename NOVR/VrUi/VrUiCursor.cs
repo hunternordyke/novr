@@ -5,6 +5,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.UI;
+using UnityEngine.XR;
+using UnityEngine.XR.OpenXR;
 
 namespace NOVR.VrUi;
 
@@ -25,6 +27,9 @@ public class VrUiCursor: NOVRBehaviour
     private LineRenderer? _laser;
     private Material? _laserMaterial;
     private UnityEngine.InputSystem.UI.InputSystemUIInputModule? _boundUiModule;
+    private Native.NativeVrUiRoot? _nativeMenu;
+    private string? _reportedPointerState;
+    private float _nextPointerReport;
     public Vector3 CursorPosition => _cursor != null ? _cursor.transform.position : Vector3.zero;
 
     protected override void Awake()
@@ -134,8 +139,19 @@ public class VrUiCursor: NOVRBehaviour
     private void Update()
     {
         var camera = UiCamera;
-        if (!Application.isFocused || camera == null || !IsRealCursorVisible())
+        if (XRSettings.enabled ? !OpenXRUtility.IsSessionFocused : !Application.isFocused)
         {
+            ReportPointerState("hidden: input focus");
+            HidePointer();
+            return;
+        }
+        if (_nativeMenu == null && transform.parent != null)
+            _nativeMenu = transform.parent.GetComponentInChildren<Native.NativeVrUiRoot>(true);
+        // The native menu owns its own visibility. A stale desktop cursor flag
+        // after a loading-scene transition must not disable its tracked pointer.
+        if (camera == null || (!IsRealCursorVisible() && _nativeMenu?.IsVisible != true && !WristMenu.IsOpen))
+        {
+            ReportPointerState(camera == null ? "hidden: no UI camera" : "hidden: no interactive UI");
             HidePointer();
             return;
         }
@@ -155,6 +171,7 @@ public class VrUiCursor: NOVRBehaviour
         IsControllerPointer = _controllerPointer.Update(camera);
         if (IsControllerPointer)
         {
+            ReportPointerState("controller pointer active");
             _mouseClick.Reset();
             _cursor!.SetActive(true);
             _cursor.transform.position = _controllerPointer.HitPosition;
@@ -171,13 +188,16 @@ public class VrUiCursor: NOVRBehaviour
         else
         {
             if (_laser != null) _laser.enabled = false;
+            // A background desktop must not feed mouse clicks into the headset.
+            if (!Application.isFocused) { ReportPointerState("hidden: no tracked pointer and desktop unfocused"); HidePointer(); return; }
             if (_realMouse == null || !_realMouse.added)
             {
                 _realMouse = null;
                 foreach (var device in InputSystem.devices)
                     if (device is Mouse mouse && mouse != _virtualMouse) { _realMouse = mouse; break; }
-                if (_realMouse == null) { HidePointer(); return; }
+                if (_realMouse == null) { ReportPointerState("hidden: no tracked pointer or mouse"); HidePointer(); return; }
             }
+            ReportPointerState("mouse fallback active");
             if (wasController) _mouseClick.Reset();
             UpdateCursorAngles();
             _mouseClick.Update(true, _realMouse.leftButton.isPressed ? 1f : 0f);
@@ -193,6 +213,23 @@ public class VrUiCursor: NOVRBehaviour
             });
         }
         UpdateCursorAnimation();
+    }
+
+    private void ReportPointerState(string state)
+    {
+        if (state == _reportedPointerState || Time.unscaledTime < _nextPointerReport) return;
+        _reportedPointerState = state;
+        _nextPointerReport = Time.unscaledTime + 2f;
+        var left = ModConfiguration.Instance.MotionControls.LeftHanded.Value;
+        var hand = InputDevices.GetDeviceAtXRNode(left ? XRNode.LeftHand : XRNode.RightHand);
+        hand.TryGetFeatureValue(UnityEngine.XR.CommonUsages.isTracked, out var tracked);
+        hand.TryGetFeatureValue(UnityEngine.XR.CommonUsages.trackingState, out var tracking);
+        var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+        head.TryGetFeatureValue(UnityEngine.XR.CommonUsages.isTracked, out var headTracked);
+        var hasPresence = head.TryGetFeatureValue(UnityEngine.XR.CommonUsages.userPresence, out var present);
+        Debug.Log($"[NOVR] UI input: {state}; desktopFocused={Application.isFocused}, xrFocused={OpenXRUtility.IsSessionFocused}, cursor={Cursor.visible}/{Cursor.lockState}, nativeMenu={_nativeMenu?.IsVisible}, pointerEnabled={ModConfiguration.Instance.ControllerBindings.PointerEnabled.Value}, handValid={hand.isValid}, handTracked={tracked}/{tracking}, headTracked={headTracked}, presence={(hasPresence ? present.ToString() : "unreported")}, eventSystem={EventSystem.current != null}.");
+        if (IsControllerPointer)
+            Debug.Log($"[NOVR] UI pointer geometry: origin={_controllerPointer.Ray.origin}, target={_controllerPointer.HitPosition}, camera={UiCamera?.transform.position}, interactive={_controllerPointer.OverInteractive}.");
     }
 
     private void HidePointer()

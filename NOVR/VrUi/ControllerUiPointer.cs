@@ -96,6 +96,7 @@ internal sealed class ControllerUiPointer
     {
         var data = _event!;
         var target = data.pointerCurrentRaycast.gameObject;
+        Debug.Log($"[NOVR] Controller UI press: {(target != null ? target.name : "no target")}.");
         data.eligibleForClick = true;
         data.dragging = false;
         data.useDragThreshold = true;

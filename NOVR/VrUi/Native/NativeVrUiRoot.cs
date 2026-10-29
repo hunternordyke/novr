@@ -65,6 +65,7 @@ public class NativeVrUiRoot : NOVRBehaviour
     private UtilityWidgetMode _utilityWidgetMode = UtilityWidgetMode.Hidden;
 
     public VrPointerState PointerState => _pointerState;
+    internal bool IsVisible => isActiveAndEnabled && _root != null && _root.activeInHierarchy;
     public GameObject? OriginalMainCanvas => _mainCanvas;
     public NativeGameActionAdapter Actions => _actions;
 
