@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.8**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.9**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -173,6 +173,10 @@ throttle motion. **View → Flight controls** shows the appropriate travel direc
 and adjustment labels. Both layouts use the existing throttle-hand buttons and
 saved per-aircraft/handedness positions. Use **Place handles** again if the new
 lift range needs more clearance around your chair.
+
+Version 0.4.5.9 reduces handle captions by 35% and moves them nearer the pilot
+to avoid sidewall and console overlap at nominal placement. The collective
+caption stays above the lift range. Saved seat and handle placements are retained.
 
 ## Default bindings
 

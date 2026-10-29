@@ -52,7 +52,8 @@ internal sealed class MotionControlVisuals : IDisposable
             Shape("Shaft", PrimitiveType.Cylinder, _stickPivot, new Vector3(0, 0.05f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
             _stickGrip = Shape("Grip", PrimitiveType.Capsule, _stickPivot, new Vector3(0, 0.12f, 0), new Vector3(0.05f, 0.04f, 0.05f), _idleMaterial);
             Shape("Top", PrimitiveType.Sphere, _stickPivot, new Vector3(0, 0.155f, 0), new Vector3(0.025f, 0.012f, 0.025f), _baseMaterial);
-            _stickLabel = Label("STICK\nHOLD GRIP", _stickBase, new Vector3(.16f, .23f, .07f));
+            _stickLabel = Label("STICK\nHOLD GRIP", _stickBase, new Vector3(.04f, .28f, -.055f));
+            _stickLabel.transform.localScale = Vector3.one * .65f;
             Shape("Stick label backplate", PrimitiveType.Cube, _stickLabel.transform, new Vector3(0, 0, .005f),
                 new Vector3(.19f, .054f, .006f), _baseMaterial);
 
@@ -75,6 +76,7 @@ internal sealed class MotionControlVisuals : IDisposable
                 new Vector3(.023f, .14f, .023f), _baseMaterial).transform;
             _throttleCaption = Child("Throttle readout", _throttleBase);
             _throttleCaption.localRotation = Quaternion.Euler(35, 0, 0);
+            _throttleCaption.localScale = Vector3.one * .65f;
             _throttleLabel = Label("THROTTLE\nHOLD GRIP", _throttleCaption, new Vector3(0, .0185f, 0));
             _throttleLabel.transform.localRotation = Quaternion.identity;
             _brakeLabel = Label("BRAKES RELEASED", _throttleCaption, new Vector3(0, -.035f, 0));
@@ -101,11 +103,12 @@ internal sealed class MotionControlVisuals : IDisposable
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
         _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
         _throttleBase.localPosition = throttle;
-        // Put captions above and outboard of the handles, leaving the central
-        // console's screens and switches clear. Mirror with the hand positions.
+        // Keep captions near the pilot and just outside each grip: farther outboard
+        // intersects cockpit walls, while centered text overlaps the HUD console.
+        // Lift collective captions above the complete lever arc; mirror with the hands.
         var side = stick.x >= throttle.x ? 1f : -1f;
-        _stickLabel.transform.localPosition = new Vector3(side * .16f, .23f, .07f);
-        _throttleCaption.localPosition = new Vector3(-side * .16f, collective ? Mathf.Max(.11f, travel * .5f) : .11f, .07f);
+        _stickLabel.transform.localPosition = new Vector3(side * .04f, .28f, -.055f);
+        _throttleCaption.localPosition = new Vector3(-side * .04f, collective ? Mathf.Max(.16f, travel * .5f + .075f) : .16f, -.055f);
         if (_lastTravel != travel || _lastCollective != collective || _lastSide != side)
         {
             _lastTravel = travel;

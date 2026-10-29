@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.8` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.9` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -101,9 +101,20 @@ handedness layouts, reject motion on other axes, preserve release/regrab, check
 placement at 0/50/100% over 5/25/60 cm travel, and cover native axis conventions,
 tap latching, breakaway, tracking recovery and label fitting. The aircraft are
 held stationary and controller poses are simulated; these are not flight tests.
-Rendered inspection verifies the new lever and its clearance from the shared
-console at nominal placement. Some aircraft sidewalls can intersect the outboard
-handle captions; saved handle placement remains adjustable.
+Rendered inspection verifies the new lever at nominal placement.
+
+Version 0.4.5.9 makes the handle captions 35% smaller and brings them closer to
+the pilot, just outside each grip. This reduces sidewall clipping and keeps them
+clear of the shared console at nominal placement. Collective captions sit above
+the complete lift range. Captions still obey cockpit depth; saved seat, handle
+and console positions remain adjustable. Custom placements and headset
+readability still need hands-on testing.
+
+Validation for 0.4.5.9: 71 automated checks and 17 in-game visual/recovery
+checks pass. Installed-plugin renders check both handedness layouts in the
+VT-7 and SAH-46 at nominal placement using the complete cockpit/HUD camera
+composition. These captures do not establish stereo comfort or readability
+through the headset.
 
 ## Brakes and throttle buttons
 
