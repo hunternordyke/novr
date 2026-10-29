@@ -11,13 +11,22 @@ internal static class MfdPages
         MfdPage.EngineFuel => "ENGINE / FUEL", MfdPage.Systems => "SYSTEMS", MfdPage.Tactical => "TACTICAL",
         MfdPage.Sensor => "SENSOR", _ => "DISPLAY"
     };
+    internal static string ShortTitle(MfdPage page) => page switch
+    {
+        MfdPage.Weapons => "WEAPONS", MfdPage.EngineFuel => "ENG / FUEL", _ => Title(page)
+    };
+    internal static (MfdPage left, MfdPage right) Select(MfdPage left, MfdPage right, bool leftDisplay, MfdPage next)
+    {
+        if ((int)next < 0 || (int)next >= Count) return (left, right);
+        var current = leftDisplay ? left : right;
+        return leftDisplay ? (next, next == right ? current : right) : (next == left ? current : left, next);
+    }
     // Native widgets have one owner. Selecting the other display's page swaps
     // them, so neither display goes blank and no native map/UI is duplicated.
     internal static (MfdPage left, MfdPage right) Cycle(MfdPage left, MfdPage right, bool leftDisplay, int direction)
     {
         var current = leftDisplay ? left : right;
         var next = (MfdPage)(((int)current + (direction < 0 ? Count - 1 : 1)) % Count);
-        if (leftDisplay) return (next, next == right ? current : right);
-        return (next == left ? current : left, next);
+        return Select(left, right, leftDisplay, next);
     }
 }

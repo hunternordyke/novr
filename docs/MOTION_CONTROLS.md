@@ -10,7 +10,7 @@ The shared console is an original Blender model; no VTOL VR assets are included.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.6.1` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.6.2` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -499,3 +499,38 @@ for final checks; no headset FPS or stereo-comfort claim is made.
   aircraft scales are unchanged. Edit layout and Console setup remain available.
 - The diagnostic input helper has been removed. The final game restart loads only
   the production mod; no automatic aircraft switches or controller tests run.
+
+## 0.4.6.2 — steadier menus and direct MFD selection
+
+The View menu opens about 72 cm in front of you and stays there while you point.
+Either controller can operate it. Losing the usual menu hand does not close it
+while the other hand can still point. Close and reopen View to center it again.
+If you prefer the older hand-following behavior, use **View → Flight controls →
+Button bindings → View menu: STEADY / FOLLOW HAND**. The adjacent **Bring menu
+forward** button places the menu again using the selected mode.
+
+The opaque console hides while View is open so it cannot cover menu buttons.
+**Console setup** retains an outline preview for position, tilt and scale changes;
+close View to inspect the actual displays. Layout editing keeps its existing
+transparent preview and Save/Cancel behavior. The menu laser uses the game's
+available particle shader and a finer tip.
+
+Each page has a clear title, motion/backplate/declutter toggles show their state,
+and **Controls help** separates stick-hand and throttle-hand bindings into two
+columns. **Hands & feedback** is also available directly from **Flight controls**.
+Resetting the seat and handles requires **Reset seat & handles… → Reset seat &
+handles**; **Keep my setup** returns without changing saved placement. This reset
+applies only to the current aircraft and handedness; panel placement is retained.
+
+Touch or point at the **PAGES** title above either MFD, then trigger/grip a page.
+The picker highlights the current page and marks unavailable aircraft instruments
+**NOT FITTED**. Selecting the other MFD's existing page swaps the two native
+widgets rather than duplicating them. **BACK**, or pressing the title again,
+closes the picker without changing the page. Only one picker opens at a time.
+The existing previous/next bezel buttons remain available.
+
+Page choices use the rectangles actually drawn on the display for direct-touch
+and ray hit testing. The ray dot follows the actual hit on the button. Existing
+fresh-press gates apply: holding a trigger while entering a menu, moving between
+choices or recovering tracking cannot activate another choice. Opening View,
+hiding the console, leaving the cockpit or entering layout editing closes pickers.

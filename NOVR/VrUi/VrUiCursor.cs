@@ -255,16 +255,12 @@ public class VrUiCursor: NOVRBehaviour
             _laser.useWorldSpace = true;
             _laser.positionCount = 2;
             _laser.startWidth = 0.0015f;
-            _laser.endWidth = 0.0025f;
+            _laser.endWidth = 0.0007f;
             _laser.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _laser.receiveShadows = false;
-            var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
-            if (shader != null)
-            {
-                _laserMaterial = new Material(shader);
-                _laserMaterial.color = CursorHoverColor;
-                _laser.material = _laserMaterial;
-            }
+            _laserMaterial = CockpitMaterials.Opaque("NOVR menu pointer", CursorHoverColor);
+            if (_laserMaterial.HasProperty("_Cull")) _laserMaterial.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            _laser.sharedMaterial = _laserMaterial;
         }
         _laser.enabled = true;
         _laser.SetPosition(0, start);

@@ -127,7 +127,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (!TryCreateModel()) { Hide(); return; }
         _visible = true; _model!.Root.gameObject.SetActive(true);
         UpdatePlacement(root);
-        _model.SetLayoutMode(CockpitLayout.Active);
+        _model.SetLayoutMode(CockpitLayout.Active || WristMenu.IsConsoleSetup);
         _hud!.SetVisible(!CockpitLayout.Active);
         if (CockpitLayout.Active)
         {
@@ -139,6 +139,9 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         // menu owns input until closed. This also resets any open eject guard.
         if (WristMenu.IsOpen)
         {
+            _hud!.ClosePageMenus();
+            _hud.SetVisible(false);
+            _model.Root.gameObject.SetActive(WristMenu.IsConsoleSetup);
             CancelInteraction(); _laser!.enabled = false; _dot!.gameObject.SetActive(false);
             if (_hint != null) _hint.text = WristMenu.IsConsoleSetup
                 ? "CONSOLE SETUP  •  PLACEMENT SAVED FOR THIS AIRCRAFT"
@@ -234,11 +237,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private Vector3 GesturePosition(Vector3 worldPosition) =>
         Quaternion.Inverse(_model!.Root.rotation) * (worldPosition - _model.Root.position);
 
-    private Vector3 Point(string key) => _model!.Groups[key].TransformPoint(_points[key]);
+    private Vector3 Point(string key) => _hud!.PagePoint(key, out var point) ? point : _model!.Groups[key].TransformPoint(_points[key]);
     private bool CanTarget(string key) => key != "eject" || _ejection.Open;
     private string? Near(Vector3 position)
     {
-        string? best = null; var distance = .055f;
+        var distance = .055f; string? best = _hud!.NearPageControl(position, ref distance);
         foreach (var pair in _points)
         {
             if (!CanTarget(pair.Key)) continue;
@@ -251,6 +254,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     {
         string? best = null; distance = 2.5f;
         if (!FrontRay(ray, out _, out _)) return null;
+        best = _hud!.RayPageControl(ray, ref distance);
         foreach (var pair in _points)
         {
             if (!CanTarget(pair.Key)) continue;
@@ -301,6 +305,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     }
     private void Activate(string control)
     {
+        if (_hud!.ActivatePageControl(control, out var pageFeedback))
+        {
+            if (pageFeedback.Length > 0) Feedback(control, pageFeedback);
+            _actionSent = true; return;
+        }
         var action = control switch { "gear" => "Gear", "radar" => "Radar", "engine" => "Toggle Engine", "assist" => "Flight Assist", "hover" => "Auto Hover", "weapon" => "Next Weapon", "cm" => "Next Countermeasure", "eject" => "Eject", _ => null };
         if (control == "hover" && HoverAssist.UnavailableReason(_aircraft) is string reason)
         { Feedback(control, reason); return; }
@@ -349,6 +358,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     };
     private string Hint(string? control)
     {
+        var pageHint = _hud!.PageHint(control); if (pageHint != null) return pageHint;
         var press = _hoverDirect ? "TRIGGER / GRIP" : "TRIGGER";
         return control switch
         {
@@ -390,6 +400,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         foreach (var point in _points)
             _model.Highlight(point.Key, _active == point.Key ? 2 : _active == null &&
                 (_nearLeft == point.Key || _nearRight == point.Key || _rayHover == point.Key) ? 1 : 0);
+        _hud!.HighlightPages(_active, _nearLeft, _nearRight, _rayHover);
         _model.SetGroupColor("gear_lamps", _aircraft.gearState switch
         {
             LandingGear.GearState.LockedExtended => new Color(.3f, 1f, .5f),
@@ -462,7 +473,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (!hit) return;
         // A raised lever/guard can be hit just outside the board's silhouette.
         // Its visible pointer must still agree with the accepted target.
-        var point = target == null ? ray.GetPoint(distance) : Point(target);
+        var point = target == null ? ray.GetPoint(distance) : _hud!.PageRayPoint(target, ray, out var pagePoint) ? pagePoint : Point(target);
         _laser.SetPosition(0, ray.origin); _laser.SetPosition(1, point);
         _dot.position = point - ray.direction * .003f;
     }

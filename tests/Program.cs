@@ -166,6 +166,27 @@ void Near(float actual, float expected, float tolerance = 0.00001f)
     if (!float.IsFinite(actual) || Math.Abs(actual - expected) > tolerance)
         throw new Exception($"Expected {expected}, got {actual}");
 }
+Check("Direct MFD selection reaches every page and swaps an occupied page", () =>
+{
+    for (var left = 0; left < MfdPages.Count; left++)
+    for (var right = 0; right < MfdPages.Count; right++)
+    if (left != right) foreach (var side in new[] { false, true })
+    for (var requested = 0; requested < MfdPages.Count; requested++)
+    {
+        var pair = MfdPages.Select((MfdPage)left, (MfdPage)right, side, (MfdPage)requested);
+        True(pair.left != pair.right);
+        True((int)(side ? pair.left : pair.right) == requested);
+        True((int)(side ? pair.right : pair.left) == (requested == (side ? right : left) ? (side ? left : right) : (side ? right : left)));
+    }
+});
+Check("Invalid direct MFD selections preserve both displayed pages", () =>
+{
+    foreach (var value in new[] { -1, 7, 200 })
+    {
+        var pair = MfdPages.Select(MfdPage.Map, MfdPage.Weapons, true, (MfdPage)value);
+        True(pair.left == MfdPage.Map && pair.right == MfdPage.Weapons);
+    }
+});
 Check("MFD pages cycle independently and wrap in both directions", () =>
 {
     var pages = MfdPages.Cycle(MfdPage.Weapons, MfdPage.Map, true, -1);

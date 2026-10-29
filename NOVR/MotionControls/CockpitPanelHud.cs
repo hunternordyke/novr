@@ -143,6 +143,7 @@ internal sealed class CockpitPanelHud
     private readonly Transform _canvas;
     private readonly RectTransform _weapons, _map;
     private readonly RectTransform[] _screens = new RectTransform[2];
+    private readonly MfdPageMenu[] _pageMenus = new MfdPageMenu[2];
     private readonly Text[] _headers = new Text[2], _messages = new Text[2], _numbers = new Text[2];
     private readonly RawImage[] _feeds = new RawImage[2];
     private readonly Vector3[] _corners = new Vector3[4];
@@ -173,7 +174,6 @@ internal sealed class CockpitPanelHud
             for (var i = 0; i < 2; i++)
             {
                 var page = i == 0 ? _left : _right;
-                _headers[i].text = MfdPages.Title(page) + (_slave == i ? " · LEFT STICK" : "");
                 _numbers[i].text = _slave == i ? "SLAVED" : "L STK";
             }
         }
@@ -213,6 +213,7 @@ internal sealed class CockpitPanelHud
             _headers[i].rectTransform.localPosition += Vector3.back * 46;
             _numbers[i] = Label(_canvas, "", new Vector2(x, -89), new Vector2(45, 14), 10);
             _numbers[i].rectTransform.localPosition += Vector3.back * 53;
+            _pageMenus[i] = new MfdPageMenu(i == 0, _headers[i], _screens[i]);
             _messages[i] = Label(_screens[i], "", Vector2.zero, new Vector2(200, 165), 16);
             var feed = Rect("Native camera feed", _screens[i], Vector2.zero, new Vector2(215, 180));
             _feeds[i] = feed.gameObject.AddComponent<RawImage>(); _feeds[i].raycastTarget = false; _feeds[i].enabled = false;
@@ -245,9 +246,61 @@ internal sealed class CockpitPanelHud
     {
         var rect = Rect("Display " + key, parent, center, size); rect.gameObject.AddComponent<RectMask2D>(); _slots.Add(key, rect);
     }
-    internal void SetVisible(bool visible) => _canvas.gameObject.SetActive(visible);
+    internal void SetVisible(bool visible)
+    {
+        _canvas.gameObject.SetActive(visible);
+        if (!visible) ClosePageMenus();
+    }
+    internal void ClosePageMenus() { foreach (var menu in _pageMenus) menu?.Close(); }
+    internal string? PageHint(string? control) => _pageMenus[0].Hint(control) ?? _pageMenus[1].Hint(control);
+    internal bool PagePoint(string control, out Vector3 point) => _pageMenus[0].TryPoint(control, out point) || _pageMenus[1].TryPoint(control, out point);
+    internal bool PageRayPoint(string id, Ray ray, out Vector3 point) => _pageMenus[0].RayPoint(id, ray, out point) || _pageMenus[1].RayPoint(id, ray, out point);
+    internal string? NearPageControl(Vector3 position, ref float distance)
+    {
+        var left = _pageMenus[0].Near(position, ref distance);
+        return _pageMenus[1].Near(position, ref distance) ?? left;
+    }
+    internal string? RayPageControl(Ray ray, ref float distance)
+    {
+        var left = _pageMenus[0].RayTarget(ray, ref distance);
+        return _pageMenus[1].RayTarget(ray, ref distance) ?? left;
+    }
+    internal void HighlightPages(string? active, string? left, string? right, string? ray)
+    { foreach (var menu in _pageMenus) menu.Highlight(active, left, right, ray); }
+    internal bool ActivatePageControl(string control, out string feedback)
+    {
+        for (var i = 0; i < 2; i++)
+        {
+            if (!_pageMenus[i].Activate(control, out var page, out feedback)) continue;
+            if (_pageMenus[i].Open) _pageMenus[1 - i].Close();
+            if (page.HasValue)
+            {
+                var config = ModConfiguration.Instance;
+                var pair = MfdPages.Select(config.LeftMfdPage.Value, config.RightMfdPage.Value, i == 0, page.Value);
+                config.LeftMfdPage.Value = pair.left; config.RightMfdPage.Value = pair.right;
+            }
+            return true;
+        }
+        feedback = ""; return false;
+    }
+    private int PageAvailability()
+    {
+        var mask = (1 << (int)MfdPage.Weapons) | (1 << (int)MfdPage.Map);
+        foreach (var app in _apps)
+        {
+            if (app == null) continue;
+            var name = app.GetType().Name;
+            if (name == "BasicFlightInstruments") mask |= 1 << (int)MfdPage.Flight;
+            if (name is "StatusGauges" or "EngineTelemetry" or "FuelGauge") mask |= 1 << (int)MfdPage.EngineFuel;
+            if (name == "SystemStatusDisplay") mask |= 1 << (int)MfdPage.Systems;
+        }
+        if (_tac != null) mask |= 1 << (int)MfdPage.Tactical;
+        if (_aircraft?.targetCam != null) mask |= 1 << (int)MfdPage.Sensor;
+        return mask;
+    }
     internal void Cycle(bool left, int direction)
     {
+        ClosePageMenus();
         var config = ModConfiguration.Instance;
         var pages = MfdPages.Cycle(config.LeftMfdPage.Value, config.RightMfdPage.Value, left, direction);
         config.LeftMfdPage.Value = pages.left; config.RightMfdPage.Value = pages.right;
@@ -266,7 +319,7 @@ internal sealed class CockpitPanelHud
             for (var i = 0; i < 2; i++)
             {
                 var page = i == 0 ? _left : _right;
-                _headers[i].text = MfdPages.Title(page); _numbers[i].text = ((int)page + 1) + " / " + MfdPages.Count;
+                _numbers[i].text = ((int)page + 1) + " / " + MfdPages.Count;
                 _messages[i].text = ""; _feeds[i].enabled = false;
             }
         }
@@ -293,7 +346,12 @@ internal sealed class CockpitPanelHud
         foreach (var dock in _docks.Values) dock.Fit();
         foreach (var dock in _nativeDocks) dock.Fit();
         UpdateSlave();
-        for (var i = 0; i < 2; i++) UpdateFeed(i, i == 0 ? _left : _right);
+        var available = PageAvailability();
+        for (var i = 0; i < 2; i++)
+        {
+            UpdateFeed(i, i == 0 ? _left : _right);
+            _pageMenus[i].Refresh(i == 0 ? _left : _right, available);
+        }
     }
     private void PlacePage(RectTransform page, MfdPage kind)
     {
@@ -379,6 +437,7 @@ internal sealed class CockpitPanelHud
     }
     internal void Restore()
     {
+        ClosePageMenus();
         _slave = -1; _mapPan = Vector2.zero; _recenter.Reset();
         RestoreNative(); foreach (var dock in _docks.Values) dock.Restore(); _docks.Clear(); _nextFind = 0;
         _left = _right = (MfdPage)(-1); _aircraft = null; _apps = Array.Empty<HUDApp>(); _tac = null;
