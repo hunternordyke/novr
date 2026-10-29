@@ -44,6 +44,7 @@ internal sealed class PilotHandVisuals : MonoBehaviour
             try { Create(aircraft,camera!.transform.parent!); }
             catch(Exception e) { ReleaseVisuals();Debug.LogWarning("[NOVR] Pilot hand visuals unavailable: "+e.Message);return; }
         }
+        else _materials?.Tick(); // Defer texture read/filter/upload beyond the hand-creation frame.
         if(_root!.parent!=camera!.transform.parent)_root.SetParent(camera.transform.parent,false);_root.localPosition=Vector3.zero;_root.localRotation=Quaternion.identity;_root.localScale=Vector3.one;_root.gameObject.SetActive(true);
         if (_sleeveThickness != settings.SleeveThickness.Value) ResizeSleeves(settings.SleeveThickness.Value);
         var controls=MotionFlightController.Instance;
@@ -62,7 +63,12 @@ internal sealed class PilotHandVisuals : MonoBehaviour
             Pose? attachment = null; var stick = false; var collective = false;
             if (controls != null && controls.TryGetHeldHandPose(left, out var gripPose, out stick, out collective)) attachment = gripPose;
             _gloves[side]?.Pose(sample, attachment, stick, collective);
-            if(_sleeves[side]!=null) _sleeves[side]!.enabled=settings.PilotArms.Value && sample.Valid && SolveArm(side,_gloves[side]!.Root.position);
+            if(_sleeves[side]!=null)
+            {
+                var glove=_gloves[side]!.Root;
+                Vector3? cuff=attachment.HasValue && collective ? glove.TransformDirection(Vector3.back) : null;
+                _sleeves[side]!.enabled=settings.PilotArms.Value && sample.Valid && SolveArm(side,glove.position,cuff);
+            }
         }
     }
     private void Create(Aircraft aircraft,Transform tracking)
@@ -133,14 +139,19 @@ internal sealed class PilotHandVisuals : MonoBehaviour
     }
     private static Vector3 Closest(Vector3 a,Vector3 b,Vector3 p)
     { var direction=b-a;return a+direction*Mathf.Clamp01(Vector3.Dot(p-a,direction)/Mathf.Max(.000000001f,direction.sqrMagnitude)); }
-    private bool SolveArm(int side,Vector3 target)
+    private bool SolveArm(int side,Vector3 target,Vector3? cuffDirection)
     {
         var u=_arm[side,0];var f=_arm[side,1];var h=_arm[side,2];if(u<0||f<0||h<0)return false;
         var upper=_copies[u];var fore=_copies[f];var hand=_copies[h];var shoulder=upper.position;
         var a=Vector3.Distance(upper.position,fore.position);var b=Vector3.Distance(fore.position,hand.position);var delta=target-shoulder;var distance=delta.magnitude;
         if(a<.05f||b<.05f||distance<.03f||distance>a+b-.002f)return false; // Gloves remain tracked beyond the sleeve's reachable envelope.
         var direction=delta/distance;var hint=_root!.TransformDirection(new Vector3(side==0?-.35f:.35f,-.5f,-.2f));
-        var bend=Vector3.ProjectOnPlane(hint,direction).normalized;if(bend.sqrMagnitude<.5f)bend=Vector3.ProjectOnPlane(_root.right,direction).normalized;
+        // A held collective's cuff faces up toward the shoulder. Choose the point
+        // on the elbow's reachable circle closest to that cuff direction instead
+        // of pulling the elbow down as for a freely tracked hand.
+        var bend=cuffDirection.HasValue?Vector3.ProjectOnPlane(cuffDirection.Value,direction):Vector3.zero;
+        if(bend.sqrMagnitude<.0001f)bend=Vector3.ProjectOnPlane(hint,direction);
+        bend=bend.normalized;if(bend.sqrMagnitude<.5f)bend=Vector3.ProjectOnPlane(_root.right,direction).normalized;
         var along=(a*a-b*b+distance*distance)/(2*distance);var height=Mathf.Sqrt(Mathf.Max(0,a*a-along*along));var elbow=shoulder+direction*along+bend*height;
         upper.rotation=Quaternion.FromToRotation(fore.position-shoulder,elbow-shoulder)*upper.rotation;
         var oldHand=hand.position;var oldFore=fore.position;fore.position=elbow;fore.rotation=Quaternion.FromToRotation(oldHand-oldFore,target-elbow)*fore.rotation;hand.position=target;

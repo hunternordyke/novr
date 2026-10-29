@@ -7,6 +7,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../NOVR/MotionControls/PilotTextureEnhancement.cs" Link="PilotTextureEnhancement.cs" />
+    <Compile Include="../NOVR/MotionControls/DeferredTextureJob.cs" Link="DeferredTextureJob.cs" />
     <Compile Include="../NOVR/MotionControls/InteractionSoundWave.cs" Link="InteractionSoundWave.cs" />
     <Compile Include="../NOVR/MotionControls/WeaponReadout.cs" Link="WeaponReadout.cs" />
     <Compile Include="../NOVR/MotionControls/MenuHistory.cs" Link="MenuHistory.cs" />

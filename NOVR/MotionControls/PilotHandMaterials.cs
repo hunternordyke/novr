@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Stopwatch = System.Diagnostics.Stopwatch;
 using UnityEngine;
 using Object=UnityEngine.Object;
 namespace NOVR.MotionControls;
@@ -11,7 +12,21 @@ internal sealed class PilotHandMaterials : IDisposable
 {
     private readonly List<Material> _materials=new();
     private readonly List<Texture2D> _textures=new();
-    private readonly Dictionary<Texture,Texture2D> _enhanced=new();
+    private sealed class Enhancement
+    {
+        internal readonly Texture Source;
+        internal readonly List<Material> Targets = new();
+        internal Texture2D? Ready;
+        internal int Size;
+        internal double SnapshotMilliseconds;
+        internal Enhancement(Texture source) => Source = source;
+    }
+    private readonly Dictionary<Texture,Enhancement> _enhanced=new();
+    private readonly Queue<Enhancement> _pending=new();
+    private Enhancement? _processing;
+    private DeferredTextureJob? _work;
+    private byte[]? _fabricRed;
+    private bool _disposed;
     private readonly Texture2D _fabric, _gloveColor, _gloveNormal;
     internal PilotHandMaterials()
     {
@@ -36,35 +51,74 @@ internal sealed class PilotHandMaterials : IDisposable
         var source=native.HasProperty("_BaseMap")?native.GetTexture("_BaseMap"):native.mainTexture;
         if(source!=null)
         {
-            if(!_enhanced.TryGetValue(source,out var texture))_enhanced[source]=texture=Enhance(source);
-            SetTexture(material,"_BaseMap",texture);SetTexture(material,"_MainTex",texture);
+            if(!_enhanced.TryGetValue(source,out var enhancement))
+            {
+                enhancement=new Enhancement(source);_enhanced.Add(source,enhancement);_pending.Enqueue(enhancement);
+            }
+            enhancement.Targets.Add(material);
+            // Render with the original atlas until the copied detail texture is ready.
+            if(enhancement.Ready!=null)
+            { SetTexture(material,"_BaseMap",enhancement.Ready);SetTexture(material,"_MainTex",enhancement.Ready); }
         }
         // Several stripped game shader variants ignore detail keywords. Bake a
-        // restrained weave/local-contrast pass once into our own albedo copy.
+        // restrained weave/local-contrast pass into our own albedo copy in the background.
         material.DisableKeyword("_DETAIL_MULX2");material.DisableKeyword("_DETAIL_SCALED");
         if(material.HasProperty("_BumpScale"))material.SetFloat("_BumpScale",.55f);
         if(material.HasProperty("_Smoothness"))material.SetFloat("_Smoothness",.25f);
         return material;
     }
-    private Texture2D Enhance(Texture source)
+    internal void Tick()
     {
-        var size=Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.Max(source.width,source.height))*2,1024,2048);
-        var previous=RenderTexture.active;var rt=RenderTexture.GetTemporary(size,size,0,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB);
-        var texture=new Texture2D(size,size,TextureFormat.RGBA32,true){name="NOVR enhanced pilot albedo",filterMode=FilterMode.Trilinear,anisoLevel=4};_textures.Add(texture);
+        if(_disposed)return;
+        if(_work!=null)
+        {
+            if(!_work.TryTake(out var result))return;
+            _work.Dispose();_work=null;
+            var enhancement=_processing!;_processing=null;
+            if(result.Error!=null)Debug.LogWarning("[NOVR] Sleeve detail preparation skipped; original atlas retained: "+result.Error);
+            else if(result.Pixels!=null && enhancement.Source!=null)
+            {
+                try
+                {
+                    var timer=Stopwatch.StartNew();
+                    var size=enhancement.Size;
+                    var texture=new Texture2D(size,size,TextureFormat.RGBA32,true){name="NOVR enhanced pilot albedo",filterMode=FilterMode.Trilinear,anisoLevel=4};_textures.Add(texture);
+                    texture.SetPixelData(result.Pixels,0);texture.Apply(true,true);enhancement.Ready=texture;
+                    foreach(var material in enhancement.Targets)if(material!=null)
+                    { SetTexture(material,"_BaseMap",texture);SetTexture(material,"_MainTex",texture); }
+                    Debug.Log($"[NOVR] Pilot sleeve detail ready at {size}x{size}; snapshot {enhancement.SnapshotMilliseconds:F1} ms, background filter {result.Milliseconds:F1} ms, upload {timer.Elapsed.TotalMilliseconds:F1} ms. Native atlas preserved.");
+                }
+                catch(Exception e){Debug.LogWarning("[NOVR] Sleeve detail upload unavailable: "+e.Message);}
+            }
+            return; // Never upload and capture another atlas in the same frame.
+        }
+        if(_pending.Count==0)return;
+        var next=_pending.Dequeue();if(next.Source==null)return;
         try
         {
-            Graphics.Blit(source,rt);RenderTexture.active=rt;texture.ReadPixels(new Rect(0,0,size,size),0,0);texture.Apply(false);
-            var input=texture.GetPixels32();var output=new Color32[input.Length];var fabric=_fabric.GetPixels32();var fw=_fabric.width;var fh=_fabric.height;
-            for(var y=0;y<size;y++)for(var x=0;x<size;x++)
-            {
-                var at=y*size+x;var c=input[at];var left=input[y*size+Mathf.Max(0,x-1)];var right=input[y*size+Mathf.Min(size-1,x+1)];var up=input[Mathf.Min(size-1,y+1)*size+x];var down=input[Mathf.Max(0,y-1)*size+x];
-                var grain=(fabric[((y*4)%size)*fh/size*fw+((x*4)%size)*fw/size].r-128)*.12f;
-                byte Channel(byte value,int neighbours)=>(byte)Mathf.Clamp(Mathf.RoundToInt(value+.35f*(value-neighbours*.25f)+grain),0,255);
-                output[at]=new Color32(Channel(c.r,left.r+right.r+up.r+down.r),Channel(c.g,left.g+right.g+up.g+down.g),Channel(c.b,left.b+right.b+up.b+down.b),c.a);
-            }
-            texture.SetPixels32(output);texture.Apply(true,true);Debug.Log("[NOVR] Pilot sleeve texture copy: "+source.width+"x"+source.height+" -> "+size+"x"+size+" with restrained fabric detail; native atlas preserved.");return texture;
+            var timer=Stopwatch.StartNew();
+            var size=Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.Max(next.Source.width,next.Source.height))*2,1024,2048);
+            var input=Snapshot(next.Source,size);
+            var fabric=_fabricRed ??= Array.ConvertAll(_fabric.GetPixels32(),pixel=>pixel.r);
+            var width=_fabric.width;var height=_fabric.height;
+            next.Size=size;next.SnapshotMilliseconds=timer.Elapsed.TotalMilliseconds;_processing=next;
+            // Capture arrays/scalars only. Texture creation, reads and uploads stay on Unity's thread.
+            _work=new DeferredTextureJob(token=>PilotTextureEnhancement.Apply(input,size,fabric,width,height,token));
         }
-        finally{RenderTexture.active=previous;RenderTexture.ReleaseTemporary(rt);}
+        catch(Exception e){_processing=null;Debug.LogWarning("[NOVR] Sleeve detail capture skipped; original atlas retained: "+e.Message);}
+    }
+    private static byte[] Snapshot(Texture source,int size)
+    {
+        var previous=RenderTexture.active;var rt=RenderTexture.GetTemporary(size,size,0,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB);Texture2D? texture=null;
+        try
+        {
+            Graphics.Blit(source,rt);RenderTexture.active=rt;
+            texture=new Texture2D(size,size,TextureFormat.RGBA32,false);
+            texture.ReadPixels(new Rect(0,0,size,size),0,0,false);
+            // ReadPixels populated CPU data; an intermediate Apply/GPU upload is unnecessary.
+            return texture.GetRawTextureData();
+        }
+        finally{RenderTexture.active=previous;RenderTexture.ReleaseTemporary(rt);if(texture!=null)Object.Destroy(texture);}
     }
     internal Material Glove(Material native,Rect patch)
     {
@@ -97,5 +151,10 @@ internal sealed class PilotHandMaterials : IDisposable
         }
         finally{RenderTexture.active=previous;RenderTexture.ReleaseTemporary(rt);if(image!=null)Object.Destroy(image);}
     }
-    public void Dispose(){foreach(var m in _materials)Object.Destroy(m);foreach(var t in _textures)Object.Destroy(t);_materials.Clear();_textures.Clear();}
+    public void Dispose()
+    {
+        if(_disposed)return;_disposed=true;
+        _work?.Dispose();_work=null;_processing=null;_pending.Clear();_enhanced.Clear();_fabricRed=null;
+        foreach(var m in _materials)Object.Destroy(m);foreach(var t in _textures)Object.Destroy(t);_materials.Clear();_textures.Clear();
+    }
 }

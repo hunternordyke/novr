@@ -4,7 +4,7 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-NOVR Motion Prototype **0.4.6.4** adds a tracked-controller stick and throttle,
+NOVR Motion Prototype **0.4.6.5** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
 The shared 3D console combines seven selectable MFD pages with physical gear,
 radar, engine, flight-assist and guarded eject controls. View → Edit cockpit layout
@@ -54,6 +54,13 @@ Weapons MFD shows the actual selected-target count alongside safety, ammunition,
 reload status or a visible native guidance cue. Selection never implies a lock.
 Idle menu pointers now prefer a usable button/map over the other hand's background;
 held clicks and drags retain their original hand through release.
+
+Version 0.4.6.5 aligns the collective sleeve's elbow with the upward-facing glove
+cuff, preserving the arm's reach and the glove's handle attachment. Sleeve texture
+sharpening and fabric detail now run on one background worker. The original pilot
+texture remains visible until the enhanced copy is ready; changing aircraft
+cancels old work. Texture capture and upload remain on Unity's main thread, so this
+is not a claim that all cockpit-entry pauses have been eliminated.
 
 Steam Frame **PC streaming through SteamVR** is the binding target, with a
 Touch-compatible fallback. The build targets Nuclear Option **0.34.3**.

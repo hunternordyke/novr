@@ -477,3 +477,34 @@ The engine's independent UI opacity multipliers preserve native per-widget color
 and fades; selected controls opt out of the parent dimmer. This follows the
 [Unity Canvas Group documentation](https://docs.unity3d.com/2022.3/Documentation/Manual/class-CanvasGroup.html).
 Brightness perception and third-party instrument behavior still need headset checks.
+
+## 0.4.6.5 — collective arm alignment and deferred sleeve detail
+
+The held collective glove keeps its cuff pointing upward and inward toward the
+shoulder. The sleeve now chooses its elbow bend from that cuff direction too,
+instead of using the downward bend of a freely tracked hand. The wrist remains
+attached to the moving handle, arm lengths stay fixed, and sleeves still hide when
+the hand is outside their reachable envelope. This is a visual change; collective
+input, saved placements and the 12 cm default travel are unchanged.
+
+Hands initially use the original pilot sleeve atlas. Sharpening and the same
+restrained fabric pattern are prepared on one background CPU worker, then applied
+to the copied sleeve materials when ready. Resolution remains capped at 2048 square.
+Both sleeves share one result for each source atlas. Leaving an aircraft cancels
+its work; late results cannot be applied to another cockpit. A failed enhancement
+keeps the original texture visible. No original game asset is changed or exported.
+
+Capture, filtering and upload occur in separate stages. Only managed pixel data
+crosses to the worker; Unity texture operations remain on its main thread. The
+intermediate readback texture no longer uploads pixels that will never be rendered.
+This follows Unity's [ReadPixels guidance](https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Texture2D.ReadPixels.html).
+Capture, texture decoding and the final upload can still cause a pause; in-game
+frame-time improvement has not been measured for this release. The log separates
+capture, background filter and upload timings for a future normal cockpit entry.
+
+Validation: 106 automated checks pass, including texture color/alpha preservation,
+fabric repetition, cancellation, serialized background jobs, stale-result rejection
+and failure recovery. An offline collective study checks mirrored low/mid/high
+poses using representative arm lengths. It is not a native pilot or headset fit
+check. No simulated input, mission changes or flight actions are needed for these
+checks.
