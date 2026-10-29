@@ -31,12 +31,12 @@ public sealed class MotionControlSettings
         StickAngle = Float(config, "Stick Angle", 25f, 5f, 60f, "Degrees of wrist tilt for full pitch or roll.");
         Deadzone = Float(config, "Stick Deadzone", 0.06f, 0f, 0.4f, "Fraction of stick travel ignored around center.");
         ResponseExponent = Float(config, "Stick Response", 1.5f, 1f, 3f, "Response curve; higher values make small movements less sensitive.");
-        ThrottleTravel = Float(config, "Throttle Travel", 0.22f, 0.05f, 0.6f, "Meters from minimum to maximum command: lift the collective in helicopters; slide the throttle forward in other aircraft.");
+        ThrottleTravel = Float(config, "Throttle Travel", 0.12f, 0.05f, 0.6f, "Total meters from minimum to maximum, including the MIL shelf: lift the collective in helicopters; slide the throttle forward in other aircraft.");
         RiggedGloves = config.Bind(section, "Rigged Gloves", true, "Show rigged gloves using the installed pilot material. Grip curls three fingers and thumb; trigger curls the index. Uses controller input, not optical finger tracking.");
         SleeveThickness = Float(config, "Pilot Sleeve Thickness", .82f, .6f, 1.2f, "Visual sleeve width relative to the native pilot. Changes thickness around the arm bones, preserving length, reach and controller positions.");
         PilotArms = config.Bind(section, "Pilot Sleeves", true, "Render-only two-bone arm posing using installed pilot sleeve geometry. Sleeves hide beyond their reach; tracked gloves remain visible.");
         GloveOffset = config.Bind(section, "Glove Wrist Offset", new Vector3(0,-.015f,-.055f), "Visual wrist offset from the runtime grip pose in meters. X mirrors for the right hand. Does not change interaction hit positions.");
-        GloveRotation = config.Bind(section, "Glove Wrist Rotation", new Vector3(25,0,0), "Visual left glove rotation in degrees; Y/Z mirror for the right hand. Does not change controller pointers or flight inputs.");
+        GloveRotation = config.Bind(section, "Glove Wrist Rotation", new Vector3(0,0,90), "Visual left glove rotation in degrees; Y/Z mirror for the right hand. Does not change controller pointers or flight inputs.");
         HelmetNightVision = config.Bind(section, "Helmet Night Vision Gesture", true, "Raise either free hand to the forehead/brow and make a fresh trigger press to toggle native night vision. A short pulse marks the gesture area. Disabled in menus, map and layout editing.");
         MilDetent = config.Bind(section, "MIL Throttle Detent", true, "Afterburning jets only: a 1.6 cm shelf at the installed engine's military-power boundary. Push through for afterburner; no timer or extra button.");
         InteractionVolume = Float(config, "Interaction Sound Volume", .25f, 0f, 1f, "Volume of spatial button, grip, detent, guard and helmet cues. Zero mutes them without disabling haptics. Uses the aircraft audio mixer when available.");
@@ -47,6 +47,18 @@ public sealed class MotionControlSettings
             if (Mathf.Abs(ThrottleTravel.Value - .25f) < .0001f) ThrottleTravel.Value = .22f;
             if (GloveRotation.Value == Vector3.zero) GloveRotation.Value = new Vector3(25,0,0);
             comfortUpgrade.Value = true;
+        }
+        var compactUpgrade = config.Bind(section, "Compact Travel Defaults Applied", false, "Migrates the former stock 22/25 cm travel to 12 cm once, preserving customized travel.");
+        if (!compactUpgrade.Value)
+        {
+            if (Mathf.Abs(ThrottleTravel.Value - .22f) < .0001f || Mathf.Abs(ThrottleTravel.Value - .25f) < .0001f) ThrottleTravel.Value = .12f;
+            compactUpgrade.Value = true;
+        }
+        var uprightUpgrade = config.Bind(section, "Upright Glove Defaults Applied", false, "Migrates former stock wrist angles to palms vertical, thumbs up; preserves custom alignment.");
+        if (!uprightUpgrade.Value)
+        {
+            if (GloveRotation.Value == Vector3.zero || GloveRotation.Value == new Vector3(25,0,0)) GloveRotation.Value = new Vector3(0,0,90);
+            uprightUpgrade.Value = true;
         }
         GrabRadius = Float(config, "Grab Radius", 0.12f, 0.03f, 0.3f, "Maximum hand distance from a handle when pressing grip.");
         StickTapGrip = config.Bind(section, "Stick Tap Grip", false, "Tap grip briefly to latch the stick; squeeze again to release. Holding longer than 0.3 seconds releases normally. Moving more than 40 cm from the handle, tracking loss or menus releases the latch.");

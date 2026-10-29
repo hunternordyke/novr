@@ -71,19 +71,36 @@ internal sealed class RiggedGlove : IDisposable
         Renderer.localBounds = new Bounds(new Vector3(0,0,.06f),Vector3.one*.45f); Renderer.shadowCastingMode=ShadowCastingMode.Off; Renderer.receiveShadows=true; Renderer.updateWhenOffscreen=false;
         LayerHelper.SetLayerRecursive(Root, LayerHelper.Layers.Cockpit);
     }
-    internal void Pose(ControllerSample sample, bool held)
+    internal void Pose(ControllerSample sample, Pose? attachment, bool stick, bool collective)
     {
         Root.gameObject.SetActive(sample.Valid);
         if (!sample.Valid) return;
         var settings=ModConfiguration.Instance.MotionControls;
         var offset=settings.GloveOffset.Value; if (!_left) offset.x=-offset.x;
-        Root.localPosition=sample.Position + sample.Rotation * offset;
-        var angles=settings.GloveRotation.Value; if (!_left) { angles.y=-angles.y; angles.z=-angles.z; }
-        Root.localRotation=sample.Rotation * Quaternion.Euler(angles);
+        var held = attachment.HasValue;
+        if (held)
+        {
+            // Asset axes: fingers +Z, back of hand +Y, thumb toward +/-X.
+            // The socket is inside the partially curled fingers, not at the wrist.
+            // Collective cuffs point up and inboard toward the shoulder; rolling
+            // around the handle axis preserves the finger wrap as it is lifted.
+            var grip = attachment!.Value;
+            var rotation = grip.rotation * (stick ? Quaternion.Euler(0, 0, _left ? 90 : -90)
+                : collective ? Quaternion.Euler(0, 0, _left ? 60 : -60) * Quaternion.Euler(0, _left ? -90 : 90, 0) : Quaternion.identity);
+            Root.SetPositionAndRotation(grip.position - rotation * new Vector3(0, -.018f, .078f), rotation);
+        }
+        else
+        {
+            Root.localPosition=sample.Position + sample.Rotation * offset;
+            var angles=settings.GloveRotation.Value; if (!_left) { angles.y=-angles.y; angles.z=-angles.z; }
+            Root.localRotation=sample.Rotation * Quaternion.Euler(angles);
+        }
         var amount=1-Mathf.Exp(-22*Time.unscaledDeltaTime);
-        _grip=Mathf.Lerp(_grip,held?1:Mathf.Clamp01(sample.Grip),amount);
-        _trigger=Mathf.Lerp(_trigger,Mathf.Clamp01(sample.Trigger),amount);
-        _thumb=Mathf.Lerp(_thumb,held || sample.Primary || sample.Secondary || sample.StickClick ? 1 : _grip*.75f,amount);
+        // Leave space for a roughly 5 cm grip instead of crushing a full fist
+        // through the handle. The index moves a little with the real trigger.
+        _grip=Mathf.Lerp(_grip,held ? .5f : Mathf.Clamp01(sample.Grip),amount);
+        _trigger=Mathf.Lerp(_trigger,held ? Mathf.Lerp(.48f, .62f, Mathf.Clamp01(sample.Trigger)) : Mathf.Clamp01(sample.Trigger),amount);
+        _thumb=Mathf.Lerp(_thumb,held ? .65f : sample.Primary || sample.Secondary || sample.StickClick ? 1 : _grip*.75f,amount);
         for(var i=0;i<_bones.Length;i++) _bones[i].localRotation=Quaternion.Slerp(_open[i],_closed[i],_fingers[i]==1?_thumb:_fingers[i]==2?_trigger:_fingers[i]==3?_grip:0);
     }
     private static Vector3 V(float[] a,int i)=>new(a[i],a[i+1],a[i+2]);

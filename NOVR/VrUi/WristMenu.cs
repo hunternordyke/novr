@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NOVR.MotionControls;
 using NOVR.VrUi.Native;
 using UnityEngine;
@@ -18,7 +19,10 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _helpBackPage, _handsBackPage, _resetPage;
+    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage;
+    private readonly Dictionary<GameObject, string> _pageTitles = new();
+    private MenuHistory<GameObject>? _history;
+    private Button? _backButton;
     private readonly List<(Text label, Func<string> text)> _liveLabels = new();
     private Text? _controlsInfo, _bindingHelp, _throttleHelp, _helpFooter, _bindingsInfo;
     private float _nextHelpRefresh;
@@ -29,6 +33,7 @@ internal sealed class WristMenu : MonoBehaviour
     private Button? _hoverButton, _assistButton;
     private Transform? _buttonParent;
     private bool _anchored;
+    private string _pageTitle = "VIEW";
     internal static bool IsOpen => _instance?._panel?.activeSelf == true;
     internal static bool IsConsoleSetup => IsOpen && _instance?._consolePage?.activeSelf == true;
     private static bool CollectiveControls => GameManager.GetLocalAircraft(out var aircraft) && MotionFlightController.UsesLiftCollective(aircraft);
@@ -48,6 +53,7 @@ internal sealed class WristMenu : MonoBehaviour
             if (IsOpen) Close(); else Open();
         }
         if (!IsOpen) return;
+        if (_backButton != null) _backButton.interactable = _history?.CanBack == true;
         foreach (var item in _liveLabels)
             if (item.label != null && item.label.gameObject.activeInHierarchy)
             { var text = item.text(); if (item.label.text != text) item.label.text = text; }
@@ -125,11 +131,7 @@ internal sealed class WristMenu : MonoBehaviour
             trackingRoot != null ? trackingRoot.rotation * _menuRotation : _menuRotation);
         if (_status != null)
         {
-            var title = _resetPage?.activeSelf == true ? "RESET SEAT & HANDLES" : _ejectPage?.activeSelf == true ? "CONFIRM EJECTION" :
-                _handsPage?.activeSelf == true ? "HANDS & FEEDBACK" : _helpPage?.activeSelf == true ? "CONTROLLER GUIDE" :
-                _bindingsPage?.activeSelf == true ? "BUTTON BINDINGS" : _controlsPage?.activeSelf == true ? "FLIGHT CONTROLS" :
-                _consolePage?.activeSelf == true ? "CONSOLE POSITION" : _flightPage?.activeSelf == true ? "FLIGHT ACTIONS" : "COCKPIT SETUP";
-            var status = title + "\n" + (CockpitProfiles.Instance?.AircraftName ?? "Cockpit") +
+            var status = _pageTitle + "\n" + (CockpitProfiles.Instance?.AircraftName ?? "Cockpit") +
                 " · Motion " + (config.MotionControls.Enabled.Value ? "ON" : "OFF") + "\n" +
                 (CockpitLayout.Active ? "Layout preview · Save or cancel when finished" : _consolePage?.activeSelf == true ? "Outline preview · Close View to see displays" : "Either hand: point + trigger · View closes this menu");
             if (_status.text != status) _status.text = status;
@@ -141,6 +143,7 @@ internal sealed class WristMenu : MonoBehaviour
         if (DynamicMap.mapMaximized) SceneSingleton<DynamicMap>.i?.Minimize();
         if (!GameManager.GetLocalAircraft(out _openAircraft)) return;
         EnsurePanel();
+        Home();
         _panel!.SetActive(true);
         _anchored = false;
         CursorManager.SetFlag(WristCursorFlag, true);
@@ -157,43 +160,40 @@ internal sealed class WristMenu : MonoBehaviour
         MotionFlightController.Instance?.ResetGrips();
     }
 
-    private void ShowFlightPage()
+    private void ShowPage(GameObject page)
     {
-        _ejectAircraft = null;
-        _ejectPage?.SetActive(false); _resetPage?.SetActive(false);
-        _consolePage?.SetActive(false);
-        _setupPage?.SetActive(false);
-        _controlsPage?.SetActive(false); _helpPage?.SetActive(false); _bindingsPage?.SetActive(false); _handsPage?.SetActive(false);
-        _flightPage?.SetActive(true);
+        _history!.Push(page); RefreshPage();
     }
-
-    private void ShowSetupPage()
+    private void Back() { _history!.Back(); RefreshPage(); }
+    private void Home() { _history!.Home(); RefreshPage(); }
+    private void RefreshPage()
     {
-        ShowFlightPage(); _flightPage?.SetActive(false); _setupPage?.SetActive(true); _resetAircraft = null;
+        foreach (var page in _pageTitles.Keys) page.SetActive(page == _history!.Current);
+        if (_history!.Current != _ejectPage) _ejectAircraft = null;
+        if (_history.Current != _resetPage) _resetAircraft = null;
+        _pageTitle = string.Join(" / ", _history.Trail.Select(page => _pageTitles[page]));
+        _nextHelpRefresh = 0;
     }
+    private void ShowFlightPage() { Home(); ShowPage(_flightPage!); }
+    private void ShowSetupPage() { Home(); ShowPage(_setupPage!); }
     private void AskReset()
     {
+        CockpitLayout.Instance?.Finish(false);
         if (!GameManager.GetLocalAircraft(out _resetAircraft)) return;
         _resetLeftHanded = ModConfiguration.Instance.MotionControls.LeftHanded.Value;
-        _setupPage!.SetActive(false); _resetPage!.SetActive(true);
+        ShowPage(_resetPage!);
     }
     private void ConfirmReset()
     {
         if (GameManager.GetLocalAircraft(out var aircraft) && aircraft == _resetAircraft &&
             _resetLeftHanded == ModConfiguration.Instance.MotionControls.LeftHanded.Value)
             CockpitProfiles.Instance?.ResetProfile();
-        ShowSetupPage();
+        Back();
     }
-    private void ShowHands(GameObject from)
-    {
-        from.SetActive(false); _handsBackPage = from; _handsPage!.SetActive(true);
-    }
-
     private void AskToEject()
     {
         if (!GameManager.GetLocalAircraft(out _ejectAircraft)) return;
-        _flightPage!.SetActive(false);
-        _ejectPage!.SetActive(true);
+        ShowPage(_ejectPage!);
     }
 
     private void ConfirmEject()
@@ -219,70 +219,77 @@ internal sealed class WristMenu : MonoBehaviour
         canvas.sortingOrder = 500;
         var background = _panel.AddComponent<Image>();
         background.color = new Color(0.025f, 0.045f, 0.055f, 1f);
-        _status = Label(rect, "", new Vector2(0, 265), new Vector2(510, 105), 22);
+        _status = Label(rect, "", new Vector2(0, 265), new Vector2(510, 105), 19);
         var config = ModConfiguration.Instance;
-        _setupPage = new GameObject("Cockpit setup", typeof(RectTransform));
-        _setupPage.transform.SetParent(rect, false);
-        _buttonParent = _setupPage.transform;
-        AddLiveButton(() => "Motion controls: " + (config.MotionControls.Enabled.Value ? "ON" : "OFF"), 0, 0, () => { CockpitLayout.Instance?.Finish(false); config.MotionControls.Enabled.Value = !config.MotionControls.Enabled.Value; });
-        AddButton("Recenter view", 1, 0, () => { NOVRHeadsetData.CalibrateTranslation(); NOVRHeadsetData.CalibrateRotation(); Close(); });
+        var motion = config.MotionControls;
+        _homePage = Page("VIEW");
+        AddButton("Flight actions", 0, 0, () => ShowPage(_flightPage!));
+        AddButton("Cockpit setup", 1, 0, () => ShowPage(_setupPage!));
+        AddButton("Flight controls", 0, 1, () => ShowPage(_controlsPage!));
+        AddButton("Comfort & display", 1, 1, () => ShowPage(_comfortPage!));
+        AddButton("Controller guide", 0, 2, () => ShowPage(_helpPage!));
+        AddButton("Recenter view", 1, 2, () => { NOVRHeadsetData.CalibrateTranslation(); NOVRHeadsetData.CalibrateRotation(); Close(); });
+        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Edit cockpit layout", 0, 4, ToggleLayout);
+        AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Motion: " + (motion.Enabled.Value ? "ON" : "OFF"), 1, 4, () =>
+        {
+            if (CockpitLayout.Active) { CockpitLayout.Instance?.Finish(false); Close(); }
+            else motion.Enabled.Value = !motion.Enabled.Value;
+        });
+        Label(_homePage.transform, "FLY · weapons, gear, radar and hover\nSET UP · seat, panel and handle placement\nTUNE · response, hands, HUD and feedback", new Vector2(0,-184), new Vector2(510,108), 19);
+
+        _setupPage = Page("COCKPIT");
+        AddButton("Seat position", 0, 0, () => ShowPage(_seatPage!));
+        AddButton("Console position", 1, 0, () => ShowPage(_consolePage!));
         AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Edit cockpit layout", 0, 1, ToggleLayout);
-        AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Reset seat & handles…", 1, 1, () => { if (CockpitLayout.Active) { CockpitLayout.Instance?.Finish(false); Close(); } else AskReset(); });
-        AddButton("Seat up", 0, 2, () => CockpitProfiles.Instance?.MoveSeat(Vector3.up * 0.02f));
-        AddButton("Seat down", 1, 2, () => CockpitProfiles.Instance?.MoveSeat(Vector3.down * 0.02f));
-        AddButton("Seat left", 0, 3, () => CockpitProfiles.Instance?.MoveSeat(Vector3.left * 0.02f));
-        AddButton("Seat right", 1, 3, () => CockpitProfiles.Instance?.MoveSeat(Vector3.right * 0.02f));
-        AddButton("Seat forward", 0, 4, () => CockpitProfiles.Instance?.MoveSeat(Vector3.forward * 0.02f));
-        AddButton("Seat back", 1, 4, () => CockpitProfiles.Instance?.MoveSeat(Vector3.back * 0.02f));
-        AddButton("Flight HUD smaller", 0, 5, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value -= .04f; });
-        AddButton("Flight HUD larger", 1, 5, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value += .04f; });
-        AddLiveButton(() => "Backplates: " + (config.HudContrast.Value ? "ON" : "OFF"), 0, 6, () => config.HudContrast.Value = !config.HudContrast.Value);
-        AddLiveButton(() => "Declutter: " + (config.HudDeclutter.Value ? "ON" : "OFF"), 1, 6, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
-        AddButton("Flight controls", 0, 7, () => { _setupPage.SetActive(false); _controlsPage!.SetActive(true); });
-        AddButton("Controls help", 1, 7, () => ShowHelp(_setupPage));
-        _resetPage = new GameObject("Reset seat and handles", typeof(RectTransform));
-        _resetPage.transform.SetParent(rect, false); _buttonParent = _resetPage.transform;
-        Label(_resetPage.transform, "Restore the default seat, stick and throttle\nfor this aircraft and handedness?\n\nYour saved handle positions will be replaced.\nThe control panel keeps its current placement.", new Vector2(0, 45), new Vector2(510, 180), 21);
-        AddButton("Keep my setup", 0, 4, ShowSetupPage);
+        AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Place handles (3s)", 1, 1, () =>
+        {
+            if (CockpitLayout.Active) CockpitLayout.Instance?.Finish(false);
+            else { motion.Enabled.Value = true; MotionFlightController.Instance?.SchedulePlacement(); }
+            Close();
+        });
+        AddLiveButton(() => "Stick hand: " + (motion.LeftHanded.Value ? "LEFT" : "RIGHT"), 0, 2,
+            () => { CockpitLayout.Instance?.Finish(false); motion.LeftHanded.Value = !motion.LeftHanded.Value; Close(); });
+        AddButton("Reset seat & handles…", 1, 2, AskReset);
+        Label(_setupPage.transform, "Edit layout: grip each item to move it.\nReopen View to save or cancel.\n\nSeat movement leaves handles and panel in place.\nPlacements are saved for this aircraft.", new Vector2(0,-115), new Vector2(510,220), 20);
+
+        _seatPage = Page("SEAT");
+        AddButton("Seat up", 0, 0, () => CockpitProfiles.Instance?.MoveSeat(Vector3.up * .02f));
+        AddButton("Seat down", 1, 0, () => CockpitProfiles.Instance?.MoveSeat(Vector3.down * .02f));
+        AddButton("Seat left", 0, 1, () => CockpitProfiles.Instance?.MoveSeat(Vector3.left * .02f));
+        AddButton("Seat right", 1, 1, () => CockpitProfiles.Instance?.MoveSeat(Vector3.right * .02f));
+        AddButton("Seat forward", 0, 2, () => CockpitProfiles.Instance?.MoveSeat(Vector3.forward * .02f));
+        AddButton("Seat back", 1, 2, () => CockpitProfiles.Instance?.MoveSeat(Vector3.back * .02f));
+        Label(_seatPage.transform, "Each step moves the viewpoint 2 cm.\nHandles and console keep their cockpit positions.", new Vector2(0,-92), new Vector2(510,140), 20);
+
+        _resetPage = Page("RESET SETUP");
+        Label(_resetPage.transform, "Restore the default seat, stick and throttle\nfor this aircraft and handedness?\n\nYour saved handle positions will be replaced.\nThe control panel keeps its current placement.", new Vector2(0,45), new Vector2(510,180), 21);
+        AddButton("Keep my setup", 0, 4, Back);
         AddButton("Reset seat & handles", 1, 4, ConfirmReset);
-        _resetPage.SetActive(false);
-        _flightPage = new GameObject("Flight and display", typeof(RectTransform));
-        _flightPage.transform.SetParent(rect, false);
-        _buttonParent = _flightPage.transform;
+
+        _flightPage = Page("FLIGHT");
         AddButton("Next weapon", 0, 0, () => ControllerActions.Instance?.QueueWristAction("Next Weapon"));
         AddButton("Next countermeasure", 1, 0, () => ControllerActions.Instance?.QueueWristAction("Next Countermeasure"));
-        AddButton("Toggle gear", 0, 1, () => ControllerActions.Instance?.QueueWristAction("Gear"));
-        AddButton("Toggle radar", 1, 1, () => ControllerActions.Instance?.QueueWristAction("Radar"));
-        AddButton("Toggle engine", 0, 2, () => ControllerActions.Instance?.QueueWristAction("Toggle Engine"));
-        var assistLabel = AddButton("Toggle flight assist", 1, 2, () => ControllerActions.Instance?.QueueWristAction("Flight Assist"));
-        _assistButton = assistLabel.transform.parent.GetComponent<Button>();
-        _liveLabels.Add((assistLabel, () => GameManager.GetLocalAircraft(out var a) && a.GetControlsFilter()?.HasFlightAssist() == true
-            ? "Toggle flight assist" : "Assist: not switchable"));
-        AddButton("Unlock last target", 1, 7, () => { SceneSingleton<CombatHUD>.i?.DeselectLast(); Close(); });
-        AddButton("Clear targets", 0, 3, () => { SceneSingleton<CombatHUD>.i?.DeselectAll(); Close(); });
+        AddButton("Unlock last target", 0, 1, () => { SceneSingleton<CombatHUD>.i?.DeselectLast(); Close(); });
+        AddButton("Clear targets", 1, 1, () => { SceneSingleton<CombatHUD>.i?.DeselectAll(); Close(); });
+        AddButton("Toggle gear", 0, 2, () => ControllerActions.Instance?.QueueWristAction("Gear"));
+        AddButton("Toggle radar", 1, 2, () => ControllerActions.Instance?.QueueWristAction("Radar"));
+        AddButton("Toggle engine", 0, 3, () => ControllerActions.Instance?.QueueWristAction("Toggle Engine"));
         AddButton("Tactical map", 1, 3, ControllerActions.ToggleMap);
-        AddButton("HUD nearer", 0, 4, () => config.HudPanelDistance.Value -= 0.5f);
-        AddButton("HUD farther", 1, 4, () => config.HudPanelDistance.Value += 0.5f);
-        AddButton("Reset HUD", 0, 5, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4f; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
-        AddButton("Mirror handedness", 1, 5, () => { config.MotionControls.LeftHanded.Value = !config.MotionControls.LeftHanded.Value; Close(); });
-        AddButton("Eject...", 0, 6, AskToEject);
-        AddButton("Console setup", 1, 6, () => { _flightPage.SetActive(false); _consolePage!.SetActive(true); });
-        var hoverLabel = AddButton("Hover assist", 0, 7, () => ControllerActions.Instance?.QueueWristAction("Auto Hover"));
+        var assistLabel = AddButton("Flight assist", 0, 4, () => ControllerActions.Instance?.QueueWristAction("Flight Assist"));
+        _assistButton = assistLabel.transform.parent.GetComponent<Button>();
+        _liveLabels.Add((assistLabel, () => GameManager.GetLocalAircraft(out var a) && a.GetControlsFilter()?.HasFlightAssist() == true ? "Toggle flight assist" : "Assist: not switchable"));
+        var hoverLabel = AddButton("Hover assist", 1, 4, () => ControllerActions.Instance?.QueueWristAction("Auto Hover"));
         _hoverButton = hoverLabel.transform.parent.GetComponent<Button>();
         _liveLabels.Add((hoverLabel, () => !GameManager.GetLocalAircraft(out var a) || a.GetControlsFilter()?.HasAutoHover() != true
             ? "Hover: not fitted" : a.radarAlt < 1f ? "Hover: ground locked" : $"Hover assist: {(a.IsAutoHoverEnabled() ? "ON" : "OFF")}"));
-        _flightPage.SetActive(false);
-        _ejectPage = new GameObject("Confirm ejection", typeof(RectTransform));
-        _ejectPage.transform.SetParent(rect, false);
-        _buttonParent = _ejectPage.transform;
-        Label(_ejectPage.transform, "Eject from this aircraft?\nThis starts the game's ejection sequence.", new Vector2(0, 65), new Vector2(510, 120), 24);
-        AddButton("Cancel", 0, 4, ShowFlightPage);
+        AddButton("Eject…", 0, 6, AskToEject);
+        _ejectPage = Page("EJECT");
+        Label(_ejectPage.transform, "Eject from this aircraft?\nThis starts the game's ejection sequence.", new Vector2(0,65), new Vector2(510,120), 24);
+        AddButton("Cancel", 0, 4, Back);
         AddButton("Confirm eject", 1, 4, ConfirmEject);
-        _ejectPage.SetActive(false);
-        _consolePage = new GameObject("Universal console setup", typeof(RectTransform));
-        _consolePage.transform.SetParent(rect, false);
-        _buttonParent = _consolePage.transform;
-        AddButton("Show / hide console", 0, 0, () => { CockpitLayout.Instance?.Finish(false); config.CockpitPanelEnabled.Value = !config.CockpitPanelEnabled.Value; });
+
+        _consolePage = Page("CONSOLE");
+        AddLiveButton(() => "Console: " + (config.CockpitPanelEnabled.Value ? "ON" : "OFF"), 0, 0, () => { CockpitLayout.Instance?.Finish(false); config.CockpitPanelEnabled.Value = !config.CockpitPanelEnabled.Value; });
         AddButton("Anchor to dashboard", 1, 0, () => { CockpitPanelPlacement.Instance?.ResetToDashboard(); config.CockpitPanelEnabled.Value = true; });
         AddButton("Panel up", 0, 1, () => MoveConsole(Vector3.up * .02f));
         AddButton("Panel down", 1, 1, () => MoveConsole(Vector3.down * .02f));
@@ -297,85 +304,95 @@ internal sealed class WristMenu : MonoBehaviour
         AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Grab to position", 0, 6, ToggleLayout);
         var placementInfo = Label(_consolePage.transform, "", new Vector2(0, -223), new Vector2(510, 65), 16);
         _liveLabels.Add((placementInfo, () => CockpitPanelPlacement.Status + "\nPanel placement is saved per aircraft.\nSeat movement leaves panel and handles in place."));
-        _consolePage.SetActive(false);
-        _controlsPage = new GameObject("Motion control feel", typeof(RectTransform));
-        _controlsPage.transform.SetParent(rect, false); _buttonParent = _controlsPage.transform;
-        var motion = config.MotionControls;
+
+        _controlsPage = Page("CONTROLS");
         AddLiveButton(() => "Stick grip: " + (motion.StickTapGrip.Value ? "TAP" : "HOLD"), 0, 0,
             () => { motion.StickTapGrip.Value = !motion.StickTapGrip.Value; MotionFlightController.Instance?.ResetGrips(); });
-        AddLiveButton(() => (CollectiveControls ? "Collective grip: " : "Throttle grip: ") + (motion.ThrottleTapGrip.Value ? "TAP" : "HOLD"), 1, 0,
+        AddLiveButton(() => (CollectiveControls ? "Collective: " : "Throttle grip: ") + (motion.ThrottleTapGrip.Value ? "TAP" : "HOLD"), 1, 0,
             () => { motion.ThrottleTapGrip.Value = !motion.ThrottleTapGrip.Value; MotionFlightController.Instance?.ResetGrips(); });
         AddButton("Less sensitive", 0, 1, () => motion.StickAngle.Value += 5);
         AddButton("More sensitive", 1, 1, () => motion.StickAngle.Value -= 5);
         AddButton("Deadzone −", 0, 2, () => motion.Deadzone.Value -= .01f);
         AddButton("Deadzone +", 1, 2, () => motion.Deadzone.Value += .01f);
-        AddLiveButton(() => CollectiveControls ? "Shorter lift" : "Shorter throttle", 0, 3, () => motion.ThrottleTravel.Value -= .025f);
-        AddLiveButton(() => CollectiveControls ? "Longer lift" : "Longer throttle", 1, 3, () => motion.ThrottleTravel.Value += .025f);
-        AddLiveButton(() => "Thumbstick yaw: " + (motion.ThumbstickYaw.Value ? "ON" : "OFF"), 0, 4,
-            () => motion.ThumbstickYaw.Value = !motion.ThumbstickYaw.Value);
-        AddButton("Reset response", 1, 4, () => { motion.StickAngle.Value = 25; motion.YawAngle.Value = 30; motion.Deadzone.Value = .06f; motion.ResponseExponent.Value = 1.5f; motion.ThrottleTravel.Value = .22f; });
-        AddButton("Button bindings", 0, 5, () => { _controlsPage.SetActive(false); _bindingsPage!.SetActive(true); _nextHelpRefresh = 0; });
-        AddButton("Place handles (3s)", 1, 5, () => { motion.Enabled.Value = true; MotionFlightController.Instance?.SchedulePlacement(); Close(); });
-        AddLiveButton(() => "Stick twist yaw: " + (motion.TwistYaw.Value ? "ON" : "OFF"), 0, 6,
+        AddLiveButton(() => CollectiveControls ? "Shorter lift (1 cm)" : "Shorter travel (1 cm)", 0, 3, () => motion.ThrottleTravel.Value -= .01f);
+        AddLiveButton(() => CollectiveControls ? "Longer lift (1 cm)" : "Longer travel (1 cm)", 1, 3, () => motion.ThrottleTravel.Value += .01f);
+        AddLiveButton(() => "Twist yaw: " + (motion.TwistYaw.Value ? "ON" : "OFF"), 0, 4,
             () => { motion.TwistYaw.Value = !motion.TwistYaw.Value; MotionFlightController.Instance?.ResetGrips(); });
-        AddButton("Hands & feedback", 1, 6, () => ShowHands(_controlsPage));
-        _controlsInfo = Label(_controlsPage.transform, "", new Vector2(0, -225), new Vector2(510, 65), 16);
-        _controlsPage.SetActive(false);
-        _helpPage = new GameObject("Controller help", typeof(RectTransform));
-        _helpPage.transform.SetParent(rect, false);
-        _bindingHelp = Label(_helpPage.transform, "", new Vector2(-132, 12), new Vector2(248, 390), 18);
-        _throttleHelp = Label(_helpPage.transform, "", new Vector2(132, 12), new Vector2(248, 390), 18);
-        _helpFooter = Label(_helpPage.transform, "", new Vector2(0, -217), new Vector2(510, 77), 16);
-        _helpPage.SetActive(false);
-        _bindingsPage = new GameObject("Throttle button layouts", typeof(RectTransform));
-        _bindingsPage.transform.SetParent(rect, false); _buttonParent = _bindingsPage.transform;
+        AddLiveButton(() => "Thumbstick yaw: " + (motion.ThumbstickYaw.Value ? "ON" : "OFF"), 1, 4, () => motion.ThumbstickYaw.Value = !motion.ThumbstickYaw.Value);
+        AddLiveButton(() => "MIL detent: " + (motion.MilDetent.Value ? "ON" : "OFF"), 0, 5, () => motion.MilDetent.Value = !motion.MilDetent.Value);
+        AddButton("Reset response", 1, 5, () => { motion.StickAngle.Value = 25; motion.YawAngle.Value = 30; motion.Deadzone.Value = .06f; motion.ResponseExponent.Value = 1.5f; motion.ThrottleTravel.Value = .12f; });
+        AddButton("Button bindings", 0, 6, () => ShowPage(_bindingsPage!));
+        AddButton("Controller guide", 1, 6, () => ShowPage(_helpPage!));
+        _controlsInfo = Label(_controlsPage.transform, "", new Vector2(0,-225), new Vector2(510,65), 16);
+        _bindingsPage = Page("BINDINGS");
         AddButton("Trigger: CMs", 0, 0, () => { config.ControllerBindings.ApplyThrottleLayout(ThrottleBindingLayout.CountermeasureTrigger); _nextHelpRefresh = 0; });
         AddButton("Trigger: brakes", 1, 0, () => { config.ControllerBindings.ApplyThrottleLayout(ThrottleBindingLayout.BrakeTrigger); _nextHelpRefresh = 0; });
         AddButton("VTOL-style controls", 0, 1, () => { config.ControllerBindings.ApplyVtolStyle(); _nextHelpRefresh = 0; });
-        AddButton("Hands & feedback", 1, 1, () => ShowHands(_bindingsPage));
-        _bindingsInfo = Label(_bindingsPage.transform, "", new Vector2(0, -10), new Vector2(510, 210), 16);
-        AddLiveButton(() => "View menu: " + (motion.ViewMenuFollowsHand.Value ? "FOLLOW HAND" : "STEADY"), 0, 6,
-            () => motion.ViewMenuFollowsHand.Value = !motion.ViewMenuFollowsHand.Value);
-        AddButton("Bring menu forward", 1, 6, () => _anchored = false);
-        AddButton("Controls help", 0, 7, () => ShowHelp(_bindingsPage));
-        _bindingsPage.SetActive(false);
-        _handsPage = new GameObject("Hands and feedback", typeof(RectTransform));
-        _handsPage.transform.SetParent(rect, false); _buttonParent = _handsPage.transform;
+        AddButton("Controller guide", 1, 1, () => ShowPage(_helpPage!));
+        _bindingsInfo = Label(_bindingsPage.transform, "", new Vector2(0,-61), new Vector2(510,310), 17);
+        _helpPage = Page("GUIDE");
+        _bindingHelp = Label(_helpPage.transform, "", new Vector2(-132, 12), new Vector2(248, 390), 18);
+        _throttleHelp = Label(_helpPage.transform, "", new Vector2(132, 12), new Vector2(248, 390), 18);
+        _helpFooter = Label(_helpPage.transform, "", new Vector2(0, -217), new Vector2(510, 77), 16);
+
+        _comfortPage = Page("COMFORT");
+        AddButton("Hands & arms", 0, 0, () => ShowPage(_handsPage!));
+        AddButton("HUD & display", 1, 0, () => ShowPage(_displayPage!));
+        AddButton("Sound & haptics", 0, 1, () => ShowPage(_feedbackPage!));
+        AddLiveButton(() => "Brow NV: " + (motion.HelmetNightVision.Value ? "ON" : "OFF"), 1, 1, () => motion.HelmetNightVision.Value = !motion.HelmetNightVision.Value);
+        AddLiveButton(() => "Menu: " + (motion.ViewMenuFollowsHand.Value ? "FOLLOW HAND" : "STEADY"), 0, 3, () => motion.ViewMenuFollowsHand.Value = !motion.ViewMenuFollowsHand.Value);
+        AddButton("Bring menu forward", 1, 3, () => _anchored = false);
+        Label(_comfortPage.transform, "Either controller can point and click.\n\nBrow NV: raise a free hand to your forehead,\nthen press its trigger to toggle night vision.", new Vector2(0,-149), new Vector2(510,160), 20);
+
+        _handsPage = Page("HANDS");
         AddLiveButton(() => "Gloves: " + (motion.RiggedGloves.Value ? "ON" : "OFF"), 0, 0, () => motion.RiggedGloves.Value = !motion.RiggedGloves.Value);
         AddLiveButton(() => "Sleeves: " + (motion.PilotArms.Value ? "ON" : "OFF"), 1, 0, () => motion.PilotArms.Value = !motion.PilotArms.Value);
         AddButton("Slimmer sleeves", 0, 1, () => motion.SleeveThickness.Value -= .05f);
         AddButton("Wider sleeves", 1, 1, () => motion.SleeveThickness.Value += .05f);
-        AddButton("Interaction sounds −", 0, 2, () => motion.InteractionVolume.Value -= .1f);
-        AddButton("Interaction sounds +", 1, 2, () => motion.InteractionVolume.Value += .1f);
-        AddButton("Wrist tips down", 0, 3, () => motion.GloveRotation.Value += Vector3.right * 5);
-        AddButton("Wrist tips up", 1, 3, () => motion.GloveRotation.Value -= Vector3.right * 5);
-        AddButton("Hands nearer", 0, 4, () => motion.GloveOffset.Value += Vector3.back * .005f);
-        AddButton("Hands farther", 1, 4, () => motion.GloveOffset.Value += Vector3.forward * .005f);
-        AddButton("Hands lower", 0, 5, () => motion.GloveOffset.Value += Vector3.down * .005f);
-        AddButton("Hands higher", 1, 5, () => motion.GloveOffset.Value += Vector3.up * .005f);
-        AddButton("Reset hand alignment", 0, 6, () => { motion.GloveOffset.Value = new Vector3(0,-.015f,-.055f); motion.GloveRotation.Value = new Vector3(25,0,0); });
-        AddLiveButton(() => "Brow NV: " + (motion.HelmetNightVision.Value ? "ON" : "OFF"), 1, 6, () => motion.HelmetNightVision.Value = !motion.HelmetNightVision.Value);
-        var handInfo = Label(_handsPage.transform, "", new Vector2(0,-223), new Vector2(510,65), 16);
-        _liveLabels.Add((handInfo, () => $"Sleeves {motion.SleeveThickness.Value*100:0}% • Wrist tilt {motion.GloveRotation.Value.x:0}° • Sound {motion.InteractionVolume.Value*100:0}%\nHand alignment changes visuals; grip hit points stay at the controller."));
-        _handsPage.SetActive(false);
+        AddButton("Hand alignment", 0, 2, () => ShowPage(_alignmentPage!));
+        var handInfo = Label(_handsPage.transform, "", new Vector2(0,-97), new Vector2(510,235), 20);
+        _liveLabels.Add((handInfo, () => $"Sleeve width: {motion.SleeveThickness.Value*100:0}%\n\nFree hands follow your controllers.\nHeld hands wrap around and follow the handle.\nRelease the grip to move the hand freely.\n\nSleeves hide beyond their natural reach."));
+
+        _alignmentPage = Page("ALIGNMENT");
+        AddButton("Palms upright", 0, 0, () => motion.GloveRotation.Value = new Vector3(0,0,90));
+        AddButton("Palms down", 1, 0, () => motion.GloveRotation.Value = Vector3.zero);
+        AddButton("Wrist tips down", 0, 1, () => motion.GloveRotation.Value += Vector3.right * 5);
+        AddButton("Wrist tips up", 1, 1, () => motion.GloveRotation.Value -= Vector3.right * 5);
+        AddButton("Palm roll −", 0, 2, () => motion.GloveRotation.Value -= Vector3.forward * 5);
+        AddButton("Palm roll +", 1, 2, () => motion.GloveRotation.Value += Vector3.forward * 5);
+        AddButton("Hands nearer", 0, 3, () => motion.GloveOffset.Value += Vector3.back * .005f);
+        AddButton("Hands farther", 1, 3, () => motion.GloveOffset.Value += Vector3.forward * .005f);
+        AddButton("Hands lower", 0, 4, () => motion.GloveOffset.Value += Vector3.down * .005f);
+        AddButton("Hands higher", 1, 4, () => motion.GloveOffset.Value += Vector3.up * .005f);
+        AddButton("Reset hand alignment", 0, 5, () => { motion.GloveOffset.Value = new Vector3(0,-.015f,-.055f); motion.GloveRotation.Value = new Vector3(0,0,90); });
+        var alignmentInfo = Label(_alignmentPage.transform, "", new Vector2(0,-190), new Vector2(510,125), 18);
+        _liveLabels.Add((alignmentInfo, () => $"Tilt {motion.GloveRotation.Value.x:0}° · Palm roll {motion.GloveRotation.Value.z:0}°\nFree-hand visuals only; hold a handle to attach.\nClose View to inspect alignment.\nPointer and flight inputs keep their real positions."));
+
+        _displayPage = Page("DISPLAY");
+        AddButton("Flight HUD smaller", 0, 0, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value -= .04f; });
+        AddButton("Flight HUD larger", 1, 0, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value += .04f; });
+        AddButton("HUD nearer", 0, 1, () => config.HudPanelDistance.Value -= .5f);
+        AddButton("HUD farther", 1, 1, () => config.HudPanelDistance.Value += .5f);
+        AddLiveButton(() => "Backplates: " + (config.HudContrast.Value ? "ON" : "OFF"), 0, 2, () => config.HudContrast.Value = !config.HudContrast.Value);
+        AddLiveButton(() => "Declutter: " + (config.HudDeclutter.Value ? "ON" : "OFF"), 1, 2, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
+        AddButton("Reset HUD", 0, 4, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
+        var displayInfo = Label(_displayPage.transform, "", new Vector2(0,-180), new Vector2(510,125), 19);
+        _liveLabels.Add((displayInfo, () => $"Flight HUD size {config.FlightHudScale.Value*100:0}%\nStatus-panel depth {config.HudPanelDistance.Value:0.0} m\nDepth changes preserve apparent size."));
+
+        _feedbackPage = Page("FEEDBACK");
+        AddButton("Quieter sounds", 0, 0, () => motion.InteractionVolume.Value -= .1f);
+        AddButton("Louder sounds", 1, 0, () => motion.InteractionVolume.Value += .1f);
+        AddButton("Weaker haptics", 0, 1, () => motion.HapticStrength.Value -= .1f);
+        AddButton("Stronger haptics", 1, 1, () => motion.HapticStrength.Value += .1f);
+        var feedbackInfo = Label(_feedbackPage.transform, "", new Vector2(0,-55), new Vector2(510,220), 21);
+        _liveLabels.Add((feedbackInfo, () => $"Sounds {motion.InteractionVolume.Value*100:0}%\nHaptics {motion.HapticStrength.Value*100:0}%\n\nZero disables that feedback.\nButtons, grabs, releases and detents\nshare these settings."));
+
+        _history = new MenuHistory<GameObject>(_homePage);
         _buttonParent = rect;
-        AddLiveButton(() => _setupPage.activeSelf ? "Flight actions" : _flightPage.activeSelf ? "Cockpit setup" :
-            _resetPage.activeSelf ? "Cancel reset" : _ejectPage.activeSelf ? "Cancel eject" : _consolePage.activeSelf ? "Back to Flight" :
-            _handsPage.activeSelf ? (_handsBackPage == _controlsPage ? "Back to Controls" : "Back to Bindings") : _bindingsPage.activeSelf ? "Back to Controls" : _helpPage.activeSelf && _helpBackPage == _bindingsPage ? "Back to Bindings" : "Back to Setup", 0, 8, () =>
-        {
-            if (_resetPage.activeSelf) { ShowSetupPage(); return; }
-            if (_ejectPage.activeSelf || _consolePage.activeSelf) { ShowFlightPage(); return; }
-            if (_helpPage.activeSelf)
-            {
-                _helpPage.SetActive(false); (_helpBackPage != null ? _helpBackPage : _setupPage).SetActive(true); return;
-            }
-            if (_handsPage.activeSelf) { _handsPage.SetActive(false); (_handsBackPage ?? _bindingsPage).SetActive(true); return; }
-            if (_bindingsPage.activeSelf) { _bindingsPage.SetActive(false); _controlsPage.SetActive(true); return; }
-            if (_controlsPage.activeSelf) { _controlsPage.SetActive(false); _setupPage.SetActive(true); return; }
-            var setup = _setupPage.activeSelf;
-            _setupPage.SetActive(!setup); _flightPage.SetActive(setup);
-        });
-        AddButton("Close", 1, 8, Close);
+        _backButton = AddButton("Back", 0, 8, Back, 3).transform.parent.GetComponent<Button>();
+        AddButton("Home", 1, 8, Home, 3);
+        AddButton("Close", 2, 8, Close, 3);
+        Home();
         LayerHelper.SetLayerRecursive(_panel.transform, LayerHelper.GetVrUiLayer());
     }
 
@@ -390,10 +407,14 @@ internal sealed class WristMenu : MonoBehaviour
         CockpitPanelPlacement.Adjust(delta);
     }
 
-    private void ShowHelp(GameObject from)
+    private GameObject Page(string title)
     {
-        from.SetActive(false); _helpBackPage = from; _helpPage!.SetActive(true); _nextHelpRefresh = 0;
+        var page = new GameObject(title, typeof(RectTransform));
+        page.transform.SetParent(_panel!.transform, false);
+        page.SetActive(false); _pageTitles.Add(page, title); _buttonParent = page.transform;
+        return page;
     }
+
     private string ThrottleBindingsHelp()
     {
         var config = ModConfiguration.Instance;
@@ -442,19 +463,20 @@ internal sealed class WristMenu : MonoBehaviour
     private void AddLiveButton(Func<string> text, int column, int row, Action action) =>
         _liveLabels.Add((AddButton(text(), column, row, action), text));
 
-    private Text AddButton(string text, int column, int row, Action action)
+    private Text AddButton(string text, int column, int row, Action action, int columns = 2)
     {
         var go = new GameObject(text, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         var rect = (RectTransform)go.transform;
         rect.SetParent(_buttonParent, false);
-        rect.sizeDelta = new Vector2(248, 49);
-        rect.anchoredPosition = new Vector2(column == 0 ? -132 : 132, 177 - row * 57);
+        var width = columns == 3 ? 160f : 248f;
+        rect.sizeDelta = new Vector2(width, 49);
+        rect.anchoredPosition = new Vector2((column - (columns - 1) * .5f) * (width + 16), 177 - row * 57);
         var button = go.GetComponent<Button>();
         button.targetGraphic = go.GetComponent<Image>();
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.onClick.AddListener(() => action());
         NativeButtonFeedback.Configure(button, new Color(0.10f, 0.24f, 0.29f));
-        return Label(rect, text, Vector2.zero, new Vector2(238, 45), 20);
+        return Label(rect, text, Vector2.zero, new Vector2(width - 10, 45), 20);
     }
 
     private Text Label(Transform parent, string text, Vector2 position, Vector2 size, int fontSize)

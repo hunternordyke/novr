@@ -150,7 +150,7 @@ trigger, or reach to a nearby control and use trigger or grip. The gear lever su
 ejection requires lifting the red guard and a separate deliberate pull/hold.
 Weapon/countermeasure status and the minimap move to its displays.
 
-Use **View → Flight actions → Console setup** to adjust its position, tilt and
+Use **View → Cockpit setup → Console position** to adjust its position, tilt and
 size. **F6** shows/hides it and restores the previous HUD layout when hidden.
 Version 0.4.5.5 keeps the other free hand’s pointer visible when one hand is near
 the console. Nearby controls take priority for their own hand; hints follow the
@@ -329,7 +329,7 @@ Grip curls three fingers and thumb; trigger curls index. This is controller-driv
 posing, not optical finger tracking. The two gloves total 9,798 triangles.
 
 Sleeves default to 82% of native thickness with unchanged lengths and wrist targets.
-View → Flight controls → Button bindings → Hands & feedback includes Slimmer/Wider
+View → Comfort & display → Hands & arms includes Slimmer/Wider
 sleeves, Gloves/Sleeves toggles, wrist-angle and hand-offset adjustments. Sleeves hide beyond their reachable envelope. Config
 `Glove Wrist Offset` / `Glove Wrist Rotation` adjust visuals only; interaction points
 continue using the runtime's grip pose. These values need a headset fit check.
@@ -339,7 +339,7 @@ night vision. A small cue identifies the gesture area. Held-trigger arrival and
 tracking recovery cannot toggle it; menus, map, layout and occupied hands suppress it.
 
 `Interaction Sound Volume` (default 0.25) controls original spatial grip/release,
-button, detent, guard and helmet cues. The Hands & feedback page has sound-volume buttons.
+button, detent, guard and helmet cues. View → Comfort & display → Sound & haptics has independent volume and strength buttons.
 Zero mutes sound independently of `Interaction Haptic Strength`. Six pooled voices
 and seven pre-generated clips bound the audio cost; the aircraft mixer is reused
 where available.
@@ -357,13 +357,14 @@ for final checks; no headset FPS or stereo-comfort claim is made.
   through release; switching hands, entering a menu or recovering tracking cannot
   turn a held trigger into a new click. Direct panel touch still works with either
   free hand. Release a latched flight handle before using that hand on the panel.
-- Default throttle/collective travel is now 22 cm (previously 25 cm). Existing
-  untouched defaults migrate once; custom travel is preserved. Flight controls
-  still has Shorter/Longer travel buttons.
-- The default glove pitch is corrected downward by 25 degrees. In Hands & feedback,
-  Wrist tips down/up changes it in 5-degree steps; nearer/farther and lower/higher
-  move the visible wrist in 5 mm steps. These adjustments leave controller hit
-  positions and flight inputs unchanged. Physical comfort remains a headset check.
+- Default throttle/collective travel is now 12 cm (previously 25 cm). Existing
+  untouched 22/25 cm defaults migrate once; custom travel is preserved. Flight controls
+  has Shorter/Longer travel buttons with 1 cm steps. The MIL shelf is included in the total.
+- Free hands default to palms vertical, thumbs up. **Hands & arms → Hand alignment**
+  has upright/down presets, wrist tilt and palm roll in 5-degree steps, and visual
+  wrist offsets in 5 mm steps. Former stock zero/25-degree wrist settings migrate
+  once; custom angles are retained. Held hands instead use fixed handle sockets.
+  Controller hit positions and flight inputs remain unchanged.
 - VT-7 dashboard fitting starts 25% larger, then checks surrounding clearance.
   Existing manually placed VT-7 panels enlarge once (within the scale limit) and
   move slightly toward the pilot to allow for the thicker scaled panel. Other
@@ -376,8 +377,7 @@ for final checks; no headset FPS or stereo-comfort claim is made.
 The View menu opens about 72 cm in front of you and stays there while you point.
 Either controller can operate it. Losing the usual menu hand does not close it
 while the other hand can still point. Close and reopen View to center it again.
-If you prefer the older hand-following behavior, use **View → Flight controls →
-Button bindings → View menu: STEADY / FOLLOW HAND**. The adjacent **Bring menu
+If you prefer the older hand-following behavior, use **View → Comfort & display → Menu: STEADY / FOLLOW HAND**. The adjacent **Bring menu
 forward** button places the menu again using the selected mode.
 
 The opaque console hides while View is open so it cannot cover menu buttons.
@@ -388,7 +388,7 @@ available particle shader and a finer tip.
 
 Each page has a clear title, motion/backplate/declutter toggles show their state,
 and **Controls help** separates stick-hand and throttle-hand bindings into two
-columns. **Hands & feedback** is also available directly from **Flight controls**.
+columns. **View → Comfort & display → Hands & arms** holds hand and sleeve settings.
 Resetting the seat and handles requires **Reset seat & handles… → Reset seat &
 handles**; **Keep my setup** returns without changing saved placement. This reset
 applies only to the current aircraft and handedness; panel placement is retained.
@@ -412,3 +412,38 @@ were inspected for clipping, occlusion, label alignment and pointer color. The
 scripted checks supplied Steam Frame-style inputs/focus without a wearer; they do
 not prove headset comfort or streamed performance. Test inputs and their temporary
 plugin were removed after the run, and original user settings were restored.
+
+## 0.4.6.3 — compact travel, attached hands and organized View menu
+
+Throttle and helicopter collective now default to **12 cm end to end**. The 1.6 cm
+MIL shelf is reserved *inside* that distance on afterburning jets. Release/regrab
+preserves the command. Change travel in **View → Flight controls**, in 1 cm steps.
+Reset response restores 12 cm. Untouched former 22/25 cm defaults migrate once.
+
+Free hands use a handshake pose: palms vertical, thumbs upward. **View → Comfort &
+display → Hands & arms → Hand alignment** provides upright/down presets, mirrored
+palm roll, wrist tilt and visual offsets. These settings affect free-hand visuals.
+
+Holding or latching a flight handle attaches the existing skinned glove to that
+handle's moving grip socket. Partial finger curls leave room for the handle; the
+index still reacts to the trigger. Stick, sliding throttle and collective use
+separate wrist orientations. The collective cuff points upward and inward toward
+the shoulder. Sleeve IK ends at the attached wrist. Release, menu
+entry, tracking loss and control disable use the existing grip-reset rules; no
+controller pose or flight input is replaced by the visual attachment. Generic
+sockets do not guarantee a perfect finger fit on every workshop handle model.
+
+View now opens Home. Back returns to the actual previous page, Home returns to the
+root, and Close stays in the same footer position everywhere. Pages are grouped:
+
+- **Flight actions**: weapons, targets, gear, radar, engine, map, assists and eject.
+- **Cockpit setup**: seat, console, individual layout editing, handle placement and handedness.
+- **Flight controls**: grip modes, response, travel, yaw, MIL detent and button bindings.
+- **Comfort & display**: hands/arms, hand alignment, HUD, sounds/haptics and menu following.
+- **Controller guide**: current bindings by hand. Recenter view is also on Home.
+
+Layout Save/Cancel is available on Home after reopening View. Reset seat/handles
+and menu ejection retain their confirmation pages; leaving them clears the pending
+confirmation. No simulated-input helper is included or running. This release's
+hand geometry was inspected offline on representative grips; wearer alignment and
+native aircraft fit still need headset testing.

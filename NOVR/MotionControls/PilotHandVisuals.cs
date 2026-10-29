@@ -59,8 +59,9 @@ internal sealed class PilotHandVisuals : MonoBehaviour
         for(var side=0;side<2;side++)
         {
             var left=side==0; var sample=TrackedControllers.Read(left);
-            var held=left==settings.LeftHanded.Value?controls?.StickHeld==true:controls?.ThrottleHeld==true;
-            _gloves[side]?.Pose(sample,held);
+            Pose? attachment = null; var stick = false; var collective = false;
+            if (controls != null && controls.TryGetHeldHandPose(left, out var gripPose, out stick, out collective)) attachment = gripPose;
+            _gloves[side]?.Pose(sample, attachment, stick, collective);
             if(_sleeves[side]!=null) _sleeves[side]!.enabled=settings.PilotArms.Value && sample.Valid && SolveArm(side,_gloves[side]!.Root.position);
         }
     }

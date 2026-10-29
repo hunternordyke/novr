@@ -1,6 +1,42 @@
 using NOVR.MotionControls;
 
 var passed = 0;
+Check("Menu history returns shared help to its source and clears confirmations on Home", () =>
+{
+    var h = new MenuHistory<string>("Home");
+    h.Back(); True(h.Current == "Home" && !h.CanBack);
+    foreach (var parent in new[] { "Controls", "Bindings", "Comfort" })
+    {
+        h.Push(parent); h.Push("Guide"); h.Back(); True(h.Current == parent);
+        h.Push("Confirm"); h.Home(); h.Back(); True(h.Current == "Home" && !h.CanBack);
+    }
+    h.Push("Controls"); h.Push("Bindings"); h.Push("Guide"); h.Push("Controls");
+    True(h.Trail.SequenceEqual(new[] { "Home", "Controls" }));
+    h.Push("Controls"); True(h.Trail.Count == 2);
+});
+Check("MIL shelf fits entirely inside the chosen throttle range and preserves regrabs", () =>
+{
+    foreach (var travel in new[] { .05f, .12f, .22f, .6f })
+    foreach (var mil in new[] { .5f, .8f, .95f })
+    {
+        var commandTravel = ThrottleDetent.CommandTravel(travel);
+        var width = ThrottleDetent.TravelMeters / commandTravel;
+        Near(ThrottleDetent.Position(1, mil, travel) - ThrottleDetent.Position(0, mil, travel), 1);
+        Near(ThrottleDetent.Output(travel / commandTravel, mil, width), 1);
+        Near(width * commandTravel, .016f);
+        var previous = -1f;
+        for (var i = 0; i <= 100; i++)
+        {
+            var command = i / 100f;
+            var fraction = ThrottleDetent.Position(command, mil, travel);
+            True(fraction >= previous && fraction >= 0 && fraction <= 1.00001f); previous = fraction;
+            Near(ThrottleDetent.Output(fraction * travel / commandTravel, mil, width), command);
+            foreach (var delta in new[] { -.5f, -.01f, 0f, .01f, .5f })
+                Near(ThrottleDetent.Output(ThrottleDetent.Input(command, mil, width) + delta / commandTravel, mil, width),
+                    ThrottleDetent.Output((fraction * travel + delta) / commandTravel, mil, width));
+        }
+    }
+});
 Check("Either hand can acquire the pointer with a fresh trigger", () =>
 {
     foreach (var preferLeft in new[] { false, true })

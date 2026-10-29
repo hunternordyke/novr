@@ -4,7 +4,7 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-NOVR Motion Prototype **0.4.6.2** adds a tracked-controller stick and throttle,
+NOVR Motion Prototype **0.4.6.3** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
 The shared 3D console combines seven selectable MFD pages with physical gear,
 radar, engine, flight-assist and guarded eject controls. View → Edit cockpit layout
@@ -29,18 +29,24 @@ a MIL detent, native VTOL nozzle-angle control, left-stick MFD map panning and a
 brow-trigger night-vision gesture. Rigged Valve gloves and locally reused pilot
 sleeves add visible hands, with adjustable wrist alignment and slimmer arms.
 Interaction sounds and haptics accompany physical controls. Either hand can use
-the menu/panel pointer. Default throttle travel is 22 cm; the VT-7 panel starts
+the menu/panel pointer. Default throttle travel is 12 cm; the VT-7 panel starts
 25% larger before clearance fitting. Seat changes leave cockpit controls in place.
-Hand, sleeve and sound settings live under **View → Flight controls → Button
-bindings → Hands & feedback**.
+Hand, sleeve, HUD and feedback settings live under **View → Comfort & display**.
 
 Version 0.4.6.2 makes the View menu steady by default, keeps its buttons clear
 of the opaque console, and separates the controller guide by hand. In Console
 setup an outline previews placement. Resetting saved seat/handle positions now
-requires a specific confirmation. Hand adjustments are directly reachable from
-Flight controls. Press either MFD's **PAGES** title to choose a display immediately;
+requires a specific confirmation. Press either MFD's **PAGES** title to choose a display immediately;
 unsupported pages are marked **NOT FITTED**, and choosing the other MFD's current
 page swaps them. The physical previous/next keys still work.
+
+Version 0.4.6.3 reduces full throttle/collective travel to **12 cm**, including the
+MIL shelf, with 1 cm adjustment steps. Free hands default to palms vertical and
+thumbs up. Held gloves wrap around and stay attached to the moving stick, throttle
+or collective; the pilot sleeves solve toward those wrists. Releasing a handle
+restores controller tracking. View opens a Home page with grouped settings and
+consistent Back/Home/Close navigation. **Comfort & display → Hands & arms → Hand
+alignment** adjusts the free-hand pose; **Flight controls** adjusts travel.
 
 Steam Frame **PC streaming through SteamVR** is the binding target, with a
 Touch-compatible fallback. The build targets Nuclear Option **0.34.3**.

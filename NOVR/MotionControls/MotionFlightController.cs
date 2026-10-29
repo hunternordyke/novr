@@ -59,6 +59,15 @@ public sealed class MotionFlightController : MonoBehaviour
     internal void CancelPlacement() { _placementTime = -1; ResetGrips(); }
     internal bool StickHeld => _ready && _stickGrip.Held;
     internal bool ThrottleHeld => _ready && _throttleGrip.Held;
+    // Render-only attachment: flight input still reads the real controller pose.
+    internal bool TryGetHeldHandPose(bool left, out Pose pose, out bool stick, out bool collective)
+    {
+        pose = default; stick = left == Settings.LeftHanded.Value; collective = !stick && LiftCollective;
+        if (!FlightActive || _visuals == null || !(stick ? StickHeld : ThrottleHeld)) return false;
+        pose = _visuals.GripPose(stick);
+        return true;
+    }
+    private float CommandTravel => MilDetent ? ThrottleDetent.CommandTravel(Settings.ThrottleTravel.Value) : Settings.ThrottleTravel.Value;
     internal float Pitch { get; private set; }
     internal float Roll { get; private set; }
     internal float Yaw { get; private set; }
@@ -81,11 +90,11 @@ public sealed class MotionFlightController : MonoBehaviour
     internal static bool UsesLiftCollective(Aircraft? aircraft) => aircraft != null && aircraft.GetControlsFilter() is HeloControlsFilter;
     private bool LiftCollective => UsesLiftCollective(_aircraft);
     private float ThrottleHandPosition => LiftCollective ? _throttleHand.Position.y : _throttleHand.Position.z;
-    private Vector3 ThrottleOffset
+    internal Vector3 ThrottleOffset
     {
         get
         {
-            var offset = FlightControlMath.ThrottleOffset(LiftCollective, Throttle, Settings.ThrottleTravel.Value);
+            var offset = FlightControlMath.ThrottleOffset(LiftCollective, MilDetent ? ThrottleDetent.Position(Throttle, _milPower, Settings.ThrottleTravel.Value) : Throttle, Settings.ThrottleTravel.Value);
             return new Vector3(0, offset.height, offset.forward);
         }
     }
@@ -279,15 +288,15 @@ public sealed class MotionFlightController : MonoBehaviour
         {
             _throttleStartPosition = ThrottleHandPosition;
             _throttleStartValue = MilDetent ? ThrottleDetent.Input(Throttle, _milPower,
-                ThrottleDetent.TravelMeters / Settings.ThrottleTravel.Value) : Throttle;
+                ThrottleDetent.TravelMeters / CommandTravel) : Throttle;
             _throttleZone = Throttle <= 0 ? -2 : Throttle >= 1 ? 2 : MilDetent && Throttle == _milPower ? 0 : MilDetent && Throttle > _milPower ? 1 : -1;
             Pulse(_throttleHand.Device);
         }
         if (throttleWasHeld && !_throttleGrip.Held && _throttleHand.Valid) InteractionHaptics.Pulse(_throttleHand.Device, .12f, .02f, InteractionCue.Release);
         if (_throttleGrip.Held)
         {
-            var input = _throttleStartValue + (ThrottleHandPosition - _throttleStartPosition) / Settings.ThrottleTravel.Value;
-            Throttle = MilDetent ? ThrottleDetent.Output(input, _milPower, ThrottleDetent.TravelMeters / Settings.ThrottleTravel.Value)
+            var input = _throttleStartValue + (ThrottleHandPosition - _throttleStartPosition) / CommandTravel;
+            Throttle = MilDetent ? ThrottleDetent.Output(input, _milPower, ThrottleDetent.TravelMeters / CommandTravel)
                 : Mathf.Clamp01(input);
             var zone = Throttle <= 0 ? -2 : Throttle >= 1 ? 2 : MilDetent && Throttle == _milPower ? 0 : MilDetent && Throttle > _milPower ? 1 : -1;
             if (zone != _throttleZone && (zone == 0 || zone == 1 || zone == -2 || zone == 2) && Time.unscaledTime >= _nextThrottlePulse)

@@ -94,7 +94,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         if (element == Element.Panel) return _panel;
         var offset = FlightControlMath.ThrottleOffset(MotionFlightController.UsesLiftCollective(_aircraft),
             MotionFlightController.Instance?.Throttle ?? .5f, ModConfiguration.Instance.MotionControls.ThrottleTravel.Value);
-        return Mirror(_throttle) + new Vector3(0, offset.height, offset.forward);
+        return Mirror(_throttle) + (MotionFlightController.Instance?.ThrottleOffset ?? new Vector3(0, offset.height, offset.forward));
     }
 
     private void MoveHand(int index, ControllerSample hand)

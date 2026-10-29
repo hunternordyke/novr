@@ -120,6 +120,10 @@ internal sealed class MotionControlVisuals : IDisposable
         _nativeStick?.SetVisible(visible); _nativeThrottle?.SetVisible(visible);
     }
 
+    internal Pose GripPose(bool stick) => stick
+        ? new Pose(_stickPivot.TransformPoint(Vector3.up * .12f), _stickPivot.rotation)
+        : new Pose(_throttleHandle.position, _throttleHandle.rotation);
+
     public void Update(Vector3 stick, Vector3 throttle, float travel, float angle, float pitch, float roll,
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
@@ -156,7 +160,7 @@ internal sealed class MotionControlVisuals : IDisposable
                     : new Vector3(i % 2 == 0 ? .02f : .013f, .003f, .003f);
             }
         }
-        var offset = FlightControlMath.ThrottleOffset(collective, thrust, travel);
+        var offset = FlightControlMath.ThrottleOffset(collective, milPower > 0 && milPower < 1 ? ThrottleDetent.Position(thrust, milPower, travel) : thrust, travel);
         _throttleHandle.localPosition = new Vector3(0, offset.height, offset.forward);
         _throttleHandle.localRotation = Quaternion.identity;
         if (collective)
@@ -188,7 +192,7 @@ internal sealed class MotionControlVisuals : IDisposable
             _brakeLabel.color = brakesApplied ? new Color(1f, .75f, .18f) : new Color(.65f, .72f, .78f);
         }
         _milMark.gameObject.SetActive(!collective && milPower > 0 && milPower < 1);
-        _milMark.localPosition = new Vector3(-side * .07f, -.025f, (milPower - .5f) * travel);
+        _milMark.localPosition = new Vector3(-side * .07f, -.025f, (ThrottleDetent.Position(milPower, milPower, travel) - .5f) * travel);
         var power = milPower > 0 && thrust >= milPower ? (thrust > milPower + .00001f ? " · AB" : " · MIL") : "";
         throttleTitle += power;
         var percent = Mathf.RoundToInt(thrust * 100);
