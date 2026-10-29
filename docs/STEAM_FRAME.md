@@ -5,7 +5,10 @@ NOVR Motion Prototype **0.4.4.6**, targeting Nuclear Option **0.34.3**, Steam bu
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
 now starts through SteamVR/OpenXR using DirectX 11 on the Linux/Proton test host.
-Flight controls and in-headset UI interactions still need hands-on validation.
+Live logs confirm 67 single-player missions, controller clicks through mission
+selection, the airbase map and Reserve/Fly, and entry into an aircraft. Motion
+flight controls, HUD comfort and the other controller bindings still need hands-on
+validation.
 
 ## Install and start
 
