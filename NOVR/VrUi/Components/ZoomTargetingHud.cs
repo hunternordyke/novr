@@ -11,6 +11,7 @@ internal sealed class ZoomTargetingHud : MonoBehaviour
     private readonly Dictionary<HudElementStyle, ZoomHudGraphic> _copies = new();
     private readonly List<HudElementStyle> _removed = new();
     internal float Magnification = 2;
+    internal bool MarkersOnly;
     private const float Distance = 3;
     private void OnEnable() => Canvas.willRenderCanvases += Draw;
     private void OnDisable()
@@ -28,13 +29,14 @@ internal sealed class ZoomTargetingHud : MonoBehaviour
         foreach (var key in _removed) { Destroy(_copies[key].gameObject); _copies.Remove(key); }
         foreach (var source in HudElementStyle.Elements)
         {
-            if (source == null || !source.isActiveAndEnabled || !source.Source.isActiveAndEnabled) continue;
+            if (source == null || !source.isActiveAndEnabled || !source.Source.isActiveAndEnabled ||
+                (MarkersOnly && source.Kind != HudElementKind.Marker && source.Kind != HudElementKind.Label)) continue;
             if (!_copies.ContainsKey(source))
             {
                 var go = new GameObject("Zoom " + source.Source.name, typeof(RectTransform));
                 go.transform.SetParent(transform, false); go.layer = gameObject.layer;
                 var rect = (RectTransform)go.transform;
-                rect.sizeDelta = new Vector2(1200, 750);
+                rect.sizeDelta = ((RectTransform)transform).rect.size;
                 var copy = go.AddComponent<ZoomHudGraphic>(); copy.raycastTarget = false;
                 _copies.Add(source, copy);
             }

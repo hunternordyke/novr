@@ -42,10 +42,14 @@ internal static class PatchCompatibility
         using var game = AssemblyDefinition.ReadAssembly(Path.Combine(gameManagedDirectory, "Assembly-CSharp.dll"));
         foreach (var contract in new[] {
             (owner: "CombatHUD", field: "weaponState", type: "HUDWeaponState"),
+            (owner: "CombatHUD", field: "markers", type: "System.Collections.Generic.List`1<HUDUnitMarker>"),
             (owner: "TacScreen", field: "cam", type: "UnityEngine.Camera"),
             (owner: "TacScreen", field: "canvas", type: "UnityEngine.Canvas"),
             (owner: "TacScreen", field: "screenMaterial", type: "UnityEngine.Material"),
             (owner: "TargetCam", field: "cam", type: "UnityEngine.Camera"),
+            (owner: "TargetCam", field: "currentMode", type: "TargetCam/CamMode"),
+            (owner: "TargetCam", field: "canvasObjectTarget", type: "UnityEngine.GameObject"),
+            (owner: "TargetCam", field: "canvasObjectLanding", type: "UnityEngine.GameObject"),
             (owner: "HUDMissileState", field: "hint", type: "TMPro.TextMeshProUGUI"),
             (owner: "HUDLaserGuidedState", field: "hint", type: "TMPro.TextMeshProUGUI") })
         {
@@ -53,6 +57,10 @@ internal static class PatchCompatibility
             if (field?.FieldType.FullName != contract.type) failures.Add($"Native readout field mismatch {contract.owner}.{contract.field}");
         }
         if (verified < 20) throw new Exception($"Only {verified} patch targets were checked; wrong build?");
+        var selector = game.MainModule.Types.Single(t => t.Name == "CombatHUD").Methods.Single(m => m.Name == "TargetSelect").Body.Instructions;
+        var acquisitionSites = selector.Count(i => i.OpCode == Mono.Cecil.Cil.OpCodes.Ldc_R4 && i.Operand is float f && f == 100 &&
+            i.Next?.Operand is MethodReference call && call.DeclaringType.Name == "FastMath" && call.Name == "InRange");
+        if (acquisitionSites != 1) failures.Add("Native optical selection acquisition-circle IL contract changed.");
         if (failures.Count != 0) throw new Exception(string.Join(Environment.NewLine, failures));
         Console.WriteLine($"Verified {verified} declared patch targets (metadata only; no game code executed).");
     }

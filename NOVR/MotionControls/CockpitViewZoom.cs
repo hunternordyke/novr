@@ -21,6 +21,7 @@ internal sealed class CockpitViewZoom : MonoBehaviour
     private GameObject? _window;
     private ZoomTargetingHud? _hud;
     private bool _held;
+    internal static bool IsActive { get; private set; }
     private const float Distance = 3f, Width = 1.2f, Height = .75f;
 
     private void Update()
@@ -42,6 +43,7 @@ internal sealed class CockpitViewZoom : MonoBehaviour
             (SceneSingleton<RadialMenuMain>.i == null || !RadialMenuMain.IsInUse());
         _button.Update(available, right.Shoulder ? 1 : 0);
         _held = _button.Held;
+        IsActive = _held;
         if (!_held) Hide();
     }
     private void LateUpdate()
@@ -95,7 +97,7 @@ internal sealed class CockpitViewZoom : MonoBehaviour
     }
     private void Hide()
     { if (_camera != null) _camera.enabled = false; if (_window != null) _window.SetActive(false); }
-    private void Reset() { _button.Reset(); _held = false; Hide(); }
+    private void Reset() { _button.Reset(); _held = false; IsActive = false; Hide(); }
     private void OnDisable() => Reset();
     private void OnDestroy()
     {

@@ -18,6 +18,8 @@ public class ModConfiguration
     public readonly ConfigEntry<float> NativeMenuHeightOffset;
     public readonly ConfigEntry<float> HmdFollowResponse;
     public readonly MotionControls.ControllerBindings ControllerBindings;
+    internal readonly MotionControls.OpticalHudSettings OpticalHud;
+    internal readonly ConfigEntry<MotionControls.TargetCueMode> TargetCue;
     public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
     public readonly ConfigEntry<bool> HudContrast, HudDeclutter, FocusedFlightHud;
     public readonly ConfigEntry<float> FlightHudScale, InstrumentBrightness, MfdBrightness;
@@ -34,6 +36,9 @@ public class ModConfiguration
         Config = config;
         MotionControls = new MotionControls.MotionControlSettings(config);
         ControllerBindings = new MotionControls.ControllerBindings(config);
+        OpticalHud = new MotionControls.OpticalHudSettings(config);
+        TargetCue = config.Bind("VR HUD", "Target Aim Cue", global::NOVR.MotionControls.TargetCueMode.Context,
+            "Context shows a small target cue only near a selectable target or while selecting. Always keeps a faint dot visible. Off hides the aim cue. Target diamonds and weapon sights are unchanged.");
         CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");
         CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Fallback cockpit position if a native dashboard surface is unavailable. Automatic dashboard fit and per-aircraft saved placements take precedence. Independent of seat adjustment.");
         CockpitPanelTilt = config.Bind("Universal Cockpit Panel", "Tilt", 20f, new ConfigDescription("Upward-facing panel tilt in degrees.", new AcceptableValueRange<float>(-90, 90)));

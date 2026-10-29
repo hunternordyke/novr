@@ -19,6 +19,10 @@ public partial class OpenXRSettings
         var frame = profiles.Find(item => item is Valve.OpenXR.Utils.SteamFrameControllerProfile);
         frame.company = "Valve";
         frame.openxrExtensionStrings = "XR_VALVE_frame_controller_interaction";
+        // Request the standard gaze action before session creation. Runtime
+        // permissions still govern availability; no raw gaze data is logged.
+        AddProfile<EyeGazeInteraction>(profiles, EyeGazeInteraction.featureId);
+        profiles.Find(item => item is EyeGazeInteraction)!.openxrExtensionStrings = EyeGazeInteraction.extensionString;
         features = profiles.ToArray();
     }
 

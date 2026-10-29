@@ -40,6 +40,10 @@ public class Core : MonoBehaviour
         gameObject.AddComponent<MotionControls.InteractionAudio>();
         gameObject.AddComponent<MotionControls.ControllerActions>();
         gameObject.AddComponent<MotionControls.CockpitViewZoom>();
+        gameObject.AddComponent<MotionControls.OpticalCameraRestore>();
+        gameObject.AddComponent<MotionControls.OpticalTargetingHud>();
+        gameObject.AddComponent<MotionControls.TargetAcquisitionCue>();
+        gameObject.AddComponent<MotionControls.PcVrCapabilities>();
         gameObject.AddComponent<VrUi.WristMenu>();
         gameObject.AddComponent<MotionControls.UniversalCockpitPanel>();
     }

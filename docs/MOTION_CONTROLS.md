@@ -685,3 +685,9 @@ a static layout audit. No simulated game input or flight-action tests were run.
 The prior 32-aircraft clearance audit predates this larger fit and does not
 validate the new dashboard footprints. In-headset rendering, restoration,
 clipping, hand comfort and streaming performance remain to be tested.
+
+## 0.4.6.7 helmet targeting
+
+See [OPTICAL_HUD.md](OPTICAL_HUD.md) for the AOTS HUD toggle, HEAD/TRACK targeting
+and contextual acquisition cue. [PC_FOVEATION.md](PC_FOVEATION.md) records the
+PC foveation investigation and eye-input readiness; PC DFR is not active.

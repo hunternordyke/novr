@@ -8,6 +8,7 @@ namespace NOVR.MotionControls;
 internal sealed class ControllerActions : MonoBehaviour
 {
     internal static ControllerActions? Instance { get; private set; }
+    internal bool TargetSelecting => _target.Held;
     private readonly ControllerButtonGate _fire = new(), _countermeasures = new(), _weapon = new(), _target = new(), _nextCountermeasure = new(), _map = new(), _clear = new(), _brake = new(), _unlock = new();
     private string? _queuedAction;
     private int _queuedFrame;

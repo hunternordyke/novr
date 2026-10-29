@@ -19,8 +19,9 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage, _aimingPage;
+    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage, _aimingPage, _opticalPage;
     private readonly Dictionary<GameObject, string> _pageTitles = new();
+    private GameObject? _performancePage;
     private MenuHistory<GameObject>? _history;
     private Button? _backButton;
     private readonly List<(Text label, Func<string> text)> _liveLabels = new();
@@ -36,6 +37,7 @@ internal sealed class WristMenu : MonoBehaviour
     private string _pageTitle = "VIEW";
     internal static bool IsOpen => _instance?._panel?.activeSelf == true;
     internal static bool IsConsoleSetup => IsOpen && _instance?._consolePage?.activeSelf == true;
+    internal static bool IsPerformancePage => IsOpen && _instance?._performancePage?.activeSelf == true;
     private static bool CollectiveControls => GameManager.GetLocalAircraft(out var aircraft) && MotionFlightController.UsesLiftCollective(aircraft);
     private void Awake() => _instance = this;
 
@@ -236,6 +238,8 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Comfort & display", 1, 1, () => ShowPage(_comfortPage!));
         AddButton("Controller guide", 0, 2, () => ShowPage(_helpPage!));
         AddButton("Recenter view", 1, 2, () => { NOVRHeadsetData.CalibrateTranslation(); NOVRHeadsetData.CalibrateRotation(); Close(); });
+        AddLiveButton(() => "AOTS HUD: " + (config.OpticalHud.Enabled.Value ? "ON" : "OFF"), 0, 3, () => { OpticalTargetingHud.Toggle(); Close(); });
+        AddButton("AOTS setup", 1, 3, () => ShowPage(_opticalPage!));
         AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Edit cockpit layout", 0, 4, ToggleLayout);
         AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Motion: " + (motion.Enabled.Value ? "ON" : "OFF"), 1, 4, () =>
         {
@@ -346,6 +350,7 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Hands & arms", 0, 0, () => ShowPage(_handsPage!));
         AddButton("HUD & display", 1, 0, () => ShowPage(_displayPage!));
         AddButton("Sound & haptics", 0, 1, () => ShowPage(_feedbackPage!));
+        AddButton("VR performance", 0, 2, () => ShowPage(_performancePage!));
         AddLiveButton(() => "Brow NV: " + (motion.HelmetNightVision.Value ? "ON" : "OFF"), 1, 1, () => motion.HelmetNightVision.Value = !motion.HelmetNightVision.Value);
         AddLiveButton(() => "Menu: " + (motion.ViewMenuFollowsHand.Value ? "FOLLOW HAND" : "STEADY"), 0, 3, () => motion.ViewMenuFollowsHand.Value = !motion.ViewMenuFollowsHand.Value);
         AddButton("Bring menu forward", 1, 3, () => _anchored = false);
@@ -384,9 +389,21 @@ internal sealed class WristMenu : MonoBehaviour
         AddLiveButton(() => "Declutter: " + (config.HudDeclutter.Value ? "ON" : "OFF"), 1, 2, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
         AddButton("Brightness", 0, 3, () => ShowPage(_brightnessPage!));
         AddButton("Aiming & markers", 1, 3, () => ShowPage(_aimingPage!));
+        AddButton("AOTS helmet view", 1, 4, () => ShowPage(_opticalPage!));
         AddButton("Reset HUD", 0, 4, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.MarkerScale.Value = .45f; config.MarkerLabelScale.Value = .55f; config.ReticleScale.Value = .45f; config.WeaponHudScale.Value = .5f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
         var displayInfo = Label(_displayPage.transform, "", new Vector2(0,-180), new Vector2(510,125), 19);
         _liveLabels.Add((displayInfo, () => $"Flight {config.FlightHudScale.Value*100:0}% • Symbols {config.MarkerScale.Value*100:0}%\nStatus-panel depth {config.HudPanelDistance.Value:0.0} m\nDepth changes preserve apparent size."));
+
+        _opticalPage = Page("AOTS HELMET VIEW");
+        AddLiveButton(() => "AOTS HUD: " + (config.OpticalHud.Enabled.Value ? "ON" : "OFF"), 0, 0, OpticalTargetingHud.Toggle);
+        AddButton("Look to aim", 1, 0, () => { config.OpticalHud.Enabled.Value = true; OpticalTargetingHud.LookToAim(); Close(); });
+        AddButton("Less magnification", 0, 1, () => config.OpticalHud.Magnification.Value -= .5f);
+        AddButton("More magnification", 1, 1, () => config.OpticalHud.Magnification.Value += .5f);
+        AddButton("Smaller image", 0, 2, () => config.OpticalHud.Width.Value -= 2);
+        AddButton("Larger image", 1, 2, () => config.OpticalHud.Width.Value += 2);
+        AddButton("Reset optical size", 0, 3, () => { config.OpticalHud.Width.Value = 20; config.OpticalHud.Magnification.Value = 2; });
+        var opticalInfo = Label(_opticalPage.transform, "", new Vector2(0, -163), new Vector2(510, 155), 18);
+        _liveLabels.Add((opticalInfo, () => $"{OpticalTargetingHud.ModeLabel} · Head zoom {config.OpticalHud.Magnification.Value:0.#}× · Width {config.OpticalHud.Width.Value:0}°\nLook with your head, then click target-select\nwhile gripping its assigned handle.\nUnlock returns to head aiming.\nTRACK uses the aircraft's automatic camera zoom.\nRight bumper temporarily shows the magnifier."));
 
         _aimingPage = Page("AIMING & MARKERS");
         AddButton("Symbols smaller", 0, 0, () => config.MarkerScale.Value -= .05f);
@@ -397,6 +414,8 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Reticle larger", 1, 2, () => config.ReticleScale.Value += .05f);
         AddButton("Range UI smaller", 0, 3, () => config.WeaponHudScale.Value -= .05f);
         AddButton("Range UI larger", 1, 3, () => config.WeaponHudScale.Value += .05f);
+        AddLiveButton(() => "Aim cue: " + config.TargetCue.Value.ToString().ToUpperInvariant(), 0, 4,
+            () => config.TargetCue.Value = (TargetCueMode)(((int)config.TargetCue.Value + 1) % 3));
         var aimingInfo = Label(_aimingPage.transform, "", new Vector2(0, -175), new Vector2(510, 100), 19);
         _liveLabels.Add((aimingInfo, () => $"Symbols {config.MarkerScale.Value*100:0}% • Labels {config.MarkerLabelScale.Value*100:0}%\nReticle {config.ReticleScale.Value*100:0}% • Range {config.WeaponHudScale.Value*100:0}%\nAim points stay aligned with the world."));
 
@@ -409,6 +428,10 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Night preset", 1, 3, () => { config.InstrumentBrightness.Value = .5f; config.MfdBrightness.Value = .45f; });
         var lightInfo = Label(_brightnessPage.transform, "", new Vector2(0,-137), new Vector2(510,215), 19);
         _liveLabels.Add((lightInfo, () => $"MFD content {config.MfdBrightness.Value*100:0}%\nHUD instruments {config.InstrumentBrightness.Value*100:0}%\n\nHUD: flight instruments, compass and pitch ladder.\nTarget markers and missile alerts keep native brightness.\nMFD page buttons and weapon readout stay readable.\nClose View to inspect the displays."));
+
+        _performancePage = Page("VR PERFORMANCE");
+        var performanceInfo = Label(_performancePage.transform, "", new Vector2(0, -12), new Vector2(510, 390), 18);
+        _liveLabels.Add((performanceInfo, () => PcVrCapabilities.Report));
 
         _feedbackPage = Page("FEEDBACK");
         AddButton("Quieter sounds", 0, 0, () => motion.InteractionVolume.Value -= .1f);

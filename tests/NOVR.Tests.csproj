@@ -7,6 +7,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../NOVR/MotionControls/OpticalHudMath.cs" Link="OpticalHudMath.cs" />
+    <Compile Include="../NOVR/MotionControls/TargetCueMode.cs" Link="TargetCueMode.cs" />
     <Compile Include="../NOVR/VrUi/Components/HudPresentationMath.cs" Link="HudPresentationMath.cs" />
     <Compile Include="../NOVR/MotionControls/PilotTextureEnhancement.cs" Link="PilotTextureEnhancement.cs" />
     <Compile Include="../NOVR/MotionControls/DeferredTextureJob.cs" Link="DeferredTextureJob.cs" />
