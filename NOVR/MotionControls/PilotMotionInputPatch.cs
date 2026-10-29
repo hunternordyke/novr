@@ -33,6 +33,7 @@ internal static class PilotMotionInputPatch
             float ___pilotStrength, ref float ___simulatedThrottle)
         {
             var motion = MotionFlightController.Instance;
+            motion?.ObserveThrottle(___pilot, ___controlInputs.throttle);
             if (motion == null || !motion.SampleFor(___pilot)) return;
             if (___pilotStrength < 0.2f)
             {
@@ -44,6 +45,7 @@ internal static class PilotMotionInputPatch
             // Seed the native accumulator so letting go keeps thrust instead of snapping back.
             ___simulatedThrottle = FlightControlMath.ToSimulatedThrottle(motion.Throttle,
                 PlayerSettings.throttleUseNegative, ___collective && PlayerSettings.invertCollective);
+            motion.ObserveThrottle(___pilot, motion.Throttle);
         }
     }
 }

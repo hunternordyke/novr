@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.6` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.7` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -69,6 +69,15 @@ button contrast. A further 18 offline checks cover native braking, separate brak
 actions, tracking/menu cancellation, placement protection and the throttle-layout UI.
 Four configuration-loading checks cover default and custom-binding preservation.
 Physical grip timing and comfort still need headset evaluation.
+
+Version 0.4.5.7 captures throttle/collective input before native hover filtering.
+The virtual handle follows the pilot’s command, not the engine power produced by
+the hover controller, so release/regrab does not adopt automatic power output.
+Its caption changes to **HOVER INPUT** during hover assist, otherwise **COLLECTIVE**
+on aircraft using collective input or **THROTTLE**. Forward/back hand travel stays
+the same. Use the console **HOV** key or **View → Flight actions → Hover assist**;
+unavailable aircraft and the native 1 m ground-clearance restriction are explained
+in the UI.
 
 ## Brakes and throttle buttons
 

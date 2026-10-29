@@ -23,6 +23,7 @@ internal sealed class WristMenu : MonoBehaviour
     private Text? _controlsInfo, _bindingHelp, _bindingsInfo;
     private float _nextHelpRefresh;
     private Aircraft? _ejectAircraft;
+    private Button? _hoverButton, _assistButton;
     private Transform? _buttonParent;
     private bool _anchored;
     internal static bool IsOpen => _instance?._panel?.activeSelf == true;
@@ -45,6 +46,12 @@ internal sealed class WristMenu : MonoBehaviour
         if (!IsOpen) return;
         foreach (var item in _liveLabels)
             if (item.label != null && item.label.gameObject.activeInHierarchy) item.label.text = item.text();
+        if (_hoverButton != null && _flightPage?.activeSelf == true)
+            _hoverButton.interactable = GameManager.GetLocalAircraft(out var hoverAircraft) &&
+                HoverAssist.UnavailableReason(hoverAircraft) == null;
+        if (_assistButton != null && _flightPage?.activeSelf == true)
+            _assistButton.interactable = GameManager.GetLocalAircraft(out var assistAircraft) &&
+                assistAircraft.GetControlsFilter()?.HasFlightAssist() == true;
         if (_controlsInfo != null && _controlsPage?.activeSelf == true)
         {
             var motion = config.MotionControls;
@@ -176,7 +183,10 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Toggle gear", 0, 1, () => ControllerActions.Instance?.QueueWristAction("Gear"));
         AddButton("Toggle radar", 1, 1, () => ControllerActions.Instance?.QueueWristAction("Radar"));
         AddButton("Toggle engine", 0, 2, () => ControllerActions.Instance?.QueueWristAction("Toggle Engine"));
-        AddButton("Toggle flight assist", 1, 2, () => ControllerActions.Instance?.QueueWristAction("Flight Assist"));
+        var assistLabel = AddButton("Toggle flight assist", 1, 2, () => ControllerActions.Instance?.QueueWristAction("Flight Assist"));
+        _assistButton = assistLabel.transform.parent.GetComponent<Button>();
+        _liveLabels.Add((assistLabel, () => GameManager.GetLocalAircraft(out var a) && a.GetControlsFilter()?.HasFlightAssist() == true
+            ? "Toggle flight assist" : "Assist: not switchable"));
         AddButton("Clear targets", 0, 3, () => SceneSingleton<CombatHUD>.i?.DeselectAll());
         AddButton("Tactical map", 1, 3, ControllerActions.ToggleMap);
         AddButton("HUD nearer", 0, 4, () => config.HudPanelDistance.Value -= 0.5f);
@@ -185,7 +195,11 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Mirror handedness", 1, 5, () => { config.MotionControls.LeftHanded.Value = !config.MotionControls.LeftHanded.Value; Close(); });
         AddButton("Eject...", 0, 6, AskToEject);
         AddButton("Console setup", 1, 6, () => { _flightPage.SetActive(false); _consolePage!.SetActive(true); });
-        Label(_flightPage.transform, "Actions close this panel.\nRelease grips before returning to flight.", new Vector2(0, -220), new Vector2(510, 56), 18);
+        var hoverLabel = AddButton("Hover assist", 0, 7, () => ControllerActions.Instance?.QueueWristAction("Auto Hover"));
+        _hoverButton = hoverLabel.transform.parent.GetComponent<Button>();
+        _liveLabels.Add((hoverLabel, () => !GameManager.GetLocalAircraft(out var a) || a.GetControlsFilter()?.HasAutoHover() != true
+            ? "Hover: not fitted" : a.radarAlt < 1f ? "Hover: ground locked" : $"Hover assist: {(a.IsAutoHoverEnabled() ? "ON" : "OFF")}"));
+        Label(_flightPage.transform, "Actions close this panel.\nRelease grips to use it.", new Vector2(132, -222), new Vector2(248, 49), 16);
         _flightPage.SetActive(false);
         _ejectPage = new GameObject("Confirm ejection", typeof(RectTransform));
         _ejectPage.transform.SetParent(rect, false);

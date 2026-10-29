@@ -48,7 +48,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         ["gear"] = new(0, 0, -.057f), ["radar"] = new(0, 0, -.036f),
         ["engine"] = new(0, 0, -.036f), ["assist"] = new(0, 0, -.036f),
         ["weapon"] = Vector3.zero, ["map"] = Vector3.zero,
-        ["cm"] = Vector3.zero, ["zoom_in"] = Vector3.zero, ["zoom_out"] = Vector3.zero,
+        ["cm"] = Vector3.zero, ["hover"] = Vector3.zero, ["zoom_in"] = Vector3.zero, ["zoom_out"] = Vector3.zero,
         ["guard"] = new(0, -.05f, -.017f), ["eject"] = new(0, -.025f, 0)
     };
     internal static bool IsDocked(Transform widget) => Instance?._hud?.Contains(widget) == true;
@@ -220,7 +220,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         {
             if (!CanTarget(pair.Key)) continue;
             var center = Point(pair.Key); var along = Vector3.Dot(center - ray.origin, ray.direction);
-            var radius = pair.Key is "guard" or "eject" ? .041f : pair.Key is "cm" or "zoom_in" or "zoom_out" ? .018f : .029f;
+            var radius = pair.Key is "guard" or "eject" ? .041f : pair.Key is "cm" or "hover" or "zoom_in" or "zoom_out" ? .018f : .029f;
             radius *= _model!.Root.localScale.x;
             if (along > .015f && along < distance && Vector3.Distance(ray.GetPoint(along), center) <= radius)
             { distance = along; best = pair.Key; }
@@ -265,7 +265,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     }
     private void Activate(string control)
     {
-        var action = control switch { "gear" => "Gear", "radar" => "Radar", "engine" => "Toggle Engine", "assist" => "Flight Assist", "weapon" => "Next Weapon", "cm" => "Next Countermeasure", "eject" => "Eject", _ => null };
+        var action = control switch { "gear" => "Gear", "radar" => "Radar", "engine" => "Toggle Engine", "assist" => "Flight Assist", "hover" => "Auto Hover", "weapon" => "Next Weapon", "cm" => "Next Countermeasure", "eject" => "Eject", _ => null };
+        if (control == "hover" && HoverAssist.UnavailableReason(_aircraft) is string reason)
+        { Feedback(control, reason); return; }
+        if (control == "assist" && _aircraft?.GetControlsFilter()?.HasFlightAssist() != true)
+        { Feedback(control, "FLIGHT ASSIST IS NOT SWITCHABLE ON THIS AIRCRAFT"); return; }
         if (control == "radar" && _aircraft?.radar == null) { Feedback(control, "RADAR NOT FITTED TO THIS AIRCRAFT"); return; }
         if (control == "gear" && _aircraft != null && _aircraft.radarAlt <= .2f)
         { Feedback(control, "GEAR LOCKED ON GROUND"); return; }
@@ -309,7 +313,11 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             "gear" => _hoverDirect ? "GEAR  •  HOLD TRIGGER / GRIP + MOVE UP OR DOWN" : "GEAR  •  TRIGGER TO TOGGLE",
             "radar" => _aircraft?.radar == null ? "RADAR  •  NOT FITTED" : $"RADAR  •  {(_aircraft.radar.activated ? "ON" : "OFF")}  •  {press} TO TOGGLE",
             "engine" => $"ENGINE  •  {(_aircraft?.Ignition == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
-            "assist" => $"FLIGHT ASSIST  •  {(_aircraft?.flightAssist == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
+            "assist" => _aircraft?.GetControlsFilter()?.HasFlightAssist() != true
+                ? "FLIGHT ASSIST IS NOT SWITCHABLE ON THIS AIRCRAFT"
+                : $"FLIGHT ASSIST  •  {(_aircraft.flightAssist ? "ON" : "OFF")}  •  {press} TO TOGGLE",
+            "hover" => HoverAssist.UnavailableReason(_aircraft) ??
+                $"HOVER ASSIST  •  {(_aircraft?.IsAutoHoverEnabled() == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
             "weapon" => $"NEXT WEAPON  •  {press}", "cm" => $"NEXT COUNTERMEASURE  •  {press}",
             "zoom_in" => $"MAP ZOOM IN  •  {press}", "zoom_out" => $"MAP ZOOM OUT  •  {press}", "map" => $"OPEN TACTICAL MAP  •  {press}",
             "guard" => $"{(_ejection.Open ? "CLOSE" : "LIFT")} EJECT GUARD  •  {press}",
@@ -333,7 +341,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         Rotate("gear", _aircraft.gearDeployed ? -30 : 30, blend);
         Rotate("radar", _aircraft.radar?.activated == true ? 25 : -25, blend);
         Rotate("engine", _aircraft.Ignition ? 25 : -25, blend);
-        Rotate("assist", _aircraft.flightAssist ? 25 : -25, blend);
+        Rotate("assist", _aircraft.GetControlsFilter()?.HasFlightAssist() != true ? 0 : _aircraft.flightAssist ? 25 : -25, blend);
         Rotate("guard", _ejection.Open ? 110 : 0, blend);
         foreach (var point in _points)
             _model.Highlight(point.Key, _active == point.Key ? 2 : _active == null &&
@@ -344,6 +352,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             LandingGear.GearState.Extending or LandingGear.GearState.Retracting => new Color(1f, .6f, .02f),
             _ => new Color(.025f, .04f, .03f)
         });
+        _model.SetGroupColor("hover_lamp", _aircraft.IsAutoHoverEnabled()
+            ? new Color(.3f, 1f, .5f) : new Color(.025f, .04f, .03f));
         _model.Groups["eject"].localPosition = _ejectRest + Vector3.back * (_active == "eject" ? .02f : 0);
         foreach (var button in _buttonRest)
             _model.Groups[button.Key].localPosition = button.Value + Vector3.forward * (_active == button.Key ? .003f : 0);
@@ -369,7 +379,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_model != null) return;
         _model = new CockpitPanelModel(transform); _ejectRest = _model.Groups["eject"].localPosition;
         _hud = new CockpitPanelHud(_model.Root);
-        foreach (var key in new[] { "weapon", "map", "cm", "zoom_in", "zoom_out" })
+        foreach (var key in new[] { "weapon", "map", "cm", "hover", "zoom_in", "zoom_out" })
             _buttonRest[key] = _model.Groups[key].localPosition;
         var hintObject = new GameObject("Console interaction hint", typeof(RectTransform), typeof(Canvas));
         hintObject.transform.SetParent(_model.Root, false); hintObject.transform.localScale = Vector3.one * .001f;

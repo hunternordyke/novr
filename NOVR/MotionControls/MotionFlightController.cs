@@ -16,6 +16,8 @@ public sealed class MotionFlightController : MonoBehaviour
     private MotionControlVisuals? _visuals;
     private bool _visualsFailed;
     private Aircraft? _aircraft;
+    private Aircraft? _throttleCommandAircraft;
+    private float _throttleCommand;
     private Quaternion _neutralStick;
     private float _throttleStartPosition;
     private float _throttleStartValue;
@@ -119,7 +121,19 @@ public sealed class MotionFlightController : MonoBehaviour
             Settings.StickAngle.Value, Pitch, Roll, Throttle, StickHeld, ThrottleHeld,
             IsNearStick(), IsNearThrottle(), _stickHand.Valid, _stickHand.Position,
             _throttleHand.Valid, _throttleHand.Position, _stickGrip.Latched, _throttleGrip.Latched,
-            Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value, _aircraft != null && _aircraft.GetInputs().brake > .05f);
+            Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value, _aircraft != null && _aircraft.GetInputs().brake > .05f,
+            _aircraft?.IsAutoHoverEnabled() == true ? "HOVER INPUT" :
+                _aircraft?.GetAircraftParameters().takeoffDistance == 0 ? "COLLECTIVE" : "THROTTLE");
+    }
+
+    // Capture the pilot's command before native hover/flight filters turn it
+    // into engine power. Regrabbing must not adopt the hover controller's output.
+    internal void ObserveThrottle(Pilot pilot, float command)
+    {
+        if (pilot == null || pilot.currentState != pilot.playerState ||
+            !GameManager.IsLocalAircraft(pilot.aircraft) || !FlightControlMath.IsFinite(command)) return;
+        _throttleCommandAircraft = pilot.aircraft;
+        _throttleCommand = Mathf.Clamp01(command);
     }
 
     // Called from both the render loop and the native pilot input hooks, so a physics tick
@@ -189,7 +203,8 @@ public sealed class MotionFlightController : MonoBehaviour
         _visuals.Root.localPosition = CockpitProfiles.SeatOffset;
         _stickHand = TrackedControllers.Read(Settings.LeftHanded.Value);
         _throttleHand = TrackedControllers.Read(!Settings.LeftHanded.Value);
-        if (!_throttleGrip.Held) Throttle = Mathf.Clamp01(aircraft.GetInputs().throttle);
+        if (!_throttleGrip.Held) Throttle = _throttleCommandAircraft == aircraft
+            ? _throttleCommand : Mathf.Clamp01(aircraft.GetInputs().throttle);
 
         var stickWasHeld = _stickGrip.Held;
         _stickGrip.Update(_stickHand.Valid, _stickHand.Grip, IsNearStick(), Settings.StickTapGrip.Value,

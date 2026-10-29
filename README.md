@@ -4,22 +4,22 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-This branch adds a primitive cockpit stick and throttle operated by tracked controllers,
-controller laser pointers, combat bindings, a wrist panel, per-aircraft seat/handle profiles,
-and adjustable HUD readability. Version **0.4.5.0** adds an original shared 3D console
-with guarded physical controls and live weapon/countermeasure/minimap displays,
-and corrects reversed motion-stick pitch. **0.4.5.1** adds optional tap-to-latch
-grips and in-headset control-feel settings and binding help. **0.4.5.2** adds
-wheel/air brakes and selectable throttle-button layouts. **0.4.5.3** improves
-handle depth/shading, backs the captions with solid panels and adds actual brake-state
-feedback and throttle-travel marks. **0.4.5.4** restores native target/landing-camera
-zoom and accurate instrument magnification while preserving headset projection.
-**0.4.5.5** adds direct trigger interaction on the console, independent free-hand
-hover feedback and context-sensitive hints, and prevents hidden pointer actions.
-**0.4.5.6** keeps gear/eject hand travel consistent at all console sizes and reports
-whether an eject request was accepted, with a deliberate retry if needed.
-Steam Frame **PC streaming through SteamVR** is the binding target, with a Touch-compatible fallback. It builds against Nuclear
-Option **0.34.3**. It is a prototype awaiting headset flight testing, not a tested release.
+NOVR Motion Prototype **0.4.5.7** adds a tracked-controller stick and throttle,
+laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
+The shared 3D console puts live weapons, countermeasures and the minimap beside
+physical gear, radar, engine, flight-assist and guarded eject controls.
+
+Optional tap-to-latch grips, adjustable control response, a live binding guide,
+wheel/air brakes and readable handle captions support flying without a keyboard.
+The **HOV** key and wrist action operate native hover assist; its lamp follows
+actual aircraft state. Throttle/collective readouts preserve the pilot’s command
+while hover assist adjusts engine power. Unavailable controls explain why.
+Native target/landing-camera zoom and magnification are preserved.
+
+Steam Frame **PC streaming through SteamVR** is the binding target, with a
+Touch-compatible fallback. The build targets Nuclear Option **0.34.3**.
+Offline input and display checks are documented in the guides below; physical
+controller reach, stereo comfort and flight feel still need headset evaluation.
 
 - **F6** shows/hides the console; hiding it restores the original status HUD.
 - **F7** enables/disables motion flight controls (off initially).

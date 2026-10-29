@@ -562,11 +562,11 @@ if (args.Length == 2)
         using var reader = new StreamReader(stream);
         var json = reader.ReadToEnd();
         var runtimeAsset = CockpitPanelAsset.Load(json);
-        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 13 && runtimeAsset.materials.Length > 3);
+        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 15 && runtimeAsset.materials.Length > 3);
         using var document = System.Text.Json.JsonDocument.Parse(json);
         var model = document.RootElement;
         var groups = model.GetProperty("groups").EnumerateArray().Select(g => g.GetProperty("name").GetString()).ToHashSet();
-        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "zoom_in", "zoom_out" })
+        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "hover", "hover_lamp", "zoom_in", "zoom_out" })
             True(groups.Contains(name));
         var materials = model.GetProperty("materials").GetArrayLength();
         var triangles = 0;

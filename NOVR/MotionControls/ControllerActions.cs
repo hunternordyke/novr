@@ -23,7 +23,7 @@ internal sealed class ControllerActions : MonoBehaviour
     internal void QueuePanelAction(string action)
     {
         if (action != "Gear" && action != "Radar" && action != "Toggle Engine" && action != "Flight Assist" &&
-            action != "Next Weapon" && action != "Next Countermeasure" && action != "Eject") return;
+            action != "Next Weapon" && action != "Next Countermeasure" && action != "Eject" && action != "Auto Hover") return;
         if (!GameManager.GetLocalAircraft(out var aircraft)) return;
         _queuedAction = action;
         _queuedFrame = Time.frameCount + 1;
@@ -130,5 +130,18 @@ internal static class ControllerPressedActionPatch
     {
         if (__instance == GameManager.playerInput && (__0 == "Gear" || __0 == "Eject"))
             __result |= ControllerActions.Instance?.Queued(__0) == true;
+    }
+}
+
+// Hover assist is the native long-press branch of Flight Assist. Expose it as
+// its own deliberate VR action without also toggling ordinary flight assist.
+[HarmonyPatch(typeof(Rewired.Player), "GetButtonTimedPressDown", new[] { typeof(string), typeof(float) })]
+internal static class ControllerHoverActionPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(Rewired.Player __instance, string __0, ref bool __result)
+    {
+        if (__instance == GameManager.playerInput && __0 == "Flight Assist")
+            __result |= ControllerActions.Instance?.Queued("Auto Hover") == true;
     }
 }

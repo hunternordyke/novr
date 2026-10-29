@@ -51,9 +51,10 @@ for x,name in ((-.13,'WEAPONS / CM'),(.13,'NAVIGATION')):
     box(name+' screen',(x,.025,-.043),(.226,.211,.002),'black',.001)
     label(name,(x,.139,-.045),.008,'green')
 # Labeled, functional bezel keys; no decorative dead buttons.
-for x,y,title,group in ((-.249,.017,'CM','cm'),(.249,.066,'+','zoom_in'),(.249,-.014,'-','zoom_out')):
+for x,y,title,group in ((-.249,.017,'CM','cm'),(-.249,-.060,'HOV','hover'),(.249,.066,'+','zoom_in'),(.249,-.014,'-','zoom_out')):
     box(title+' bezel key',(x,y,-.046),(.018,.025,.008),'edge',.002,group)
-    label(title,(x,y,-.051),.008 if group=='cm' else .015,'white',group)
+    label(title,(x,y,-.051),.0065 if group=='hover' else .008 if group=='cm' else .015,'white',group)
+cylinder('Hover indicator',(-.249,-.037,-.048),.0035,.003,'green',group='hover_lamp')
 label('GEAR',(-.315,.123,-.031),.012)
 box('Gear gate',(-.315,.015,-.034),(.040,.14,.009),'black',.005)
 label('UP',(-.315,.096,-.041),.008)
@@ -90,7 +91,7 @@ label('MAP',(.315,-.137,-.049),.008,group='map')
 pivots={'gear_lamps':(0,0,0),'static':(0,0,0),'gear':(-.315,.015,-.044),'radar':(-.19,-.139,-.038),
 'engine':(-.065,-.139,-.038),'assist':(.065,-.139,-.038),'weapon':(.185,-.137,-.039),
 'eject':(.315,.022,-.059),'guard':(.315,.083,-.071),'map':(.315,-.137,-.039),
-'cm':(-.249,.017,-.046),'zoom_in':(.249,.066,-.046),'zoom_out':(.249,-.014,-.046)}
+'cm':(-.249,.017,-.046),'hover':(-.249,-.060,-.046),'hover_lamp':(0,0,0),'zoom_in':(.249,.066,-.046),'zoom_out':(.249,-.014,-.046)}
 # Apply transforms, triangulate and export individual meshes grouped by animated pivot.
 parts=[]
 for obj in objects:

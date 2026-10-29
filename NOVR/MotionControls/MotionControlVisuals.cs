@@ -21,7 +21,7 @@ internal sealed class MotionControlVisuals : IDisposable
     private float _lastTravel = -1;
     private readonly Dictionary<Mesh, Mesh> _shadedMeshes = new();
     private int _lastThrottlePercent = -1;
-    private string? _lastStickCaption, _lastThrottleCaption;
+    private string? _lastStickCaption, _lastThrottleCaption, _lastThrottleTitle;
 
     public MotionControlVisuals(Transform trackingRoot)
     {
@@ -81,7 +81,7 @@ internal sealed class MotionControlVisuals : IDisposable
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
         bool stickLatched = false, bool throttleLatched = false, bool stickTapMode = false, bool throttleTapMode = false,
-        bool brakesApplied = false)
+        bool brakesApplied = false, string throttleTitle = "THROTTLE")
     {
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
         _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
@@ -115,11 +115,12 @@ internal sealed class MotionControlVisuals : IDisposable
         }
         var percent = Mathf.RoundToInt(thrust * 100);
         var throttleCaption = throttleLatched ? "LATCHED\nGRIP TO RELEASE" : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
-        if (_lastThrottlePercent != percent || _lastThrottleCaption != throttleCaption)
+        if (_lastThrottlePercent != percent || _lastThrottleCaption != throttleCaption || _lastThrottleTitle != throttleTitle)
         {
-            _throttleLabel.text = $"THROTTLE {percent}%\n{throttleCaption}";
+            _throttleLabel.text = $"{throttleTitle} {percent}%\n{throttleCaption}";
             _lastThrottlePercent = percent;
             _lastThrottleCaption = throttleCaption;
+            _lastThrottleTitle = throttleTitle;
         }
     }
 
