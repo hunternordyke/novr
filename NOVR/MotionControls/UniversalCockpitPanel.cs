@@ -45,6 +45,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private readonly Dictionary<string, Vector3> _buttonRest = new();
     private readonly Dictionary<string, Vector3> _points = new()
     {
+        ["mfd_left_prev"] = Vector3.zero, ["mfd_left_next"] = Vector3.zero,
+        ["mfd_right_prev"] = Vector3.zero, ["mfd_right_next"] = Vector3.zero,
         ["gear"] = new(0, 0, -.057f), ["radar"] = new(0, 0, -.036f),
         ["engine"] = new(0, 0, -.036f), ["assist"] = new(0, 0, -.036f),
         ["weapon"] = Vector3.zero, ["map"] = Vector3.zero,
@@ -84,6 +86,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         var settings = ModConfiguration.Instance;
         if (Keyboard.current?.f6Key.wasPressedThisFrame == true)
         {
+            CockpitLayout.Instance?.Finish(false);
             settings.CockpitPanelEnabled.Value = !settings.CockpitPanelEnabled.Value;
             if (settings.CockpitPanelEnabled.Value) _modelFailed = false;
         }
@@ -105,12 +108,17 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         }
         if (!TryCreateModel()) { Hide(); return; }
         _visible = true; _model!.Root.gameObject.SetActive(true);
-        var offset = settings.CockpitPanelPosition.Value;
-        if (!TrackedControllers.Finite(offset)) offset = new Vector3(0, -.32f, .65f);
-        offset = new Vector3(Mathf.Clamp(offset.x, -.5f, .5f), Mathf.Clamp(offset.y, -.75f, .15f), Mathf.Clamp(offset.z, .3f, 1.2f));
-        _model.Root.SetPositionAndRotation(root.TransformPoint(CockpitProfiles.SeatOffset + offset),
-            root.rotation * Quaternion.Euler(settings.CockpitPanelTilt.Value, 0, 0));
+        var offset = CockpitLayout.BoundPanel(CockpitLayout.PanelPosition);
+        _model.Root.SetPositionAndRotation(root.TransformPoint(CockpitProfiles.SeatOffset + offset), root.rotation * CockpitLayout.PanelRotation);
         _model.Root.localScale = Vector3.one * settings.CockpitPanelScale.Value;
+        _model.SetLayoutMode(CockpitLayout.Active);
+        _hud!.SetVisible(!CockpitLayout.Active);
+        if (CockpitLayout.Active)
+        {
+            CancelInteraction(); _laser!.enabled = false; _dot!.gameObject.SetActive(false);
+            if (_hint != null) _hint.text = CockpitLayout.Hint;
+            return;
+        }
         // Leave the console visible during placement adjustments, but the wrist
         // menu owns input until closed. This also resets any open eject guard.
         if (WristMenu.IsOpen)
@@ -221,6 +229,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             if (!CanTarget(pair.Key)) continue;
             var center = Point(pair.Key); var along = Vector3.Dot(center - ray.origin, ray.direction);
             var radius = pair.Key is "guard" or "eject" ? .041f : pair.Key is "cm" or "hover" or "zoom_in" or "zoom_out" ? .018f : .029f;
+            if (pair.Key.StartsWith("mfd_")) radius = .013f;
             radius *= _model!.Root.localScale.x;
             if (along > .015f && along < distance && Vector3.Distance(ray.GetPoint(along), center) <= radius)
             { distance = along; best = pair.Key; }
@@ -273,7 +282,12 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (control == "radar" && _aircraft?.radar == null) { Feedback(control, "RADAR NOT FITTED TO THIS AIRCRAFT"); return; }
         if (control == "gear" && _aircraft != null && _aircraft.radarAlt <= .2f)
         { Feedback(control, "GEAR LOCKED ON GROUND"); return; }
-        if (control is "zoom_in" or "zoom_out")
+        if (control.StartsWith("mfd_"))
+        {
+            _hud?.Cycle(control.StartsWith("mfd_left"), control.EndsWith("prev") ? -1 : 1);
+            Feedback(control, "MFD PAGE CHANGED");
+        }
+        else if (control is "zoom_in" or "zoom_out")
         {
             var map = SceneSingleton<DynamicMap>.i;
             if (map != null && !DynamicMap.mapMaximized)
@@ -318,6 +332,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
                 : $"FLIGHT ASSIST  •  {(_aircraft.flightAssist ? "ON" : "OFF")}  •  {press} TO TOGGLE",
             "hover" => HoverAssist.UnavailableReason(_aircraft) ??
                 $"HOVER ASSIST  •  {(_aircraft?.IsAutoHoverEnabled() == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
+            "mfd_left_prev" or "mfd_right_prev" => $"PREVIOUS MFD PAGE  •  {press}",
+            "mfd_left_next" or "mfd_right_next" => $"NEXT MFD PAGE  •  {press}",
             "weapon" => $"NEXT WEAPON  •  {press}", "cm" => $"NEXT COUNTERMEASURE  •  {press}",
             "zoom_in" => $"MAP ZOOM IN  •  {press}", "zoom_out" => $"MAP ZOOM OUT  •  {press}", "map" => $"OPEN TACTICAL MAP  •  {press}",
             "guard" => $"{(_ejection.Open ? "CLOSE" : "LIFT")} EJECT GUARD  •  {press}",
@@ -357,7 +373,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         _model.Groups["eject"].localPosition = _ejectRest + Vector3.back * (_active == "eject" ? .02f : 0);
         foreach (var button in _buttonRest)
             _model.Groups[button.Key].localPosition = button.Value + Vector3.forward * (_active == button.Key ? .003f : 0);
-        _hud!.Update();
+        if (!CockpitLayout.Active) _hud!.Update();
     }
     private bool TryCreateModel()
     {
@@ -379,7 +395,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_model != null) return;
         _model = new CockpitPanelModel(transform); _ejectRest = _model.Groups["eject"].localPosition;
         _hud = new CockpitPanelHud(_model.Root);
-        foreach (var key in new[] { "weapon", "map", "cm", "hover", "zoom_in", "zoom_out" })
+        foreach (var key in new[] { "weapon", "map", "cm", "hover", "zoom_in", "zoom_out", "mfd_left_prev", "mfd_left_next", "mfd_right_prev", "mfd_right_next" })
             _buttonRest[key] = _model.Groups[key].localPosition;
         var hintObject = new GameObject("Console interaction hint", typeof(RectTransform), typeof(Canvas));
         hintObject.transform.SetParent(_model.Root, false); hintObject.transform.localScale = Vector3.one * .001f;

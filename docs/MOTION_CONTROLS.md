@@ -2,12 +2,15 @@
 
 This is the first iteration toward the hands-on cockpit interaction described in the
 [official VTOL VR manual](https://cdn.steamstatic.com/steam/apps/667970/manuals/VTOL_VR_Manual.pdf).
-The stick and throttle use runtime Unity primitives. The shared console uses an
-original Blender model. Neither includes VTOL VR code, models, or textures.
+The stick and throttle reuse isolated meshes and materials from the installed
+aircraft at runtime, with primitive fallbacks for unsupported aircraft. Stationary
+original handles are hidden only while the replacements are visible, and restored
+when disabled or leaving the cockpit. No native game assets are exported or shipped.
+The shared console is an original Blender model; no VTOL VR assets are included.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.9` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.6.0` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -33,6 +36,65 @@ behavior in a live headset. Headset flight testing is still required.
 Restoring both backed-up NOVR folders and restarting restores the previous mod,
 including its OpenXR payload. F7 disables flight input immediately, but restoring
 the previous package is the way to revert all HUD/runtime changes.
+
+## Layout editing and helicopter defaults
+
+Open **left View → Edit cockpit layout**. Release grip first; either hand can
+reach and grip the stick, throttle/collective, or panel independently. You can also
+point at a handle or panel and squeeze grip. Move the hand to translate the item;
+turn your wrist while holding the panel to rotate it. The panel becomes an outline
+so handles behind it remain visible. Flight and console actions are suspended
+while editing. Open View again and choose **Save layout** or **Cancel layout**.
+
+Handle positions save per aircraft and handedness; the panel pose is shared across
+aircraft. Tracking loss or menus release a drag; a new grip press is required.
+Leaving the cockpit cancels an unfinished edit. The older **Place handles (3s)**
+option is under **View → Flight controls**; F8 remains available.
+
+Helicopter collective travel is centered **15 cm below the default stick**
+(default grip coordinates: stick y −0.36 m, collective center y −0.51 m).
+With the default 25 cm travel, the top of the collective range stays slightly below
+the stick. Untouched old helicopter defaults migrate once; custom placements remain.
+**Reset aircraft setup** uses this lower default and also resets the seat position.
+Jets and the VT-7 keep their existing throttle height.
+
+## VTOL-style buttons and inspection view
+
+The preset follows VTOL VR's trigger/action-button division, while using Nuclear
+Option's native target and weapon logic. **View → Flight controls → Button bindings
+→ VTOL-style controls** applies it. Existing stock bindings migrate automatically;
+custom bindings are retained. Held or tap-latched handles both enable their buttons.
+
+| Action | Default Frame button | Required context |
+| --- | --- | --- |
+| Fire | Right trigger | Stick held |
+| Next weapon | Right A, release | Stick held |
+| Wheel/air brakes | Left trigger, hold | Throttle held |
+| Countermeasures | Left D-pad down, hold | Throttle held |
+| Select target under head-directed cue | Left thumbstick click, release | Throttle held |
+| Remove latest selected target | Right X, release | Stick held |
+| Clear all selected targets | Right Y, release | Stick held |
+| Next countermeasure type | Left D-pad right, release | Throttle held |
+| Inspection magnifier | Physical right bumper, hold | Cockpit, with either grip held or released |
+| Map / wrist menu | Right B / left View | Cockpit |
+
+Target selection does not force a weapon lock: seeker, range, radar and weapon
+restrictions still apply. X removes the most recently selected target; Y clears
+all selected targets. Both actions are also on the wrist Flight actions page.
+For Touch fallback: A changes weapon, X deploys CMs, left thumbstick click selects,
+and Y changes CM type; use wrist actions for unlock/clear. A controller without a
+shoulder button has no default inspection binding.
+
+The right bumper is reserved even when using a custom binding or mirrored controls.
+It shows a **mono magnified image on a panel 3 m ahead**, with the normal stereo
+periphery preserved. Release hides it. Full-view XR zoom was removed after it caused
+uncomfortable convergence during headset testing. Headset projection and eye
+separation are unchanged by the replacement. The window is for visual inspection;
+it does not alter the target camera's zoom or provide MFD cursor control.
+
+The magnifier renders at 1024×640 only while held. Its additional camera has a GPU
+cost that still needs streaming/flight evaluation. Menus, pause, tracking loss,
+layout editing and aircraft changes cancel it; release before reactivating.
 
 ## Grip comfort and control feel
 
@@ -317,3 +379,15 @@ collective/auto-hover behavior, improve labels and control geometry, add direct 
 switch interaction, and profile frame pacing and cockpit camera costs. Streaming latency
 and controller emulation need validation on Steam Frame; this code does not configure
 Steam Link quality, foveation, or networking.
+
+## 0.4.6.0 validation
+
+76 automated checks pass, including 45 native patch-target checks. In-game
+checks using simulated controller input passed: 53 in the VT-7 for layout,
+native handle restoration, MFD pages and focused HUD; 50 in the SAH-46 for
+the same core behavior before the final lower-default adjustment; and 32 in
+the VT-7 for configuration migration, grip-bound native actions, target selection,
+unlock/clear and the replacement inspection magnifier. The latter verify both
+actual OpenXR eye projections remain unchanged while the image is visible.
+The helicopter's final lower default is compiled; its ergonomics remain for
+headset testing. Captures are inspection views, not stereo comfort validation.

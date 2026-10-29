@@ -7,15 +7,25 @@ seat offsets still apply.
 
 ## Displays
 
-The left display receives the game's live weapon, countermeasure, power and
-grid-reference widgets. The right display receives its live minimized map.
-These are the existing UI objects, not simulated readings or a second map render.
-The original transforms are restored when the console hides, when leaving the
-cockpit, and before expanding the tactical map. Aim markers, flight-path vector,
-pitch ladder and other world-aligned symbology stay in the forward view. Incoming
-missile alerts also remain forward-facing and override HUD declutter while active.
-The weapon display explicitly shows **SAFE** when the native weapon safety lock
-is engaged; it never changes the aircraft’s actual safety state.
+Each display has **< / >** keys below it. Point and trigger, or touch with trigger
+or grip, to cycle pages. The seven choices are **Weapons/CM, Map, Flight,
+Engine/Fuel, Systems, Tactical, Sensor**. Left defaults to Weapons/CM; right defaults
+to Map. If the requested page is already on the other screen, the screens swap.
+
+Weapons/CM and Map use the game's original live UI objects. Flight, Engine/Fuel
+and Systems use the instrument widgets fitted to the current aircraft. Tactical
+shows its existing radar/optical display; Sensor shows its active target or landing
+camera. Tactical mirrors the native shared display and follows it into camera
+mode when the game replaces its radar image; Sensor provides the full camera
+feed. Unsupported instrument pages and inactive camera feeds show explicit
+messages. Selecting Sensor does not activate or change the aircraft camera.
+
+The original UI transforms, activity and layers restore when the console hides,
+when leaving the cockpit, and before opening the full map. Weapon/map widgets stay
+out of the forward view while another MFD page is selected. **SAFE** reflects the
+native weapon-safety state. Target markers, flight-path cues and missile alerts
+retain their normal projection. The green flight instruments now use a compact
+forward layout; View provides **Flight HUD smaller / larger** controls.
 
 ## Controls
 
@@ -44,6 +54,7 @@ control that produced them. Point at the front of the console to use its laser c
 | HOV bezel key | Trigger toggles native hover assist | Trigger or grip near the key |
 | CM bezel key | Trigger cycles countermeasure type | Trigger or grip near the key |
 | + / − navigation keys | Trigger changes minimap zoom, centered on the aircraft | Trigger or grip near the key |
+| < / > under each MFD | Previous/next page | Trigger or grip near the key |
 | MAP | Trigger expands tactical map | Trigger or grip near the key |
 | Red eject guard | Trigger lifts/closes cover | Trigger or grip near the cover |
 | Yellow eject handle | After opening the cover and releasing trigger, hold trigger on the handle for 0.75 s | After opening the cover and releasing your press, hold trigger or grip on the handle and pull it toward you at least 4.5 cm |
@@ -89,10 +100,15 @@ While hover assist is active, the motion handle reads **HOVER INPUT**. Its posit
 and percentage follow the pilot’s climb/descent command, independently of the engine power
 chosen by the hover controller. Moving it forward increases the command; releasing
 and regrabbing preserves that command. The ordinary readout is **COLLECTIVE** on
-aircraft using collective input, or **THROTTLE** otherwise. The current handle
-still moves along the same forward/back rail in every aircraft.
+aircraft using collective input, or **THROTTLE** otherwise. Helicopters use lift/lower motion; jets and the VT-7 use forward/back motion.
 
 ## Position and fallback
+
+Use **View → Edit cockpit layout** to move each handle and the console independently
+with grip. Rotate your wrist to rotate the panel. It becomes an outline while editing,
+so it cannot obscure handles. Reopen View to **Save layout** or **Cancel layout**.
+Panel position/rotation is global; handles are saved per aircraft and handedness.
+
 
 Open **View → Flight actions → Console setup** to adjust position in 2 cm steps,
 tilt in 5-degree steps, or size in 5% steps. Adjustments preview live on the console;
@@ -125,7 +141,7 @@ contextual hints follow the approach described in the
 
 ## Validation status
 
-71 automated checks pass, including pitch polarity, diagonal stick input,
+76 automated checks pass, including pitch polarity, diagonal stick input,
 guarded-ejection transitions, embedded mesh integrity and 45 Harmony target
 metadata checks against Nuclear Option 0.34.3. The game builds with no errors.
 22 live checks in a disposable offline FS-12 mission verify initialization, widget
@@ -169,3 +185,15 @@ populate in the game.
 If the embedded model cannot load, NOVR keeps the original HUD and reports one
 error instead of retrying every frame. Toggle F6 off/on to retry after resolving
 the problem. No diagnostic tool is included in the release package.
+
+## 0.4.6.0 validation
+
+76 automated checks pass, including 45 native patch-target checks. In-game
+checks using simulated controller input passed: 53 in the VT-7 for layout,
+native handle restoration, MFD pages and focused HUD; 50 in the SAH-46 for
+the same core behavior before the final lower-default adjustment; and 32 in
+the VT-7 for configuration migration, grip-bound native actions, target selection,
+unlock/clear and the replacement inspection magnifier. The latter verify both
+actual OpenXR eye projections remain unchanged while the image is visible.
+The helicopter's final lower default is compiled; its ergonomics remain for
+headset testing. Captures are inspection views, not stereo comfort validation.

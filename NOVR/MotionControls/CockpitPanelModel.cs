@@ -90,6 +90,23 @@ internal sealed class CockpitPanelModel : IDisposable
         catch { Dispose(); throw; }
     }
 
+    private LineRenderer? _layoutOutline;
+    internal void SetLayoutMode(bool editing)
+    {
+        foreach (var group in _renderers.Values) foreach (var renderer in group) renderer.enabled = !editing;
+        if (editing && _layoutOutline == null)
+        {
+            var go = new GameObject("Panel layout outline", typeof(LineRenderer)); go.transform.SetParent(Root, false);
+            _layoutOutline = go.GetComponent<LineRenderer>(); _layoutOutline.useWorldSpace = false;
+            _layoutOutline.sharedMaterial = _materials[6]; _layoutOutline.widthMultiplier = .004f;
+            _layoutOutline.positionCount = 5;
+            _layoutOutline.SetPositions(new[] { new Vector3(-.385f,-.18f,-.05f), new Vector3(-.385f,.18f,-.05f),
+                new Vector3(.385f,.18f,-.05f), new Vector3(.385f,-.18f,-.05f), new Vector3(-.385f,-.18f,-.05f) });
+            go.layer = (int)LayerHelper.GetVrUiLayer();
+        }
+        if (_layoutOutline != null) _layoutOutline.enabled = editing;
+    }
+
     internal void SetGroupColor(string group, Color color)
     {
         if (!_renderers.TryGetValue(group, out var renderers)) return;

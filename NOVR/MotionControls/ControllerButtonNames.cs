@@ -3,7 +3,7 @@ namespace NOVR.MotionControls;
 public enum ControllerButton
 {
     None, Trigger, Primary, Secondary, Menu, Shoulder, Top, Outside, StickClick,
-    ShoulderOrPrimary, OutsideOrSecondary, PrimaryOrStickClick, PrimaryOrSecondary, SecondaryOrStickClick
+    ShoulderOrPrimary, OutsideOrSecondary, PrimaryOrStickClick, PrimaryOrSecondary, SecondaryOrStickClick, SecondaryOrNone
 }
 
 // The in-headset help uses the same hand/profile choices as input sampling.
@@ -16,6 +16,7 @@ internal static class ControllerButtonNames
         ControllerButton.PrimaryOrStickClick => frame ? ControllerButton.Primary : ControllerButton.StickClick,
         ControllerButton.PrimaryOrSecondary => frame ? ControllerButton.Primary : ControllerButton.Secondary,
         ControllerButton.SecondaryOrStickClick => frame ? ControllerButton.Secondary : ControllerButton.StickClick,
+        ControllerButton.SecondaryOrNone => frame ? ControllerButton.Secondary : ControllerButton.None,
         _ => button
     };
     internal static string Describe(ControllerButton button, bool left, bool frame)

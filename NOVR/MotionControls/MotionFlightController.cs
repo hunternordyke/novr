@@ -49,7 +49,8 @@ public sealed class MotionFlightController : MonoBehaviour
     private ControllerSample _throttleHand;
     private MotionControlSettings Settings => ModConfiguration.Instance.MotionControls;
 
-    internal bool FlightActive => _ready;
+    internal bool FlightActive => _ready && !CockpitLayout.Active;
+    internal void CancelPlacement() { _placementTime = -1; ResetGrips(); }
     internal bool StickHeld => _ready && _stickGrip.Held;
     internal bool ThrottleHeld => _ready && _throttleGrip.Held;
     internal float Pitch { get; private set; }
@@ -77,6 +78,7 @@ public sealed class MotionFlightController : MonoBehaviour
     {
         if (Keyboard.current?.f7Key.wasPressedThisFrame == true)
         {
+            CockpitLayout.Instance?.Finish(false);
             Settings.Enabled.Value = !Settings.Enabled.Value;
             if (!Settings.Enabled.Value) _placementTime = -1f;
             ResetGrips();
@@ -98,7 +100,7 @@ public sealed class MotionFlightController : MonoBehaviour
             _placementConfirmationUntil = Time.unscaledTime + 6f;
             Debug.LogWarning($"[NOVR] Handle placement timed out: {Status}. Try Place handles again after resolving this state.");
         }
-        if (!_ready) return;
+        if (!_ready || CockpitLayout.Active) return;
         if (_placementTime >= 0f && Time.unscaledTime >= _placementTime && _stickHand.Valid && _throttleHand.Valid)
         {
             _placementTime = -1f;
@@ -130,7 +132,8 @@ public sealed class MotionFlightController : MonoBehaviour
         if (!_ready || _visuals == null) return;
         _visuals.Update(StickPosition, ThrottlePosition, Settings.ThrottleTravel.Value,
             Settings.StickAngle.Value, Pitch, Roll, Throttle, StickHeld, ThrottleHeld,
-            IsNearStick(), IsNearThrottle(), _stickHand.Valid, _stickHand.Position,
+            CockpitLayout.Active ? CockpitLayout.Hovered(CockpitLayout.Element.Stick) : IsNearStick(),
+            CockpitLayout.Active ? CockpitLayout.Hovered(CockpitLayout.Element.Throttle) : IsNearThrottle(), _stickHand.Valid, _stickHand.Position,
             _throttleHand.Valid, _throttleHand.Position, _stickGrip.Latched, _throttleGrip.Latched,
             Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value, _aircraft != null && _aircraft.GetInputs().brake > .05f,
             _aircraft?.IsAutoHoverEnabled() == true ? "HOVER INPUT" :
@@ -159,7 +162,7 @@ public sealed class MotionFlightController : MonoBehaviour
         Sample();
         // Pilot.playerControlled is a legacy serialized field with no writers in
         // 0.34.3. Local aircraft ownership and the active pilot state are authoritative.
-        return _ready && pilot != null && !pilot.dead &&
+        return _ready && !CockpitLayout.Active && pilot != null && !pilot.dead &&
                pilot.aircraft == _aircraft && pilot.currentState == pilot.playerState;
     }
 
@@ -185,7 +188,7 @@ public sealed class MotionFlightController : MonoBehaviour
             _visuals?.Dispose();
             _visuals = null;
             _aircraft = aircraft;
-            try { _visuals = new MotionControlVisuals(trackingRoot); }
+            try { _visuals = new MotionControlVisuals(trackingRoot); _visuals.UseAircraftModels(aircraft); }
             catch (System.Exception exception)
             {
                 _visualsFailed = true;
@@ -210,12 +213,14 @@ public sealed class MotionFlightController : MonoBehaviour
         }
 
         _ready = true;
-        _visuals.Root.gameObject.SetActive(true);
+        _visuals.SetVisible(true);
         _visuals.Root.localPosition = CockpitProfiles.SeatOffset;
         _stickHand = TrackedControllers.Read(Settings.LeftHanded.Value);
         _throttleHand = TrackedControllers.Read(!Settings.LeftHanded.Value);
         if (!_throttleGrip.Held) Throttle = _throttleCommandAircraft == aircraft
             ? _throttleCommand : Mathf.Clamp01(aircraft.GetInputs().throttle);
+
+        if (CockpitLayout.Active) { ResetGrips(); ReportStatus(CockpitLayout.Hint); return; }
 
         var stickWasHeld = _stickGrip.Held;
         _stickGrip.Update(_stickHand.Valid, _stickHand.Grip, IsNearStick(), Settings.StickTapGrip.Value,
@@ -347,7 +352,7 @@ public sealed class MotionFlightController : MonoBehaviour
         _ready = false;
         _calibrationHold = 0f;
         _calibrationLatched = false;
-        if (_visuals?.Root != null) _visuals.Root.gameObject.SetActive(false);
+        if (_visuals?.Root != null) _visuals.SetVisible(false);
     }
 
     private void OnDisable() => Suspend();

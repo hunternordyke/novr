@@ -6,7 +6,8 @@ using Object = UnityEngine.Object;
 
 namespace NOVR.MotionControls;
 
-// Runtime primitives keep the prototype self-contained: no Unity editor project or asset bundle.
+// Native aircraft handles are reused when separate meshes are available. Runtime
+// primitives remain a fallback for aircraft without reusable control geometry.
 internal sealed class MotionControlVisuals : IDisposable
 {
     public Transform Root { get; }
@@ -18,6 +19,8 @@ internal sealed class MotionControlVisuals : IDisposable
     private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial, _textMaterial;
     private readonly Font _font;
     private readonly TextMesh _stickLabel, _throttleLabel, _brakeLabel;
+    private NativeControlModel? _nativeStick, _nativeThrottle;
+    private readonly List<Renderer> _fallbackStick = new(), _fallbackThrottle = new();
     private bool? _lastBrake;
     private float _lastTravel = -1;
     private bool? _lastCollective;
@@ -94,6 +97,23 @@ internal sealed class MotionControlVisuals : IDisposable
         catch { Dispose(); throw; }
     }
 
+    internal void UseAircraftModels(Aircraft aircraft)
+    {
+        _fallbackStick.AddRange(_stickPivot.GetComponentsInChildren<Renderer>(true));
+        _fallbackStick.Add(_stickBase.Find("Base").GetComponent<Renderer>());
+        foreach (var group in new[] { _rail, _sliderParts, _collectiveParts, _collectiveJoint, _collectiveShaft })
+            _fallbackThrottle.AddRange(group.GetComponentsInChildren<Renderer>(true));
+        _nativeStick = NativeControlModel.TryCreate(aircraft, true, _stickPivot);
+        _nativeThrottle = NativeControlModel.TryCreate(aircraft, false, _throttleHandle);
+        if (_nativeStick != null) foreach (var renderer in _fallbackStick) renderer.enabled = false;
+        if (_nativeThrottle != null) foreach (var renderer in _fallbackThrottle) renderer.enabled = false;
+    }
+    internal void SetVisible(bool visible)
+    {
+        Root.gameObject.SetActive(visible);
+        _nativeStick?.SetVisible(visible); _nativeThrottle?.SetVisible(visible);
+    }
+
     public void Update(Vector3 stick, Vector3 throttle, float travel, float angle, float pitch, float roll,
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
         bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
@@ -144,6 +164,8 @@ internal sealed class MotionControlVisuals : IDisposable
             _collectiveShaft.localScale = new Vector3(.023f, length * .5f, .023f);
             _throttleHandle.localRotation = Quaternion.LookRotation(arm, Vector3.up);
         }
+        _nativeStick?.Highlight(stickHeld || CockpitLayout.Held(CockpitLayout.Element.Stick) ? 2 : stickNear ? 1 : 0);
+        _nativeThrottle?.Highlight(throttleHeld || CockpitLayout.Held(CockpitLayout.Element.Throttle) ? 2 : throttleNear ? 1 : 0);
         _stickGrip.sharedMaterial = stickHeld ? _heldMaterial : stickNear ? _hoverMaterial : _idleMaterial;
         _throttleGrip.sharedMaterial = throttleHeld ? _heldMaterial : throttleNear ? _hoverMaterial : _idleMaterial;
         _collectiveGrip.sharedMaterial = _throttleGrip.sharedMaterial;
@@ -246,6 +268,7 @@ internal sealed class MotionControlVisuals : IDisposable
 
     public void Dispose()
     {
+        _nativeStick?.Dispose(); _nativeThrottle?.Dispose();
         Font.textureRebuilt -= RefreshFontTexture;
         if (Root != null) Object.Destroy(Root.gameObject);
         foreach (var mesh in _shadedMeshes.Values) Object.Destroy(mesh);

@@ -1,6 +1,18 @@
 using NOVR.MotionControls;
 
 var passed = 0;
+Check("VTOL-style buttons keep throttle brakes, countermeasures and target selection separate", () =>
+{
+    var layout = ThrottleBindingProfiles.Get(ThrottleBindingLayout.VtolStyle);
+    True(layout.Brake == ControllerButton.Trigger && layout.Countermeasures == ControllerButton.Primary);
+    True(layout.Target == ControllerButton.StickClick && layout.NextCountermeasure == ControllerButton.Secondary);
+    True(!ThrottleBindingProfiles.Conflicts(layout, true) && !ThrottleBindingProfiles.Conflicts(layout, false));
+});
+Check("Frame unlock button does not steal the Touch map button", () =>
+{
+    True(ControllerButtonNames.Resolve(ControllerButton.SecondaryOrNone, true) == ControllerButton.Secondary);
+    True(ControllerButtonNames.Resolve(ControllerButton.SecondaryOrNone, false) == ControllerButton.None);
+});
 var payloadTestDir = Path.Combine(Path.GetTempPath(), "novr-payload-" + Guid.NewGuid());
 Directory.CreateDirectory(payloadTestDir);
 try
@@ -42,6 +54,34 @@ void Near(float actual, float expected, float tolerance = 0.00001f)
     if (!float.IsFinite(actual) || Math.Abs(actual - expected) > tolerance)
         throw new Exception($"Expected {expected}, got {actual}");
 }
+Check("MFD pages cycle independently and wrap in both directions", () =>
+{
+    var pages = MfdPages.Cycle(MfdPage.Weapons, MfdPage.Map, true, -1);
+    True(pages.left == MfdPage.Sensor && pages.right == MfdPage.Map);
+    pages = MfdPages.Cycle(pages.left, pages.right, true, 1);
+    True(pages.left == MfdPage.Weapons && pages.right == MfdPage.Map);
+    pages = MfdPages.Cycle(pages.left, pages.right, false, 1);
+    True(pages.left == MfdPage.Weapons && pages.right == MfdPage.Flight);
+});
+Check("selecting an occupied MFD page swaps the native widgets between displays", () =>
+{
+    var pages = MfdPages.Cycle(MfdPage.Weapons, MfdPage.Map, true, 1);
+    True(pages.left == MfdPage.Map && pages.right == MfdPage.Weapons);
+    pages = MfdPages.Cycle(pages.left, pages.right, false, 1);
+    True(pages.left == MfdPage.Weapons && pages.right == MfdPage.Map);
+});
+Check("every MFD selection retains two distinct valid pages", () =>
+{
+    for (var left = 0; left < MfdPages.Count; left++)
+        for (var right = 0; right < MfdPages.Count; right++)
+            if (left != right) foreach (var side in new[] { false, true }) foreach (var direction in new[] { -1, 1 })
+            {
+                var p = MfdPages.Cycle((MfdPage)left, (MfdPage)right, side, direction);
+                True(p.left != p.right && Enum.IsDefined(p.left) && Enum.IsDefined(p.right));
+                True(MfdPages.Title(p.left) != "DISPLAY" && MfdPages.Title(p.right) != "DISPLAY");
+            }
+});
+
 GripLatch Grab()
 {
     var grip = new GripLatch();
@@ -197,7 +237,7 @@ Check("controller help resolves fallback bindings and unavailable controls", () 
 });
 Check("both throttle presets have distinct buttons on Frame and Touch profiles", () =>
 {
-    foreach (var layout in new[] { ThrottleBindingLayout.CountermeasureTrigger, ThrottleBindingLayout.BrakeTrigger })
+    foreach (var layout in new[] { ThrottleBindingLayout.CountermeasureTrigger, ThrottleBindingLayout.BrakeTrigger, ThrottleBindingLayout.VtolStyle })
     foreach (var frame in new[] { true, false })
     {
         var preset = ThrottleBindingProfiles.Get(layout);
@@ -599,11 +639,11 @@ if (args.Length == 2)
         using var reader = new StreamReader(stream);
         var json = reader.ReadToEnd();
         var runtimeAsset = CockpitPanelAsset.Load(json);
-        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 15 && runtimeAsset.materials.Length > 3);
+        True(runtimeAsset.parts.Length > 10 && runtimeAsset.groups.Length == 19 && runtimeAsset.materials.Length > 3);
         using var document = System.Text.Json.JsonDocument.Parse(json);
         var model = document.RootElement;
         var groups = model.GetProperty("groups").EnumerateArray().Select(g => g.GetProperty("name").GetString()).ToHashSet();
-        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "hover", "hover_lamp", "zoom_in", "zoom_out" })
+        foreach (var name in new[] { "static", "gear", "gear_lamps", "radar", "engine", "assist", "guard", "eject", "weapon", "map", "cm", "hover", "hover_lamp", "zoom_in", "zoom_out", "mfd_left_prev", "mfd_left_next", "mfd_right_prev", "mfd_right_next" })
             True(groups.Contains(name));
         var materials = model.GetProperty("materials").GetArrayLength();
         var triangles = 0;

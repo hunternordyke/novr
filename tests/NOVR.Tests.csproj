@@ -7,6 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../NOVR/MotionControls/MfdPages.cs" Link="MfdPages.cs" />
     <Compile Include="../NOVR/MotionControls/FlightGrip.cs" Link="FlightGrip.cs" />
     <Compile Include="../NOVR/MotionControls/FlightControlMath.cs" Link="FlightControlMath.cs" />
     <Compile Include="../NOVR/MotionControls/GuardedEjection.cs" Link="GuardedEjection.cs" />

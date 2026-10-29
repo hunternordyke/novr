@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.9**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.6.0**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -22,9 +22,10 @@ validation.
    OpenXR initialization.
 4. In a cockpit, press the throttle-hand **View** button (the thin button at the top
    of the left controller in the default layout) to open the wrist panel. Choose
-   **Place handles (3s)**; this also enables motion controls. The panel closes;
-   place both hands comfortably and wait three seconds. A short haptic pulse confirms
-   placement when the controllers support it. Release both grips before grabbing.
+   **Edit cockpit layout** to enable the controls and move the stick, throttle/collective
+   and panel independently. Release grip, then reach or point and grip the item;
+   move your hand, and rotate your wrist to rotate the panel. Open View again to
+   **Save layout** or **Cancel layout**.
 5. Use **Seat up/down/left/right/forward/back** for 2 cm adjustments. Placements and
    seat offsets save automatically for the aircraft and handedness.
 
@@ -180,48 +181,38 @@ caption stays above the lift range. Saved seat and handle placements are retaine
 
 ## Default bindings
 
-Right-handed layout: right hand = stick/pointer; left hand = throttle/wrist panel.
-The handedness setting swaps these roles. Native Frame physical labels below describe
-the default right-handed layout. In a mirrored layout, use the same *button position*
-on the opposite controller; the labels differ between hands.
+The 0.4.6.0 VTOL-style preset uses the following right-handed Frame layout.
+Combat/flight buttons work only with the corresponding handle held or latched.
 
-| Action | Native Steam Frame | Touch-compatible fallback | Context |
-| --- | --- | --- | --- |
-| Show/hide console | Wrist Console setup | F6 | Cockpit |
-| Grab flight control | Grip near handle | Grip near handle | Cockpit, motion controls enabled |
-| Fire selected weapon | Right trigger | Right trigger | Hold stick grip; release trigger before firing after a mode change |
-| Wheel / air brake | Left D-pad down | Left thumbstick click | Hold button while holding or latching throttle |
-| Countermeasures | Left trigger | Left trigger | Hold throttle grip |
-| Next weapon | Right shoulder | Right A | Hold stick; activates on button release |
-| Select target | Left shoulder | Left X | Hold throttle; selects under the head-directed target designator on release |
-| Next countermeasure | Left D-pad right | Left Y | Hold throttle; activates on release |
-| Clear targets | Right Y | Wrist panel | Hold stick for the direct binding |
-| Open/close map | Right B | Right B | Cockpit; works with grips released |
-| Open/close wrist panel | Left View | Left menu | Cockpit; works with motion controls off |
-| Click / drag menus | Right trigger / hold trigger | Right trigger / hold trigger | Menu or map visible |
-| Scroll a menu | Right thumbstick vertical | Same | Point at scrollable content |
-| Zoom map | Right thumbstick vertical | Same | Point at the map |
-| Pan map | Left thumbstick | Same | Point at the map with right controller |
-| Yaw | Right thumbstick horizontal | Same | Hold stick, flight mode |
+| Action | Frame | Touch fallback |
+| --- | --- | --- |
+| Fire | Right trigger | Right trigger |
+| Next weapon | Right A | Right A |
+| Wheel/air brake | Left trigger | Left trigger |
+| Deploy countermeasures | Left D-pad down | Left X |
+| Select target at head-directed cue | Left thumbstick click | Left thumbstick click |
+| Unlock latest target | Right X | Wrist Flight actions |
+| Clear all targets | Right Y | Wrist Flight actions |
+| Next CM type | Left D-pad right | Left Y |
+| Inspection magnifier, grip optional | Physical right bumper, hold | Shoulder button if fitted |
+| Map | Right B | Right B |
+| Wrist panel | Left View | Left menu |
 
-The menu pointer uses the stick hand. If that hand is untracked, the mouse remains
-available. Controller raycasting uses actual world-space UI surfaces, including
-normal button, dropdown, drag and scroll events. Losing tracking cancels a press
-without sending a click or drop. Trigger presses are disarmed across menu/flight
-transitions until released. Physical keyboard/HOTAS bindings remain available.
+Weapon/target/CM-type changes and unlocks act on release; fire, brake and CM
+deployment act while held. Grip release, menus and tracking loss cancel input.
+Selection requests the game's normal target selection; weapon lock still depends
+on the weapon and its native restrictions. Unlock removes the newest target first.
 
-No binding uses the system button. The headset/runtime may reserve some buttons;
-F9 remains available if the runtime does not deliver the menu/view input.
+Right bumper remains physical right when handedness is mirrored. It displays a
+mono magnified forward image at a fixed 3 m depth, while preserving the normal
+stereo view outside the window. It does not change XR projection or the sensor FOV.
+The earlier whole-view zoom was removed after uncomfortable headset convergence.
+Release hides the image. Its extra 1024×640 camera runs only while held.
 
-Bindings are editable in `BepInEx/config/deltawing.novr.cfg` under
-`[VR Controller Bindings]` while the game is closed. Button values include `Trigger`,
-`Primary`, `Secondary`, `Menu`, `Shoulder`, `Top`, `Outside`, `StickClick`, and `None`.
-`ShoulderOrPrimary` and `OutsideOrSecondary` select the native Frame button when
-available and the ordinary Touch button otherwise. `Primary` means Frame A/D-pad down;
-`Secondary` means Frame X/D-pad right. `PrimaryOrStickClick`, `PrimaryOrSecondary`
-and `SecondaryOrStickClick` adapt the throttle presets to Frame/Touch input.
-Avoid assigning conflicting actions to the same
-button. Combat bindings are distinct from the fixed trigger/menu pointer interaction.
+Use **View → Flight controls → Button bindings → VTOL-style controls** to reapply
+the preset. Original stock bindings migrate once; other custom bindings survive.
+Earlier throttle presets remain available. Right bumper is reserved for inspection
+while enabled, so custom actions assigned to that button are suppressed.
 
 ## Wrist panel and cockpit profiles
 

@@ -19,10 +19,12 @@ public class ModConfiguration
     public readonly ConfigEntry<float> HmdFollowResponse;
     public readonly MotionControls.ControllerBindings ControllerBindings;
     public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
-    public readonly ConfigEntry<bool> HudContrast, HudDeclutter;
+    public readonly ConfigEntry<bool> HudContrast, HudDeclutter, FocusedFlightHud;
+    public readonly ConfigEntry<float> FlightHudScale;
+    internal readonly ConfigEntry<MotionControls.MfdPage> LeftMfdPage, RightMfdPage;
     public readonly ConfigEntry<bool> CockpitPanelEnabled;
     public readonly ConfigEntry<Vector3> CockpitPanelPosition;
-    public readonly ConfigEntry<float> CockpitPanelTilt, CockpitPanelScale;
+    public readonly ConfigEntry<float> CockpitPanelTilt, CockpitPanelScale, CockpitPanelYaw, CockpitPanelRoll;
 
     public ModConfiguration(ConfigFile config)
     {
@@ -33,8 +35,14 @@ public class ModConfiguration
         ControllerBindings = new MotionControls.ControllerBindings(config);
         CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");
         CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Panel center relative to the recentered seat, in meters. Shared by every aircraft.");
-        CockpitPanelTilt = config.Bind("Universal Cockpit Panel", "Tilt", 20f, new ConfigDescription("Upward-facing panel tilt in degrees.", new AcceptableValueRange<float>(0, 60)));
+        CockpitPanelTilt = config.Bind("Universal Cockpit Panel", "Tilt", 20f, new ConfigDescription("Upward-facing panel tilt in degrees.", new AcceptableValueRange<float>(-90, 90)));
+        CockpitPanelYaw = config.Bind("Universal Cockpit Panel", "Yaw", 0f, new ConfigDescription("Panel yaw in degrees, set by grabbing it in Edit layout.", new AcceptableValueRange<float>(-180, 180)));
+        CockpitPanelRoll = config.Bind("Universal Cockpit Panel", "Roll", 0f, new ConfigDescription("Panel roll in degrees, set by grabbing it in Edit layout.", new AcceptableValueRange<float>(-180, 180)));
         CockpitPanelScale = config.Bind("Universal Cockpit Panel", "Scale", 1f, new ConfigDescription("Shared panel size.", new AcceptableValueRange<float>(0.65f, 1.4f)));
+        LeftMfdPage = config.Bind("Universal Cockpit Panel", "Left MFD page", global::NOVR.MotionControls.MfdPage.Weapons, "Page on the left display.");
+        RightMfdPage = config.Bind("Universal Cockpit Panel", "Right MFD page", global::NOVR.MotionControls.MfdPage.Map, "Page on the right display. Selecting an occupied page swaps the displays.");
+        FocusedFlightHud = config.Bind("VR HUD", "Focused Flight HUD", true, "Compact flight instruments and a limited forward pitch ladder. Target and missile-warning projections remain independent.");
+        FlightHudScale = config.Bind("VR HUD", "Flight HUD Scale", .38f, new ConfigDescription("Size of the focused flight instruments and pitch-ladder window.", new AcceptableValueRange<float>(.22f, .75f)));
         HudPanelScale = config.Bind("VR HUD", "Status Panel Scale", 1.15f,
             new ConfigDescription("Size of cockpit status panels; aiming markers keep their angular alignment.", new AcceptableValueRange<float>(0.8f, 1.6f)));
         HudPanelDistance = config.Bind("VR HUD", "Status Panel Distance", 4f,

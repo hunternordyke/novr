@@ -8,6 +8,7 @@ public class NOVRHMDBehavior : UIRenderedCanvasBehavior
     
     
     private float _offset = 1000;
+    private readonly System.Collections.Generic.Dictionary<Transform, Vector3> _scales = new();
 
     private void LateUpdate()
     {
@@ -20,7 +21,7 @@ public class NOVRHMDBehavior : UIRenderedCanvasBehavior
         SetLocalPosition("Speed", new Vector3(-110f, 150f, 0f)); // TODO: Patch game files and use events to set these gameobjects
         SetLocalPosition("Altitude", new Vector3(110f, 150f, 0f));
         SetLocalPosition("Bearing", new Vector3(0f, 200f, 0f));
-        SetLocalPosition("Artificial Horizon", new Vector3(0f, 150f, 0f));
+        SetLocalPosition("ArtificialHorizon", new Vector3(0f, 150f, 0f));
     }
 
     private void SetLocalPosition(string childName, Vector3 localPosition)
@@ -31,7 +32,10 @@ public class NOVRHMDBehavior : UIRenderedCanvasBehavior
             return;
         }
 
-        child.localPosition = localPosition;
+        if (!_scales.TryGetValue(child, out var originalScale)) { originalScale = child.localScale; _scales.Add(child, originalScale); }
+        var size = ModConfiguration.Instance.FocusedFlightHud.Value ? ModConfiguration.Instance.FlightHudScale.Value : 1f;
+        child.localPosition = localPosition * size;
+        child.localScale = originalScale * size;
     }
 
     private void SetLocalPositionRotationAndScale(

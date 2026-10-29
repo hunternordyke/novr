@@ -35,8 +35,10 @@ public class Core : MonoBehaviour
         gameObject.AddComponent<VrCameraManager>();
         gameObject.AddComponent<APIBus>();
         gameObject.AddComponent<MotionControls.CockpitProfiles>();
+        gameObject.AddComponent<MotionControls.CockpitLayout>();
         gameObject.AddComponent<MotionControls.MotionFlightController>();
         gameObject.AddComponent<MotionControls.ControllerActions>();
+        gameObject.AddComponent<MotionControls.CockpitViewZoom>();
         gameObject.AddComponent<VrUi.WristMenu>();
         gameObject.AddComponent<MotionControls.UniversalCockpitPanel>();
     }

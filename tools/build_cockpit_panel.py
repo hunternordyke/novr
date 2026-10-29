@@ -46,10 +46,15 @@ for x in (-.355,.355):
         cylinder('Captive screw',(x,y,-.029),.005,.003,'silver')
         box('Screw slot',(x,y,-.031),(.006,.001,.001),'black',0)
 label('FLIGHT SYSTEMS',(0,.154,-.028),.010)
-for x,name in ((-.13,'WEAPONS / CM'),(.13,'NAVIGATION')):
+for x,name in ((-.13,'LEFT MFD'),(.13,'RIGHT MFD')):
     box(name+' bezel',(x,.025,-.032),(.248,.238,.018),'black',.008)
     box(name+' screen',(x,.025,-.043),(.226,.211,.002),'black',.001)
     label(name,(x,.139,-.045),.008,'green')
+for x,side in ((-.13,'left'),(.13,'right')):
+    for dx,title,direction in ((-.055,'<','prev'),(.055,'>','next')):
+        group='mfd_'+side+'_'+direction
+        box(group,(x+dx,-.089,-.046),(.030,.014,.008),'edge',.002,group)
+        label(title,(x+dx,-.089,-.051),.011,'white',group)
 # Labeled, functional bezel keys; no decorative dead buttons.
 for x,y,title,group in ((-.249,.017,'CM','cm'),(-.249,-.060,'HOV','hover'),(.249,.066,'+','zoom_in'),(.249,-.014,'-','zoom_out')):
     box(title+' bezel key',(x,y,-.046),(.018,.025,.008),'edge',.002,group)
@@ -92,6 +97,8 @@ pivots={'gear_lamps':(0,0,0),'static':(0,0,0),'gear':(-.315,.015,-.044),'radar':
 'engine':(-.065,-.139,-.038),'assist':(.065,-.139,-.038),'weapon':(.185,-.137,-.039),
 'eject':(.315,.022,-.059),'guard':(.315,.083,-.071),'map':(.315,-.137,-.039),
 'cm':(-.249,.017,-.046),'hover':(-.249,-.060,-.046),'hover_lamp':(0,0,0),'zoom_in':(.249,.066,-.046),'zoom_out':(.249,-.014,-.046)}
+for x,side in ((-.13,'left'),(.13,'right')):
+    for dx,direction in ((-.055,'prev'),(.055,'next')): pivots['mfd_'+side+'_'+direction]=(x+dx,-.089,-.046)
 # Apply transforms, triangulate and export individual meshes grouped by animated pivot.
 parts=[]
 for obj in objects:

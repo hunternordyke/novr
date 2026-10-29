@@ -94,7 +94,7 @@ internal sealed class WristMenu : MonoBehaviour
         }
         if (_status != null)
             _status.text = (CockpitProfiles.Instance?.AircraftName ?? "Cockpit") + "\n" +
-                $"Motion controls: {(config.MotionControls.Enabled.Value ? "ON" : "OFF")}  |  HUD {config.HudPanelScale.Value:0.00}x\n" +
+                $"Motion controls: {(config.MotionControls.Enabled.Value ? "ON" : "OFF")}  |  HUD {config.FlightHudScale.Value:0.00}x\n" +
                 (MotionFlightController.Instance?.Status ?? "Waiting for cockpit");
     }
 
@@ -162,18 +162,18 @@ internal sealed class WristMenu : MonoBehaviour
         _setupPage = new GameObject("Cockpit setup", typeof(RectTransform));
         _setupPage.transform.SetParent(rect, false);
         _buttonParent = _setupPage.transform;
-        AddButton("Motion controls", 0, 0, () => config.MotionControls.Enabled.Value = !config.MotionControls.Enabled.Value);
+        AddButton("Motion controls", 0, 0, () => { CockpitLayout.Instance?.Finish(false); config.MotionControls.Enabled.Value = !config.MotionControls.Enabled.Value; });
         AddButton("Recenter view", 1, 0, () => { NOVRHeadsetData.CalibrateTranslation(); NOVRHeadsetData.CalibrateRotation(); Close(); });
-        AddButton("Place handles (3s)", 0, 1, () => { config.MotionControls.Enabled.Value = true; MotionFlightController.Instance?.SchedulePlacement(); Close(); });
-        AddButton("Reset aircraft setup", 1, 1, () => CockpitProfiles.Instance?.ResetProfile());
+        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Edit cockpit layout", 0, 1, ToggleLayout);
+        AddLiveButton(() => CockpitLayout.Active ? "Cancel layout" : "Reset aircraft setup", 1, 1, () => { if (CockpitLayout.Active) { CockpitLayout.Instance?.Finish(false); Close(); } else CockpitProfiles.Instance?.ResetProfile(); });
         AddButton("Seat up", 0, 2, () => CockpitProfiles.Instance?.MoveSeat(Vector3.up * 0.02f));
         AddButton("Seat down", 1, 2, () => CockpitProfiles.Instance?.MoveSeat(Vector3.down * 0.02f));
         AddButton("Seat left", 0, 3, () => CockpitProfiles.Instance?.MoveSeat(Vector3.left * 0.02f));
         AddButton("Seat right", 1, 3, () => CockpitProfiles.Instance?.MoveSeat(Vector3.right * 0.02f));
         AddButton("Seat forward", 0, 4, () => CockpitProfiles.Instance?.MoveSeat(Vector3.forward * 0.02f));
         AddButton("Seat back", 1, 4, () => CockpitProfiles.Instance?.MoveSeat(Vector3.back * 0.02f));
-        AddButton("HUD smaller", 0, 5, () => config.HudPanelScale.Value -= 0.05f);
-        AddButton("HUD larger", 1, 5, () => config.HudPanelScale.Value += 0.05f);
+        AddButton("Flight HUD smaller", 0, 5, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value -= .04f; });
+        AddButton("Flight HUD larger", 1, 5, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value += .04f; });
         AddButton("Toggle backplates", 0, 6, () => config.HudContrast.Value = !config.HudContrast.Value);
         AddButton("Toggle declutter", 1, 6, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
         AddButton("Flight controls", 0, 7, () => { _setupPage.SetActive(false); _controlsPage!.SetActive(true); });
@@ -190,11 +190,12 @@ internal sealed class WristMenu : MonoBehaviour
         _assistButton = assistLabel.transform.parent.GetComponent<Button>();
         _liveLabels.Add((assistLabel, () => GameManager.GetLocalAircraft(out var a) && a.GetControlsFilter()?.HasFlightAssist() == true
             ? "Toggle flight assist" : "Assist: not switchable"));
-        AddButton("Clear targets", 0, 3, () => SceneSingleton<CombatHUD>.i?.DeselectAll());
+        AddButton("Unlock last target", 1, 7, () => { SceneSingleton<CombatHUD>.i?.DeselectLast(); Close(); });
+        AddButton("Clear targets", 0, 3, () => { SceneSingleton<CombatHUD>.i?.DeselectAll(); Close(); });
         AddButton("Tactical map", 1, 3, ControllerActions.ToggleMap);
         AddButton("HUD nearer", 0, 4, () => config.HudPanelDistance.Value -= 0.5f);
         AddButton("HUD farther", 1, 4, () => config.HudPanelDistance.Value += 0.5f);
-        AddButton("Reset HUD", 0, 5, () => { config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4f; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
+        AddButton("Reset HUD", 0, 5, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4f; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
         AddButton("Mirror handedness", 1, 5, () => { config.MotionControls.LeftHanded.Value = !config.MotionControls.LeftHanded.Value; Close(); });
         AddButton("Eject...", 0, 6, AskToEject);
         AddButton("Console setup", 1, 6, () => { _flightPage.SetActive(false); _consolePage!.SetActive(true); });
@@ -202,7 +203,6 @@ internal sealed class WristMenu : MonoBehaviour
         _hoverButton = hoverLabel.transform.parent.GetComponent<Button>();
         _liveLabels.Add((hoverLabel, () => !GameManager.GetLocalAircraft(out var a) || a.GetControlsFilter()?.HasAutoHover() != true
             ? "Hover: not fitted" : a.radarAlt < 1f ? "Hover: ground locked" : $"Hover assist: {(a.IsAutoHoverEnabled() ? "ON" : "OFF")}"));
-        Label(_flightPage.transform, "Actions close this panel.\nRelease grips to use it.", new Vector2(132, -222), new Vector2(248, 49), 16);
         _flightPage.SetActive(false);
         _ejectPage = new GameObject("Confirm ejection", typeof(RectTransform));
         _ejectPage.transform.SetParent(rect, false);
@@ -214,8 +214,8 @@ internal sealed class WristMenu : MonoBehaviour
         _consolePage = new GameObject("Universal console setup", typeof(RectTransform));
         _consolePage.transform.SetParent(rect, false);
         _buttonParent = _consolePage.transform;
-        AddButton("Show / hide console", 0, 0, () => config.CockpitPanelEnabled.Value = !config.CockpitPanelEnabled.Value);
-        AddButton("Reset console", 1, 0, () => { config.CockpitPanelPosition.Value = new Vector3(0, -.32f, .65f); config.CockpitPanelTilt.Value = 20; config.CockpitPanelScale.Value = 1; config.CockpitPanelEnabled.Value = true; });
+        AddButton("Show / hide console", 0, 0, () => { CockpitLayout.Instance?.Finish(false); config.CockpitPanelEnabled.Value = !config.CockpitPanelEnabled.Value; });
+        AddButton("Reset console", 1, 0, () => { config.CockpitPanelPosition.Value = new Vector3(0, -.32f, .65f); config.CockpitPanelTilt.Value = 20; config.CockpitPanelYaw.Value = config.CockpitPanelRoll.Value = 0; config.CockpitPanelScale.Value = 1; config.CockpitPanelEnabled.Value = true; });
         AddButton("Panel up", 0, 1, () => MoveConsole(Vector3.up * .02f));
         AddButton("Panel down", 1, 1, () => MoveConsole(Vector3.down * .02f));
         AddButton("Panel left", 0, 2, () => MoveConsole(Vector3.left * .02f));
@@ -226,7 +226,8 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("Tilt down", 1, 4, () => config.CockpitPanelTilt.Value -= 5);
         AddButton("Panel smaller", 0, 5, () => config.CockpitPanelScale.Value -= .05f);
         AddButton("Panel larger", 1, 5, () => config.CockpitPanelScale.Value += .05f);
-        Label(_consolePage.transform, "One layout and position for every aircraft.\nAdjustments preview on the console.\nF6 also shows/hides it.", new Vector2(0, -193), new Vector2(510, 105), 20);
+        AddLiveButton(() => CockpitLayout.Active ? "Save layout" : "Grab to position", 0, 6, ToggleLayout);
+        Label(_consolePage.transform, "Panel placement is shared by every aircraft.\nHandle positions are saved per aircraft.\nGrab to move; open View again to save/cancel.", new Vector2(0, -223), new Vector2(510, 65), 16);
         _consolePage.SetActive(false);
         _controlsPage = new GameObject("Motion control feel", typeof(RectTransform));
         _controlsPage.transform.SetParent(rect, false); _buttonParent = _controlsPage.transform;
@@ -250,13 +251,14 @@ internal sealed class WristMenu : MonoBehaviour
         _controlsPage.SetActive(false);
         _helpPage = new GameObject("Controller help", typeof(RectTransform));
         _helpPage.transform.SetParent(rect, false);
-        _bindingHelp = Label(_helpPage.transform, "", new Vector2(0, -8), new Vector2(510, 470), 20);
+        _bindingHelp = Label(_helpPage.transform, "", new Vector2(0, -8), new Vector2(510, 470), 18);
         _helpPage.SetActive(false);
         _bindingsPage = new GameObject("Throttle button layouts", typeof(RectTransform));
         _bindingsPage.transform.SetParent(rect, false); _buttonParent = _bindingsPage.transform;
         AddButton("Trigger: CMs", 0, 0, () => { config.ControllerBindings.ApplyThrottleLayout(ThrottleBindingLayout.CountermeasureTrigger); _nextHelpRefresh = 0; });
         AddButton("Trigger: brakes", 1, 0, () => { config.ControllerBindings.ApplyThrottleLayout(ThrottleBindingLayout.BrakeTrigger); _nextHelpRefresh = 0; });
-        _bindingsInfo = Label(_bindingsPage.transform, "", new Vector2(0, -15), new Vector2(510, 300), 20);
+        AddButton("VTOL-style controls", 0, 1, () => { config.ControllerBindings.ApplyVtolStyle(); _nextHelpRefresh = 0; });
+        _bindingsInfo = Label(_bindingsPage.transform, "", new Vector2(0, -42), new Vector2(510, 250), 17);
         AddButton("Controls help", 0, 7, () => ShowHelp(_bindingsPage));
         _bindingsPage.SetActive(false);
         _buttonParent = rect;
@@ -278,11 +280,17 @@ internal sealed class WristMenu : MonoBehaviour
         LayerHelper.SetLayerRecursive(_panel.transform, LayerHelper.GetVrUiLayer());
     }
 
+    private static void ToggleLayout()
+    {
+        if (CockpitLayout.Active) { CockpitLayout.Instance?.Finish(true); Close(); }
+        else CockpitLayout.Instance?.Begin();
+    }
+
     private static void MoveConsole(Vector3 delta)
     {
         var position = ModConfiguration.Instance.CockpitPanelPosition;
         var p = position.Value + delta;
-        position.Value = new Vector3(Mathf.Clamp(p.x, -.5f, .5f), Mathf.Clamp(p.y, -.75f, .15f), Mathf.Clamp(p.z, .3f, 1.2f));
+        position.Value = CockpitLayout.BoundPanel(p);
     }
 
     private void ShowHelp(GameObject from)
@@ -298,14 +306,15 @@ internal sealed class WristMenu : MonoBehaviour
         var layout = ThrottleBindingProfiles.Identify(buttons);
         var wristConflict = ThrottleBindingProfiles.SharesButton(config.ControllerBindings.WristMenu.Value, frame,
             buttons.Brake, buttons.Countermeasures, buttons.Target, buttons.NextCountermeasure);
-        string Name(ControllerButton value) => ControllerButtonNames.Describe(value, left, frame);
+        string Name(ControllerButton value) => !left && config.ControllerBindings.RightBumperZoom.Value && ControllerButtonNames.Resolve(value, frame) == ControllerButton.Shoulder
+            ? "Reserved for zoom" : ControllerButtonNames.Describe(value, left, frame);
         return $"{(left ? "LEFT" : "RIGHT")} HAND • THROTTLE\n" +
-            "Layout: " + (layout == ThrottleBindingLayout.CountermeasureTrigger ? "Countermeasure trigger" : layout == ThrottleBindingLayout.BrakeTrigger ? "Brake trigger" : "Custom") +
+            "Layout: " + (layout == ThrottleBindingLayout.VtolStyle ? "VTOL-style trigger brake" : layout == ThrottleBindingLayout.CountermeasureTrigger ? "Countermeasure trigger" : layout == ThrottleBindingLayout.BrakeTrigger ? "Brake trigger" : "Custom") +
             $"\n\nBrake: {Name(buttons.Brake)} (hold)\nCountermeasures: {Name(buttons.Countermeasures)}\n" +
             $"Select target: {Name(buttons.Target)} (release)\nCM type: {Name(buttons.NextCountermeasure)} (release)\n\n" +
             (wristConflict ? "Wrist button overlaps; edit custom binding.\n" :
                 ThrottleBindingProfiles.Conflicts(buttons, frame) ? "Shared buttons detected; choose a layout.\n" : "") +
-            "Use these buttons while holding the throttle.\nThe two choices replace only this hand's\nbrake, CM and target-selection bindings.";
+            "Use these buttons while holding the throttle.\nVTOL style also sets stick trigger/A and RB zoom.\nRight bumper is reserved while zoom is enabled.";
     }
 
     private string BindingsHelp()
@@ -313,11 +322,13 @@ internal sealed class WristMenu : MonoBehaviour
         var config = ModConfiguration.Instance;
         var stickLeft = config.MotionControls.LeftHanded.Value;
         var bindings = config.ControllerBindings;
-        string Button(ControllerButton button, bool left) => ControllerButtonNames.Describe(button, left, TrackedControllers.NativeFrame(left));
+        string Button(ControllerButton button, bool left) => !left && bindings.RightBumperZoom.Value && ControllerButtonNames.Resolve(button, TrackedControllers.NativeFrame(left)) == ControllerButton.Shoulder
+            ? "Reserved for zoom" : ControllerButtonNames.Describe(button, left, TrackedControllers.NativeFrame(left));
         return $"{(stickLeft ? "LEFT" : "RIGHT")} HAND • STICK\n" +
             $"Fire: {Button(bindings.Fire.Value, stickLeft)}\n" +
             $"Next weapon: {Button(bindings.NextWeapon.Value, stickLeft)} (release)\n" +
-            $"Clear targets: {Button(bindings.ClearTargets.Value, stickLeft)}\n\n" +
+            $"Unlock last: {Button(bindings.UnlockTarget.Value, stickLeft)}\n" +
+            $"Clear all: {Button(bindings.ClearTargets.Value, stickLeft)}\n\n" +
             $"{(stickLeft ? "RIGHT" : "LEFT")} HAND • THROTTLE\n" +
             $"Brake: {Button(bindings.Brake.Value, !stickLeft)} (hold)\n" +
             $"Countermeasures: {Button(bindings.Countermeasures.Value, !stickLeft)}\n" +
@@ -325,6 +336,7 @@ internal sealed class WristMenu : MonoBehaviour
             $"CM type: {Button(bindings.NextCountermeasure.Value, !stickLeft)}\n\n" +
             $"Map: {(stickLeft ? "Left" : "Right")} {Button(bindings.Map.Value, stickLeft)}\n" +
             $"Wrist panel: {(stickLeft ? "Right" : "Left")} {Button(bindings.WristMenu.Value, !stickLeft)}\n\n" +
+            (bindings.RightBumperZoom.Value ? "Right bumper: HOLD MAGNIFIER (grip optional).\n" : "Right bumper zoom: OFF.\n") +
             "Combat buttons need a held or latched handle.\nFree hand: point + trigger for menus/console.\nRelease triggers and grips after menus.\nRelease handles; hold both thumbstick clicks to place.";
     }
 

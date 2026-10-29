@@ -4,10 +4,18 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-NOVR Motion Prototype **0.4.5.8** adds a tracked-controller stick and throttle,
+NOVR Motion Prototype **0.4.6.0** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
-The shared 3D console puts live weapons, countermeasures and the minimap beside
-physical gear, radar, engine, flight-assist and guarded eject controls.
+The shared 3D console combines seven selectable MFD pages with physical gear,
+radar, engine, flight-assist and guarded eject controls. View → Edit cockpit layout
+lets either hand move the panel, stick and throttle independently. Native aircraft
+handle models replace the stationary originals while active; helicopter collective
+defaults are lower than the stick. A compact forward HUD reduces visual clutter.
+
+VTOL-style bindings use stick trigger/action for fire/weapon, and throttle
+trigger/action for brakes/countermeasures. Target select, unlock-last and clear-all
+are grip-gated. Physical right bumper opens a fixed-depth inspection magnifier
+with either grip released or held; it does not change headset stereo projection.
 
 Optional tap-to-latch grips, adjustable control response, a live binding guide,
 wheel/air brakes and readable handle captions support flying without a keyboard.

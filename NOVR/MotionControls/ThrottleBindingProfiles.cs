@@ -1,6 +1,6 @@
 namespace NOVR.MotionControls;
 
-internal enum ThrottleBindingLayout { CountermeasureTrigger, BrakeTrigger, Custom }
+internal enum ThrottleBindingLayout { CountermeasureTrigger, BrakeTrigger, Custom, VtolStyle }
 
 internal readonly struct ThrottleButtons
 {
@@ -13,6 +13,8 @@ internal static class ThrottleBindingProfiles
 {
     internal static ThrottleButtons Get(ThrottleBindingLayout layout) => layout switch
     {
+        ThrottleBindingLayout.VtolStyle => new(ControllerButton.Trigger, ControllerButton.Primary,
+            ControllerButton.StickClick, ControllerButton.Secondary),
         ThrottleBindingLayout.CountermeasureTrigger => new(ControllerButton.PrimaryOrStickClick, ControllerButton.Trigger,
             ControllerButton.ShoulderOrPrimary, ControllerButton.Secondary),
         ThrottleBindingLayout.BrakeTrigger => new(ControllerButton.Trigger, ControllerButton.ShoulderOrPrimary,
@@ -21,7 +23,7 @@ internal static class ThrottleBindingProfiles
     };
     internal static ThrottleBindingLayout Identify(ThrottleButtons buttons)
     {
-        foreach (var layout in new[] { ThrottleBindingLayout.CountermeasureTrigger, ThrottleBindingLayout.BrakeTrigger })
+        foreach (var layout in new[] { ThrottleBindingLayout.VtolStyle, ThrottleBindingLayout.CountermeasureTrigger, ThrottleBindingLayout.BrakeTrigger })
         {
             var preset = Get(layout);
             if (buttons.Brake == preset.Brake && buttons.Countermeasures == preset.Countermeasures &&
