@@ -37,6 +37,8 @@ internal sealed class MfdPageMenu
         AddKey(bar, header, -1);
         _menu = Rect(screen, "MFD page choices", Vector2.zero, new Vector2(215, 180));
         _menu.localPosition += Vector3.back * 2;
+        var visibility = _menu.gameObject.AddComponent<CanvasGroup>();
+        visibility.ignoreParentGroups = true; visibility.blocksRaycasts = false;
         _menu.gameObject.AddComponent<Image>().color = new Color(.015f, .035f, .04f, 1);
         for (var i = 0; i <= MfdPages.Count; i++)
         {

@@ -22,11 +22,14 @@ internal sealed class FocusedFlightHud : MonoBehaviour
             _nextFind = Time.unscaledTime + .5f;
             foreach (var manager in _hud.GetComponentsInChildren<HUDAppManager>(true))
                 if (!_instruments.ContainsKey(manager.transform))
+                {
                     _instruments.Add(manager.transform, (manager.transform.localPosition, manager.transform.localScale));
+                    InstrumentBrightness.Add(manager.transform);
+                }
             if (_compass == null)
             {
                 _compass = _hud.GetHUDCenter().Find("compass");
-                if (_compass != null) { _compassPosition = _compass.localPosition; _compassScale = _compass.localScale; }
+                if (_compass != null) { InstrumentBrightness.Add(_compass); _compassPosition = _compass.localPosition; _compassScale = _compass.localScale; }
             }
         }
         var scale = ModConfiguration.Instance.FocusedFlightHud.Value ? ModConfiguration.Instance.FlightHudScale.Value : 1f;

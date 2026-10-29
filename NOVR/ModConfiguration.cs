@@ -20,7 +20,7 @@ public class ModConfiguration
     public readonly MotionControls.ControllerBindings ControllerBindings;
     public readonly ConfigEntry<float> HudPanelScale, HudPanelDistance;
     public readonly ConfigEntry<bool> HudContrast, HudDeclutter, FocusedFlightHud;
-    public readonly ConfigEntry<float> FlightHudScale;
+    public readonly ConfigEntry<float> FlightHudScale, InstrumentBrightness, MfdBrightness;
     internal readonly ConfigEntry<MotionControls.MfdPage> LeftMfdPage, RightMfdPage;
     public readonly ConfigEntry<bool> CockpitPanelEnabled;
     public readonly ConfigEntry<Vector3> CockpitPanelPosition;
@@ -41,6 +41,10 @@ public class ModConfiguration
         CockpitPanelScale = config.Bind("Universal Cockpit Panel", "Scale", 1f, new ConfigDescription("Automatic dashboard-fit size multiplier, also used for fallback placement. Manual panel sizes are saved per aircraft.", new AcceptableValueRange<float>(0.65f, 1.4f)));
         LeftMfdPage = config.Bind("Universal Cockpit Panel", "Left MFD page", global::NOVR.MotionControls.MfdPage.Weapons, "Page on the left display.");
         RightMfdPage = config.Bind("Universal Cockpit Panel", "Right MFD page", global::NOVR.MotionControls.MfdPage.Map, "Page on the right display. Selecting an occupied page swaps the displays.");
+        InstrumentBrightness = config.Bind("VR HUD", "Instrument Brightness", 1f,
+            new ConfigDescription("Brightness of flight instruments, compass and pitch ladder only. Target/flight-path markers and missile warnings retain their native brightness.", new AcceptableValueRange<float>(.35f, 1f)));
+        MfdBrightness = config.Bind("Universal Cockpit Panel", "Display Brightness", 1f,
+            new ConfigDescription("Brightness of MFD content, including native instrument/camera pages. Headers, page choices, weapon safety/readout and external warning indicators stay readable.", new AcceptableValueRange<float>(.35f, 1f)));
         FocusedFlightHud = config.Bind("VR HUD", "Focused Flight HUD", true, "Compact flight instruments and a limited forward pitch ladder. Target and missile-warning projections remain independent.");
         FlightHudScale = config.Bind("VR HUD", "Flight HUD Scale", .38f, new ConfigDescription("Size of the focused flight instruments and pitch-ladder window.", new AcceptableValueRange<float>(.22f, .75f)));
         HudPanelScale = config.Bind("VR HUD", "Status Panel Scale", 1.15f,

@@ -1,6 +1,56 @@
 using NOVR.MotionControls;
 
 var passed = 0;
+Check("Idle pointer prefers an actionable control over the other hand's background", () =>
+{
+    foreach (var left in new[] { false, true })
+    {
+        var p = new PointerHandSelection();
+        p.Update(!left, true, 0, true, true, 0, true, left ? 2 : 1, left ? 1 : 2);
+        True(p.Left == left && !p.Trigger.Pressed);
+        p.Update(!left, true, left ? 1 : 0, true, true, left ? 0 : 1, true);
+        True(p.Left == left && p.Trigger.Pressed);
+        p.Update(!left, true, left ? 1 : 0, true, true, left ? 0 : 1, true, left ? 1 : 2, left ? 2 : 1);
+        True(p.Left == left && p.Trigger.Held);
+        p.Update(!left, true, 0, true, true, 0, true, left ? 1 : 2, left ? 2 : 1);
+        True(p.Left == left && p.Trigger.Released);
+        p.Update(!left, true, 0, true, true, 0, true, left ? 1 : 2, left ? 2 : 1);
+        True(p.Left != left && !p.Trigger.Pressed);
+    }
+});
+Check("Priority changes cannot convert a held non-owner trigger to a click", () =>
+{
+    var p = new PointerHandSelection();
+    p.Update(false, true, 1, true, true, 0, true, 1, 2);
+    p.Update(false, true, 1, true, true, 0, true, 2, 1);
+    True(!p.Left && !p.Trigger.Pressed);
+    p.Update(false, true, 0, true, true, 0, true, 2, 1);
+    True(p.Left && !p.Trigger.Pressed);
+    p.Update(false, true, 1, true, true, 0, true, 2, 1);
+    True(p.Left && p.Trigger.Pressed);
+});
+Check("Weapon readout never equates target selection with a lock", () =>
+{
+    foreach (var count in new[] { -1, 0, 1, 8 })
+    {
+        var readout = WeaponReadout.Describe(count, true, false, 4, false, true, null);
+        True(readout.text == Math.Max(0, count) + " SELECTED · LOADED" && !readout.caution);
+    }
+    True(WeaponReadout.Describe(0, true, false, 4, false, true, "SHOOT").text == "0 SELECTED · LOADED");
+    True(WeaponReadout.Describe(1, true, false, 4, false, true, "NOT LASED").text == "1 SELECTED · NOT LASED");
+    True(WeaponReadout.Describe(1, true, false, 4, false, true, "SHOOT").text == "1 SELECTED · SHOOT");
+});
+Check("Weapon safety, ammunition and reload constraints precede native guidance", () =>
+{
+    var safety = WeaponReadout.Describe(2, true, true, 4, false, true, "SHOOT");
+    True(safety.text == "2 SELECTED · SAFETY ON" && safety.caution);
+    True(WeaponReadout.Describe(1, true, false, 0, false, true, "SHOOT").text == "1 SELECTED · EMPTY");
+    True(WeaponReadout.Describe(1, true, false, 4, true, false, "SHOOT").text == "1 SELECTED · RELOADING");
+    True(WeaponReadout.Describe(1, true, false, 4, false, false, "SHOOT").text == "1 SELECTED · NOT READY");
+    True(WeaponReadout.Describe(1, false, false, 0, false, false, null).text == "1 SELECTED · NO WEAPON");
+    // One mount can reload while another is already available.
+    True(WeaponReadout.Describe(1, true, false, 4, true, true, "SHOOT").text == "1 SELECTED · SHOOT");
+});
 Check("Menu history returns shared help to its source and clears confirmations on Home", () =>
 {
     var h = new MenuHistory<string>("Home");

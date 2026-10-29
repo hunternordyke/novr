@@ -10,7 +10,7 @@ internal sealed class PointerHandSelection
     internal ControllerButtonGate Trigger => Left ? _left : _right;
 
     internal void Update(bool preferLeft, bool leftAvailable, float leftTrigger, bool leftTarget,
-        bool rightAvailable, float rightTrigger, bool rightTarget)
+        bool rightAvailable, float rightTrigger, bool rightTarget, int leftPriority = 1, int rightPriority = 1)
     {
         _left.Update(leftAvailable, leftTrigger);
         _right.Update(rightAvailable, rightTrigger);
@@ -21,8 +21,12 @@ internal sealed class PointerHandSelection
         var target = Left ? leftTarget : rightTarget;
         var otherAvailable = Left ? rightAvailable : leftAvailable;
         var otherTarget = Left ? rightTarget : leftTarget;
+        var priority = Left ? leftPriority : rightPriority;
+        var otherPriority = Left ? rightPriority : leftPriority;
+        var otherValue = Left ? rightTrigger : leftTrigger;
+        var otherIdle = FlightControlMath.IsFinite(otherValue) && otherValue <= .35f;
         if (otherAvailable && (other.Pressed && otherTarget ||
-            !other.Held && (!available || !target && otherTarget))) Left = !Left;
+            !other.Held && otherIdle && (!available || otherTarget && (!target || otherPriority > priority)))) Left = !Left;
     }
 
     internal void Reset()

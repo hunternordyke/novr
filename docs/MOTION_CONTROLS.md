@@ -569,3 +569,33 @@ and menu ejection retain their confirmation pages; leaving them clears the pendi
 confirmation. No simulated-input helper is included or running. This release's
 hand geometry was inspected offline on representative grips; wearer alignment and
 native aircraft fit still need headset testing.
+
+## 0.4.6.4 — display brightness and clearer targeting feedback
+
+Open **View → Comfort & display → HUD & display → Brightness**. MFD content and
+HUD flight instruments adjust independently from 35–100%, in 10-point steps.
+Day restores both to 100%; Night sets MFD content to 45% and HUD instruments to
+50%. New settings default to 100%, preserving the existing appearance until changed.
+HUD dimming covers flight instruments, compass and pitch ladder. World target
+markers, the flight-path marker and forward missile alerts retain native brightness.
+MFD page headers/choices, the Weapons readout, its SAFE label, and physical console
+warning lamps are outside the content dimmer. Native systems-page instruments
+and their built-in warnings dim with that page. Close View to inspect the result.
+
+The Weapons page adds a compact **N SELECTED · STATUS** line. The count comes from
+the game's selected-target list. Status prioritizes NO WEAPON, SAFETY ON, EMPTY,
+RELOADING and NOT READY. Otherwise it mirrors a currently visible missile/laser
+HUD cue such as OUT OF RANGE, NOT LASED or SHOOT, or shows LOADED. LOADED describes
+ammunition/reload availability only. Selection, LOADED and native SHOOT are not
+proof of seeker lock or guaranteed launch success; normal game restrictions remain.
+Hidden or mismatched weapon cues are ignored. Readout refresh is limited to 10 Hz.
+
+When neither hand is pressing, the menu pointer prefers a usable button, scroll
+control or expanded map over the other hand's blank background. It stays with its
+current hand when priorities tie. Held clicks/drags keep ownership through release;
+a trigger already held on entry cannot create a new click when priority changes.
+
+The engine's independent UI opacity multipliers preserve native per-widget colors
+and fades; selected controls opt out of the parent dimmer. This follows the
+[Unity Canvas Group documentation](https://docs.unity3d.com/2022.3/Documentation/Manual/class-CanvasGroup.html).
+Brightness perception and third-party instrument behavior still need headset checks.

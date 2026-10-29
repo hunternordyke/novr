@@ -19,7 +19,7 @@ internal sealed class WristMenu : MonoBehaviour
     private GameObject? _panel;
     private Text? _status;
     private Font? _font;
-    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage;
+    private GameObject? _setupPage, _flightPage, _ejectPage, _consolePage, _controlsPage, _helpPage, _bindingsPage, _handsPage, _resetPage, _homePage, _seatPage, _comfortPage, _alignmentPage, _displayPage, _feedbackPage, _brightnessPage;
     private readonly Dictionary<GameObject, string> _pageTitles = new();
     private MenuHistory<GameObject>? _history;
     private Button? _backButton;
@@ -375,9 +375,20 @@ internal sealed class WristMenu : MonoBehaviour
         AddButton("HUD farther", 1, 1, () => config.HudPanelDistance.Value += .5f);
         AddLiveButton(() => "Backplates: " + (config.HudContrast.Value ? "ON" : "OFF"), 0, 2, () => config.HudContrast.Value = !config.HudContrast.Value);
         AddLiveButton(() => "Declutter: " + (config.HudDeclutter.Value ? "ON" : "OFF"), 1, 2, () => config.HudDeclutter.Value = !config.HudDeclutter.Value);
+        AddButton("Brightness", 0, 3, () => ShowPage(_brightnessPage!));
         AddButton("Reset HUD", 0, 4, () => { config.FocusedFlightHud.Value = true; config.FlightHudScale.Value = .38f; config.HudPanelScale.Value = 1.15f; config.HudPanelDistance.Value = 4; config.HudContrast.Value = true; config.HudDeclutter.Value = false; });
         var displayInfo = Label(_displayPage.transform, "", new Vector2(0,-180), new Vector2(510,125), 19);
         _liveLabels.Add((displayInfo, () => $"Flight HUD size {config.FlightHudScale.Value*100:0}%\nStatus-panel depth {config.HudPanelDistance.Value:0.0} m\nDepth changes preserve apparent size."));
+
+        _brightnessPage = Page("BRIGHTNESS");
+        AddButton("MFD dimmer", 0, 0, () => config.MfdBrightness.Value -= .1f);
+        AddButton("MFD brighter", 1, 0, () => config.MfdBrightness.Value += .1f);
+        AddButton("HUD dimmer", 0, 1, () => config.InstrumentBrightness.Value -= .1f);
+        AddButton("HUD brighter", 1, 1, () => config.InstrumentBrightness.Value += .1f);
+        AddButton("Day preset", 0, 3, () => { config.InstrumentBrightness.Value = 1; config.MfdBrightness.Value = 1; });
+        AddButton("Night preset", 1, 3, () => { config.InstrumentBrightness.Value = .5f; config.MfdBrightness.Value = .45f; });
+        var lightInfo = Label(_brightnessPage.transform, "", new Vector2(0,-137), new Vector2(510,215), 19);
+        _liveLabels.Add((lightInfo, () => $"MFD content {config.MfdBrightness.Value*100:0}%\nHUD instruments {config.InstrumentBrightness.Value*100:0}%\n\nHUD: flight instruments, compass and pitch ladder.\nTarget markers and missile alerts keep native brightness.\nMFD page buttons and weapon readout stay readable.\nClose View to inspect the displays."));
 
         _feedbackPage = Page("FEEDBACK");
         AddButton("Quieter sounds", 0, 0, () => motion.InteractionVolume.Value -= .1f);

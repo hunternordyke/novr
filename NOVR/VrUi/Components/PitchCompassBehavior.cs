@@ -110,6 +110,7 @@ public class PitchCompassBehavior : MonoBehaviour
         var sourceRectTransform = _sourcePitchCompass.rectTransform;
         _fullTextureDisplayHeight = sourceRectTransform.rect.height / _sourcePitchCompass.uvRect.height;
         _sliceRoot = CreateSliceRoot(sourceRectTransform);
+        InstrumentBrightness.Add(_sliceRoot);
 
         for (var sliceIndex = 0; sliceIndex < FullPitchStepCount; sliceIndex++)
         {

@@ -59,6 +59,8 @@ internal sealed class CockpitPanelHud
                     safety.color = new Color(.4f, .3f, .03f, .18f);
                     _safeLabel = Label(widget, "SAFE", new Vector2(80, 33), new Vector2(70, 24), 17);
                     _safeLabel.color = new Color(1f, .75f, .2f);
+                    var visibility = _safeLabel.gameObject.AddComponent<CanvasGroup>();
+                    visibility.ignoreParentGroups = true; visibility.blocksRaycasts = false;
                     var label = _safeLabel;
                     _restoreLayout.Add(() =>
                     {
@@ -141,6 +143,10 @@ internal sealed class CockpitPanelHud
     private readonly List<Dock> _nativeDocks = new();
     private readonly List<GameObject> _nativeSlots = new();
     private readonly Transform _canvas;
+    private readonly CanvasGroup[] _brightness = new CanvasGroup[2];
+    private readonly NativeWeaponReadout _weaponReadout = new();
+    private readonly Text _targetStatus;
+    private float _nextReadout, _lastBrightness = -1;
     private readonly RectTransform _weapons, _map;
     private readonly RectTransform[] _screens = new RectTransform[2];
     private readonly MfdPageMenu[] _pageMenus = new MfdPageMenu[2];
@@ -209,6 +215,7 @@ internal sealed class CockpitPanelHud
             _screens[i] = Rect("MFD " + i, _canvas, new Vector2(x, 20), new Vector2(215, 180));
             _screens[i].localPosition += Vector3.back * 46;
             _screens[i].gameObject.AddComponent<RectMask2D>();
+            _brightness[i] = _screens[i].gameObject.AddComponent<CanvasGroup>();
             _headers[i] = Label(_canvas, "", new Vector2(x, 120), new Vector2(212, 18), 12);
             _headers[i].rectTransform.localPosition += Vector3.back * 46;
             _numbers[i] = Label(_canvas, "", new Vector2(x, -89), new Vector2(45, 14), 10);
@@ -219,11 +226,15 @@ internal sealed class CockpitPanelHud
             _feeds[i] = feed.gameObject.AddComponent<RawImage>(); _feeds[i].raycastTarget = false; _feeds[i].enabled = false;
         }
         _weapons = Rect("Weapons page", _canvas, Vector2.zero, new Vector2(215, 180));
-        Slot("weaponPanel", _weapons, new Vector2(0, 48), new Vector2(212, 78));
-        Slot("countermeasuresBackground", _weapons, new Vector2(0, -10), new Vector2(212, 36));
-        Slot("PowerPanel", _weapons, new Vector2(0, -43), new Vector2(212, 25));
-        Slot("GridAircraft", _weapons, new Vector2(25, -76), new Vector2(150, 18));
-        Label(_weapons, "GRID", new Vector2(-72, -76), new Vector2(50, 20), 11);
+        _targetStatus = Label(_weapons, "", new Vector2(0, 79), new Vector2(212, 18), 11);
+        _targetStatus.supportRichText = false;
+        var readoutVisibility = _targetStatus.gameObject.AddComponent<CanvasGroup>();
+        readoutVisibility.ignoreParentGroups = true; readoutVisibility.blocksRaycasts = false;
+        Slot("weaponPanel", _weapons, new Vector2(0, 32), new Vector2(212, 72));
+        Slot("countermeasuresBackground", _weapons, new Vector2(0, -25), new Vector2(212, 32));
+        Slot("PowerPanel", _weapons, new Vector2(0, -55), new Vector2(212, 20));
+        Slot("GridAircraft", _weapons, new Vector2(25, -80), new Vector2(150, 16));
+        Label(_weapons, "GRID", new Vector2(-72, -80), new Vector2(50, 16), 11);
         _map = Rect("Map page", _canvas, Vector2.zero, new Vector2(215, 180));
         Slot("map", _map, Vector2.zero, new Vector2(215, 180));
         LayerHelper.SetLayerRecursive(_canvas, LayerHelper.GetVrUiLayer());
@@ -346,6 +357,18 @@ internal sealed class CockpitPanelHud
         foreach (var dock in _docks.Values) dock.Fit();
         foreach (var dock in _nativeDocks) dock.Fit();
         UpdateSlave();
+        if (_lastBrightness != config.MfdBrightness.Value)
+        {
+            _lastBrightness = config.MfdBrightness.Value;
+            for (var i = 0; i < 2; i++) _brightness[i].alpha = _lastBrightness;
+        }
+        if (_weapons.gameObject.activeInHierarchy && Time.unscaledTime >= _nextReadout)
+        {
+            _nextReadout = Time.unscaledTime + .1f;
+            var readout = _weaponReadout.Read(aircraft);
+            if (_targetStatus.text != readout.text) _targetStatus.text = readout.text;
+            _targetStatus.color = readout.caution ? new Color(1, .75f, .2f) : new Color(.55f, .9f, .7f);
+        }
         var available = PageAvailability();
         for (var i = 0; i < 2; i++)
         {
@@ -438,6 +461,7 @@ internal sealed class CockpitPanelHud
     internal void Restore()
     {
         ClosePageMenus();
+        _targetStatus.text = ""; _nextReadout = 0;
         _slave = -1; _mapPan = Vector2.zero; _recenter.Reset();
         RestoreNative(); foreach (var dock in _docks.Values) dock.Restore(); _docks.Clear(); _nextFind = 0;
         _left = _right = (MfdPage)(-1); _aircraft = null; _apps = Array.Empty<HUDApp>(); _tac = null;

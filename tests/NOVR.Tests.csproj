@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../NOVR/MotionControls/InteractionSoundWave.cs" Link="InteractionSoundWave.cs" />
+    <Compile Include="../NOVR/MotionControls/WeaponReadout.cs" Link="WeaponReadout.cs" />
     <Compile Include="../NOVR/MotionControls/MenuHistory.cs" Link="MenuHistory.cs" />
     <Compile Include="../NOVR/MotionControls/MfdPages.cs" Link="MfdPages.cs" />
     <Compile Include="../NOVR/MotionControls/HelmetGestureMath.cs" Link="HelmetGestureMath.cs" />

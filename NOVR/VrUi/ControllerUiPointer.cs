@@ -49,7 +49,8 @@ internal sealed class ControllerUiPointer
         var rightHit = rightAvailable ? Raycast(rightRay, camera) : default;
         var previousLeft = _hands.Left;
         _hands.Update(settings.MotionControls.LeftHanded.Value, leftAvailable, leftHand.Trigger, leftHit.gameObject != null,
-            rightAvailable, rightHand.Trigger, rightHit.gameObject != null);
+            rightAvailable, rightHand.Trigger, rightHit.gameObject != null,
+            TargetPriority(leftHit.gameObject), TargetPriority(rightHit.gameObject));
         if (previousLeft != _hands.Left) { Release(true); SetHover(null); }
         if (!(_hands.Left ? leftAvailable : rightAvailable)) { Cancel(); return false; }
         var hand = _hands.Left ? leftHand : rightHand;
@@ -61,12 +62,8 @@ internal sealed class ControllerUiPointer
         data.delta = screen - data.position;
         data.position = screen;
         data.pointerCurrentRaycast = hit;
-        OverInteractive = hit.gameObject != null &&
-            (ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit.gameObject) != null ||
-             ExecuteEvents.GetEventHandler<IDragHandler>(hit.gameObject) != null);
-        var map = SceneSingleton<DynamicMap>.i;
-        OverMap = DynamicMap.mapMaximized && hit.gameObject != null && map != null &&
-                  (hit.gameObject.transform.IsChildOf(map.transform) || hit.gameObject == map.mapBackground.gameObject);
+        OverInteractive = Interactive(hit.gameObject);
+        OverMap = IsMap(hit.gameObject);
         SetHover(hit.gameObject);
         // UGUI scroll is in wheel steps. Use elapsed time, not frame count.
         Scroll = new Vector2(0, FlightControlMath.Axis(hand.Axis.y, 0.2f, 1) * 12f * Mathf.Min(Time.unscaledDeltaTime, 0.05f));
@@ -82,6 +79,22 @@ internal sealed class ControllerUiPointer
             ExecuteEvents.ExecuteHierarchy(hit.gameObject, data, ExecuteEvents.scrollHandler);
         return true;
     }
+
+    private static bool Interactive(GameObject? target)
+    {
+        if (target == null) return false;
+        var selectable = target.GetComponentInParent<Selectable>();
+        if (selectable != null && (!selectable.isActiveAndEnabled || !selectable.IsInteractable())) return false;
+        return ExecuteEvents.GetEventHandler<IPointerClickHandler>(target) != null ||
+            ExecuteEvents.GetEventHandler<IDragHandler>(target) != null || ExecuteEvents.GetEventHandler<IScrollHandler>(target) != null;
+    }
+    private static bool IsMap(GameObject? target)
+    {
+        var map = SceneSingleton<DynamicMap>.i;
+        return DynamicMap.mapMaximized && target != null && map != null &&
+            (target.transform.IsChildOf(map.transform) || target == map.mapBackground?.gameObject);
+    }
+    private static int TargetPriority(GameObject? target) => target == null ? 0 : Interactive(target) || IsMap(target) ? 2 : 1;
 
     private Ray HandRay(Camera camera, ControllerSample hand, int index)
     {

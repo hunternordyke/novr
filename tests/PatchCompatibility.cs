@@ -37,6 +37,17 @@ internal static class PatchCompatibility
             }
             verified++;
         }
+        // Native guidance is mirrored read-only. Verify the private fields used
+        // by that bridge as well as the Harmony-injected fields above.
+        using var game = AssemblyDefinition.ReadAssembly(Path.Combine(gameManagedDirectory, "Assembly-CSharp.dll"));
+        foreach (var contract in new[] {
+            (owner: "CombatHUD", field: "weaponState", type: "HUDWeaponState"),
+            (owner: "HUDMissileState", field: "hint", type: "TMPro.TextMeshProUGUI"),
+            (owner: "HUDLaserGuidedState", field: "hint", type: "TMPro.TextMeshProUGUI") })
+        {
+            var field = game.MainModule.Types.Single(t => t.FullName == contract.owner).Fields.SingleOrDefault(f => f.Name == contract.field);
+            if (field?.FieldType.FullName != contract.type) failures.Add($"Native readout field mismatch {contract.owner}.{contract.field}");
+        }
         if (verified < 20) throw new Exception($"Only {verified} patch targets were checked; wrong build?");
         if (failures.Count != 0) throw new Exception(string.Join(Environment.NewLine, failures));
         Console.WriteLine($"Verified {verified} declared patch targets (metadata only; no game code executed).");
