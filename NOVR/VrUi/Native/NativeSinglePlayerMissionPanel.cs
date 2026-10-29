@@ -43,7 +43,7 @@ public class NativeSinglePlayerMissionPanel : MonoBehaviour
     private int _page;
     private MissionGroupFilter _activeGroupFilter = MissionGroupFilter.All;
     private int _activeTagFilterIndex;
-    private bool _loaded;
+    private bool _visible;
 
     public void Initialize(NativeGameActionAdapter actions, RectTransform root)
     {
@@ -56,11 +56,12 @@ public class NativeSinglePlayerMissionPanel : MonoBehaviour
     {
         if (_container == null) return;
 
-        if (visible && !_loaded)
+        if (visible && !_visible)
         {
             LoadMissions();
         }
 
+        _visible = visible;
         NativePanelTransition.SetVisible(_container, visible);
     }
 
@@ -166,7 +167,6 @@ public class NativeSinglePlayerMissionPanel : MonoBehaviour
 
     private void LoadMissions()
     {
-        _loaded = true;
         _missions.Clear();
         _filteredMissions.Clear();
         _page = 0;
@@ -180,6 +180,7 @@ public class NativeSinglePlayerMissionPanel : MonoBehaviour
                 .Where(entry => HasTag(entry.mission, MissionTag.SinglePlayer))
                 .Select(entry => new MissionEntry(entry.key, entry.mission));
             _missions.AddRange(entries);
+            Debug.Log($"[NOVR] Loaded {_missions.Count} single-player missions for the VR menu.");
         }
         catch (System.Exception exception)
         {
