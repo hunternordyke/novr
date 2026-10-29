@@ -43,7 +43,7 @@ public class ModConfiguration
         OpticalHud = new MotionControls.OpticalHudSettings(config);
         CockpitAlerts = new VrUi.SpecialBehavior.CockpitAlertSettings(config);
         TargetCue = config.Bind("VR HUD", "Target Aim Cue", global::NOVR.MotionControls.TargetCueMode.Context,
-            "Context shows a small target cue only near a selectable target or while selecting. Always keeps a faint dot visible. Off hides the aim cue. Target diamonds and weapon sights are unchanged.");
+            "Context shows a white hollow gaze circle only near a selectable target or while selecting. Always keeps the circle visible and brightens it during acquisition. Off hides the aim cue. Target diamonds and weapon sights are unchanged.");
         Fs20NativeCockpitEnabled = config.Bind("FS-20 Native Cockpit", "Interactive Controls", true, "Operate the FS-20 original cockpit controls in VR. Its native cluster is fixed to the aircraft and always replaces the universal movable panel. Disabling this leaves the original cockpit visible.");
         CockpitPanelEnabled = config.Bind("Universal Cockpit Panel", "Enabled", true, "Show the shared 3D control panel and dock weapon status and minimap to its displays.");
         CockpitPanelPosition = config.Bind("Universal Cockpit Panel", "Position", new Vector3(0, -0.32f, 0.65f), "Fallback cockpit position if a native dashboard surface is unavailable. Automatic dashboard fit and per-aircraft saved placements take precedence. Independent of seat adjustment.");

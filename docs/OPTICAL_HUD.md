@@ -1,11 +1,11 @@
-# Helmet optical targeting HUD (0.4.6.7)
+# Helmet optical targeting HUD (updated 0.4.7.1)
 
 Open **View → AOTS HUD** to toggle the borderless head-following optical image.
 It starts off. **View → AOTS setup** changes image width (12–26°) and HEAD
 magnification (1–6×); defaults are 20° and 2×. The image is a mono sensor feed on
 a stereo surface 3 m away. Neither eye projection nor headset FOV is changed.
 
-- **HEAD:** turn your head to aim the optical view. The small central reticle
+- **HEAD:** turn your head to aim the optical view. The hollow central circle
   matches target selection; target/location graphics magnify their positions,
   while their glyphs keep the configured readable size.
 - **Select:** press and release the configured target button while gripping its
@@ -35,20 +35,23 @@ only mirrors the native feed. No second scene camera or render texture is added;
 an otherwise idle optical camera still incurs its usual rendering cost while
 HEAD is enabled. Both MFD feed and HUD share the texture.
 
-## Less intrusive acquisition cue
+## Hollow gaze circle
 
 The old persistent center diamond is hidden without changing the native aim
 transform. **View → Comfort & display → HUD & display → Aiming & markers →
 Aim cue** cycles:
 
-- **CONTEXT** (default): the small dot and short acquisition ticks appear near an
-  available target or during target selection, then fade away.
-- **ALWAYS:** keep a faint small dot, brightening with acquisition feedback.
+- **CONTEXT** (default): the hollow circle appears near an
+  available target or during target selection, then fades away.
+- **ALWAYS:** keep the circle visible, brightening with acquisition feedback.
 - **OFF:** hide the aim cue. Target diamonds and weapon-specific sights remain.
 
-The optical HEAD image has its own small reticle while deliberately active;
-OFF hides this too. Acquisition feedback means a selectable candidate, not a
-missile lock.
+The white circle has a dark outline for contrast against bright skies and sensor
+imagery. It spans about 1.6° with an empty center, replacing the tiny dot/ticks.
+The optical HEAD image uses the same circle while deliberately active; its size
+stays constant as optical magnification changes. OFF hides this too. The circle
+does not change the target selection radius. Acquisition feedback means a
+selectable candidate, not a missile lock.
 
 The interaction is inspired by the optical HEAD mode documented on page 9 of
 [VTOL VR's official manual](https://cdn.akamai.steamstatic.com/steam/apps/667970/manuals/VTOL_VR_Manual.pdf?t=1703226033).

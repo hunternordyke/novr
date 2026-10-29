@@ -313,11 +313,11 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
         _laser = Line("FS-20 pointer",2,.001f); _ring = Line("FS-20 hover",25,.0008f);
         _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
         _textMaterial = new Material(Shader.Find("UI/Default")); _textMaterial.SetInt("unity_GUIZTestMode",(int)CompareFunction.LessEqual);
-        _textMaterial.color = new Color(.8f,.95f,.9f); RefreshFont(_font); Font.textureRebuilt += RefreshFont;
+        _textMaterial.color = Color.white; RefreshFont(_font); Font.textureRebuilt += RefreshFont;
         var label = new GameObject("FS-20 contextual hint",typeof(TextMesh)); label.transform.SetParent(_root,false);
         label.layer = (int)LayerHelper.Layers.Cockpit; label.transform.localRotation = Quaternion.Euler(12,0,0);
         _hint = label.GetComponent<TextMesh>(); _hint.font = _font; _hint.fontSize = 48; _hint.characterSize = .0024f;
-        _hint.anchor = TextAnchor.MiddleCenter; _hint.alignment = TextAlignment.Center;
+        _hint.anchor = TextAnchor.MiddleCenter; _hint.alignment = TextAlignment.Center; _hint.color = Color.white;
         label.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial;
         // A seat-style pull loop below the existing center pedestal. The native
         // JETTISON control is deliberately not repurposed as ejection.
@@ -330,7 +330,7 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
         Bar(_guard,new(0,-.026f,0),new(.069f,.055f,.005f),_black);
         var guardLabel = new GameObject("EJECT",typeof(TextMesh)); guardLabel.transform.SetParent(_guard,false); guardLabel.layer = (int)LayerHelper.Layers.Cockpit;
         guardLabel.transform.localPosition = new Vector3(0,-.026f,-.003f);
-        var text = guardLabel.GetComponent<TextMesh>(); text.font = _font; text.fontSize = 48; text.characterSize = .002f; text.anchor = TextAnchor.MiddleCenter; text.text = "EJECT";
+        var text = guardLabel.GetComponent<TextMesh>(); text.font = _font; text.fontSize = 48; text.characterSize = .002f; text.anchor = TextAnchor.MiddleCenter; text.text = "EJECT"; text.color = Color.white;
         guardLabel.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial;
     }
     private LineRenderer Line(string name, int count, float width)
@@ -345,7 +345,16 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
         go.transform.SetParent(parent,false); go.transform.localPosition = position; go.transform.localScale = scale;
         go.layer = (int)LayerHelper.Layers.Cockpit; go.GetComponent<Renderer>().sharedMaterial = material;
     }
-    private void RefreshFont(Font font) { if (font == _font && _textMaterial != null) _textMaterial.mainTexture = font.material.mainTexture; }
+    private void RefreshFont(Font font)
+    {
+        if (font != _font || _textMaterial == null) return;
+        var texture = font.material.mainTexture;
+        _textMaterial.mainTexture = texture;
+        // CanvasRenderer supplies this for UI fonts, but MeshRenderer does not.
+        // Without white RGB, an Alpha8 atlas produces black TextMesh labels.
+        var alphaOnly = texture is Texture2D atlas && atlas.format == TextureFormat.Alpha8;
+        _textMaterial.SetVector("_TextureSampleAdd", alphaOnly ? new Vector4(1, 1, 1, 0) : Vector4.zero);
+    }
     private void End() { _active = null; _owner = -1; _ejection.Release(); }
     private void Cancel()
     {

@@ -8,7 +8,7 @@ using UnityEngine.XR;
 namespace NOVR.MotionControls;
 
 // Preserve the native designator transform used by selection. Only replace its
-// visual: a quiet center dot, with four short ticks when a candidate is in range.
+// visual: a readable hollow circle, brightening when a candidate is in range.
 [DefaultExecutionOrder(110)]
 internal sealed class TargetAcquisitionCue : MonoBehaviour
 {
@@ -16,7 +16,7 @@ internal sealed class TargetAcquisitionCue : MonoBehaviour
     private Image? _native;
     private CanvasGroup? _nativeGroup;
     private float _originalAlpha;
-    private GameObject? _view, _ticks;
+    private GameObject? _view;
     private Canvas? _canvas;
     private CanvasGroup? _group;
     private float _opacity;
@@ -57,7 +57,7 @@ internal sealed class TargetAcquisitionCue : MonoBehaviour
         var candidate = _candidate;
         var selecting = ready && (ControllerActions.Instance?.TargetSelecting == true || GameManager.playerInput.GetButton("Select"));
         var show = TargetCueVisibility.Show(ModConfiguration.Instance.TargetCue.Value, ready, candidate, selecting);
-        var desired = show ? candidate || selecting ? .8f : .25f : 0;
+        var desired = show ? candidate || selecting ? 1f : .65f : 0;
         _opacity = Mathf.MoveTowards(_opacity, desired, Time.unscaledDeltaTime * 6);
         if (!ready || _opacity <= .001f) { Hide(); return; }
         var camera = APIBus.CockpitHudCamera;
@@ -65,7 +65,6 @@ internal sealed class TargetAcquisitionCue : MonoBehaviour
         if (Vector3.Dot(direction, camera.transform.forward) <= 0) { Hide(); return; }
         EnsureView(camera);
         _canvas!.worldCamera = camera; _group!.alpha = _opacity;
-        _ticks!.SetActive(candidate || selecting);
         _view!.transform.SetPositionAndRotation(camera.transform.position + direction.normalized * 3, camera.transform.rotation);
         _view.SetActive(true);
     }
@@ -77,19 +76,7 @@ internal sealed class TargetAcquisitionCue : MonoBehaviour
         _canvas = _view.GetComponent<Canvas>(); _canvas.renderMode = RenderMode.WorldSpace;
         _canvas.worldCamera = camera; _canvas.overrideSorting = true; _canvas.sortingOrder = 180;
         _group = _view.GetComponent<CanvasGroup>(); _group.blocksRaycasts = false;
-        Image Mark(Transform parent, Vector2 position, Vector2 size)
-        {
-            var rect = (RectTransform)new GameObject("Aim cue", typeof(RectTransform)).transform;
-            rect.SetParent(parent, false); rect.anchoredPosition = position; rect.sizeDelta = size;
-            var mark = rect.gameObject.AddComponent<Image>(); mark.color = new Color(.45f, .95f, .6f, 1); mark.raycastTarget = false;
-            return mark;
-        }
-        Mark(_view.transform, Vector2.zero, new Vector2(3, 3));
-        _ticks = new GameObject("Acquisition ticks", typeof(RectTransform)); _ticks.transform.SetParent(_view.transform, false);
-        Mark(_ticks.transform, new Vector2(-14, 0), new Vector2(6, 2));
-        Mark(_ticks.transform, new Vector2(14, 0), new Vector2(6, 2));
-        Mark(_ticks.transform, new Vector2(0, -14), new Vector2(2, 6));
-        Mark(_ticks.transform, new Vector2(0, 14), new Vector2(2, 6));
+        GazeRingGraphic.Create(_view.transform);
         LayerHelper.SetLayerRecursive(_view.transform, LayerHelper.GetVrUiLayer());
     }
     private void Restore() { if (_nativeGroup != null) _nativeGroup.alpha = _originalAlpha; }

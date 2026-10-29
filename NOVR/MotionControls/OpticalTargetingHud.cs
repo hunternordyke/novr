@@ -176,12 +176,7 @@ internal sealed class OpticalTargetingHud : MonoBehaviour
         var overlay = Rect("Head-directed target markers", _window.transform, Vector2.one);
         overlay.gameObject.AddComponent<RectMask2D>();
         _markers = overlay.gameObject.AddComponent<ZoomTargetingHud>(); _markers.MarkersOnly = true;
-        _crosshair = Rect("Head acquisition reticle", _window.transform, Vector2.zero).gameObject;
-        foreach (var size in new[] { new Vector2(24, 2), new Vector2(2, 24) })
-        {
-            var line = Rect("Reticle", _crosshair.transform, size).gameObject.AddComponent<Image>();
-            line.raycastTarget = false; line.color = new Color(.4f, 1, .5f, .8f);
-        }
+        _crosshair = GazeRingGraphic.Create(_window.transform);
         _status = Rect("Optical mode", _window.transform, new Vector2(650, 45)).gameObject.AddComponent<Text>();
         _status.font = Resources.GetBuiltinResource<Font>("Arial.ttf"); _status.fontSize = 23;
         _status.alignment = TextAnchor.MiddleCenter; _status.raycastTarget = false;

@@ -7,9 +7,15 @@ placements do not move the cluster. Other aircraft retain the shared console.
 
 Release the flight-control grip on the hand you want to use. Either free hand can
 point at an enabled control and press trigger, or reach within 3.5 cm and press
-trigger or grip. Small contextual hints identify the function and current state.
+trigger or grip. White contextual hints identify the function and current state.
 Release before moving to another control. Button presses, grabs and eject actions
 use the existing sound and haptic settings.
+
+In 0.4.7.1, interaction hints and the eject-cover label are explicitly white.
+The font material also handles alpha-only font atlases correctly, including
+after the dynamic atlas rebuilds; these could previously make the text black
+despite its light tint. This changes the VR interaction text, not the aircraft's
+original painted legends.
 
 ## Control locations
 

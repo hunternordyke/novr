@@ -451,7 +451,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         var textObject = new GameObject("Hint", typeof(RectTransform), typeof(Text)); textObject.transform.SetParent(hintObject.transform, false);
         ((RectTransform)textObject.transform).sizeDelta = new Vector2(780, 30);
         _hint = textObject.GetComponent<Text>(); _hint.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        _hint.fontSize = 12; _hint.alignment = TextAnchor.MiddleCenter; _hint.color = new Color(.75f, 1, .8f); _hint.raycastTarget = false;
+        _hint.fontSize = 12; _hint.alignment = TextAnchor.MiddleCenter; _hint.color = Color.white; _hint.raycastTarget = false;
         var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? Shader.Find("Sprites/Default") ?? Shader.Find("UI/Default");
         _pointerMaterial = new Material(shader) { color = new Color(.4f, 1, .7f) };
         if (_pointerMaterial.HasProperty("_BaseColor")) _pointerMaterial.SetColor("_BaseColor", _pointerMaterial.color);
