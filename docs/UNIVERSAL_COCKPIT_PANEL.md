@@ -21,18 +21,31 @@ is engaged; it never changes the aircraft’s actual safety state.
 
 Release the flight-control grip on the hand you want to use. The default right
 hand can aim a laser at the console and use its trigger. Either free hand can
-interact directly by coming within 5.5 cm of a control and squeezing grip.
+interact directly by coming within 5.5 cm of a control and pressing **trigger or grip**.
+Use grip to hold the motion flight stick and throttle.
+
+Version 0.4.5.5 gives a nearby console control priority for that hand. The other
+free hand can keep pointing, and both hovered controls highlight. Once one hand
+holds a control, it owns console input until released. Release the buttons before
+moving to another control; arriving with a held press does not activate it.
+If squeezing trigger and grip together, release both before a new grab.
+
+Hints describe the current interaction: pinch/grab instructions when close,
+trigger instructions when pointing, and progress during a laser eject pull.
+These hints take priority over entry messages and tracking notices for the other
+hand. Result messages such as **GEAR LOCKED ON GROUND** remain visible for the
+control that produced them. Point at the front of the console to use its laser controls.
 
 | Control | Laser | Direct hand |
 | --- | --- | --- |
-| Gear lever | Trigger toggles gear | Grip the wheel-shaped handle, then move up/down at least 2.5 cm |
-| Radar, engine, flight assist | Trigger toggles | Grip near the toggle |
-| Next WPN | Trigger cycles weapon | Grip near the key |
-| CM bezel key | Trigger cycles countermeasure type | Grip near the key |
-| + / − navigation keys | Trigger changes minimap zoom, centered on the aircraft | Grip near the key |
-| MAP | Trigger expands tactical map | Grip near the key |
-| Red eject guard | Trigger lifts/closes cover | Grip near the cover |
-| Yellow eject handle | After opening the cover and releasing trigger, hold trigger on the handle for 0.75 s | After opening the cover and releasing grip, grab the handle and pull it toward you at least 4.5 cm |
+| Gear lever | Trigger toggles gear | Hold trigger or grip on the wheel-shaped handle, then move up/down at least 2.5 cm |
+| Radar, engine, flight assist | Trigger toggles | Trigger or grip near the toggle |
+| Next WPN | Trigger cycles weapon | Trigger or grip near the key |
+| CM bezel key | Trigger cycles countermeasure type | Trigger or grip near the key |
+| + / − navigation keys | Trigger changes minimap zoom, centered on the aircraft | Trigger or grip near the key |
+| MAP | Trigger expands tactical map | Trigger or grip near the key |
+| Red eject guard | Trigger lifts/closes cover | Trigger or grip near the cover |
+| Yellow eject handle | After opening the cover and releasing trigger, hold trigger on the handle for 0.75 s | After opening the cover and releasing your press, hold trigger or grip on the handle and pull it toward you at least 4.5 cm |
 
 Ejection requires a fresh press after opening the cover. Leaving the handle during
 a laser hold cancels the pull. Pausing, menus, tracking/focus loss, recentering and
@@ -72,7 +85,9 @@ The design takes general inspiration from the grouped cockpit controls in the
 and the striped emergency handles described in
 [NASA's F-111 cockpit reference](https://www.nasa.gov/image-article/f-111-advanced-fighter-technology-integration-2/).
 It is an original, simplified universal layout, not a replica of either aircraft.
-No military/game model or texture is included.
+No military/game model or texture is included. Direct trigger interaction and
+contextual hints follow the approach described in the
+[VTOL VR manual](https://cdn.steamstatic.com/steam/apps/667970/manuals/VTOL_VR_Manual.pdf?t=1649333292).
 
 ## Validation status
 
@@ -84,6 +99,12 @@ docking/restoration (including fonts and anchors), map zoom/expand/restore, nati
 weapon and countermeasure selection, radar/engine/assist switches, the ground gear
 restriction, pause cancellation and guarded ejection. Ejection also verifies the
 camera handoff to the pilot's helmet point after native asynchronous setup.
+For 0.4.5.5, 32 further checks drive the production panel with simulated controller
+poses and button values. They cover both hands, direct trigger/grip input, native
+weapon/CM/engine/assist actions, the visible pointer, control hints, tracking
+recovery, handedness, scaled/tilted positioning, map transitions, the ground gear
+restriction and a full direct-trigger guarded eject pull. The previous build
+reproduced six interaction failures; all six pass with these changes.
 Live fixed-camera captures verify the model, readable weapon/countermeasure
 widgets and minimized map. These captures use a
 temporary diagnostic camera; they do not establish stereo comfort or physical

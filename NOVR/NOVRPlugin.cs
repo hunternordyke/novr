@@ -18,7 +18,7 @@ namespace NOVR;
 [BepInPlugin(
     "deltawing.novr",
     "NOVR (Motion Prototype)",
-    "0.4.5.4")]
+    "0.4.5.5")]
 public class NOVRPlugin : BaseUnityPlugin
 {
     

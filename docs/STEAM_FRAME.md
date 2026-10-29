@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.4**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.5**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -145,13 +145,17 @@ zoom or add a new control binding.
 
 The console appears automatically in the cockpit. Its layout and placement are
 shared by every aircraft. Release a flight-control grip, then use the laser and
-trigger or grip a nearby console control. The gear lever supports grab-and-move;
+trigger, or reach to a nearby control and use trigger or grip. The gear lever supports grab-and-move;
 ejection requires lifting the red guard and a separate deliberate pull/hold.
 Weapon/countermeasure status and the minimap move to its displays.
 
 Use **View → Flight actions → Console setup** to adjust its position, tilt and
 size. **F6** shows/hides it and restores the previous HUD layout when hidden.
-Console interactions and display fitting still require in-headset validation.
+Version 0.4.5.5 keeps the other free hand’s pointer visible when one hand is near
+the console. Nearby controls take priority for their own hand; hints follow the
+control being used, including eject progress. Release a held control before
+operating another. Console interactions and display fitting still require
+in-headset validation.
 
 ## Default bindings
 

@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.4` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.5` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,

@@ -14,6 +14,8 @@ wheel/air brakes and selectable throttle-button layouts. **0.4.5.3** improves
 handle depth/shading, backs the captions with solid panels and adds actual brake-state
 feedback and throttle-travel marks. **0.4.5.4** restores native target/landing-camera
 zoom and accurate instrument magnification while preserving headset projection.
+**0.4.5.5** adds direct trigger interaction on the console, independent free-hand
+hover feedback and context-sensitive hints, and prevents hidden pointer actions.
 Steam Frame **PC streaming through SteamVR** is the binding target, with a Touch-compatible fallback. It builds against Nuclear
 Option **0.34.3**. It is a prototype awaiting headset flight testing, not a tested release.
 

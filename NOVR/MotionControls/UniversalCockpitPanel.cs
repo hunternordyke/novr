@@ -18,7 +18,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private CockpitPanelHud? _hud;
     private Aircraft? _aircraft;
     private readonly GuardedEjection _ejection = new();
-    private readonly ControllerButtonGate[] _grips = { new(), new() };
+    private readonly ControllerButtonGate[] _directButtons = { new(), new() };
     private readonly ControllerButtonGate _trigger = new();
     private LineRenderer? _laser;
     private Transform? _dot;
@@ -35,7 +35,10 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private Quaternion _lastRotation;
     private int _guardHand = -1;
     private string? _hover;
+    private string? _nearLeft, _nearRight, _rayHover;
+    private bool _hoverDirect;
     private string _feedback = "";
+    private string? _feedbackControl;
     private float _feedbackUntil;
     private bool _modelFailed;
     private readonly Dictionary<string, Vector3> _buttonRest = new();
@@ -87,7 +90,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_aircraft != aircraft)
         {
             Hide(); _aircraft = aircraft;
-            _feedback = "FREE HAND  •  POINT + TRIGGER, OR REACH + GRIP";
+            _feedback = "FREE HAND  •  POINT + TRIGGER, OR REACH + TRIGGER / GRIP";
+            _feedbackControl = null;
             _feedbackUntil = Time.unscaledTime + 6f;
         }
         if (_lastCalibration != NOVRHeadsetData.TranslationCalibrationOffset ||
@@ -122,14 +126,19 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (_ejection.Open && (_guardHand == 0 ? !left.Valid : !right.Valid)) { _ejection.Reset(); End(); }
         var leftFree = !(leftStick ? motion?.StickHeld == true : motion?.ThrottleHeld == true);
         var rightFree = !(leftStick ? motion?.ThrottleHeld == true : motion?.StickHeld == true);
-        var nearLeft = Direct(left, leftFree, root, 0);
-        var nearRight = Direct(right, rightFree, root, 1);
+        _nearLeft = Direct(left, leftFree, root, 0);
+        _nearRight = Direct(right, rightFree, root, 1);
         var hand = leftStick ? left : right;
         var free = leftStick ? leftFree : rightFree;
-        var pointerAllowed = hand.Valid && free && settings.ControllerBindings.PointerEnabled.Value && (_owner < 0 || _owner == 2);
+        var nearHand = leftStick ? _nearLeft : _nearRight;
+        var nearOtherHand = leftStick ? _nearRight : _nearLeft;
+        // Reaching takes precedence for that hand. The other free hand may still
+        // point until a control is grabbed; never accept an invisible laser click.
+        var pointerAllowed = hand.Valid && free && nearHand == null &&
+            settings.ControllerBindings.PointerEnabled.Value && (_owner < 0 || _owner == 2);
         var ray = new Ray(root.TransformPoint(hand.AimPosition + CockpitProfiles.SeatOffset), root.rotation * hand.AimRotation * Vector3.forward);
-        var target = pointerAllowed ? RayTarget(ray, out _) : null;
-        _trigger.Update(hand.Valid && free && settings.ControllerBindings.PointerEnabled.Value, hand.Trigger);
+        var target = _rayHover = pointerAllowed ? RayTarget(ray, out _) : null;
+        _trigger.Update(pointerAllowed, hand.Trigger);
         if (_trigger.Pressed && _owner < 0 && target != null) Begin(target, 2, Vector3.zero, hand);
         if (_owner == 2)
         {
@@ -142,23 +151,35 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
             else Held(Vector3.zero, hand);
         }
         if (_owner < 0 && !left.Valid && !right.Valid) _ejection.Reset();
-        var showRay = pointerAllowed && nearLeft == null && nearRight == null && _owner != 0 && _owner != 1;
-        DrawPointer(ray, showRay, target);
-        _hover = _active ?? nearLeft ?? nearRight ?? target;
-        if (_hint != null) _hint.text = motion?.PlacementHint ?? motion?.TrackingHint ?? (Time.unscaledTime < _feedbackUntil ? _feedback : Hint(_hover));
+        DrawPointer(ray, pointerAllowed, target);
+        _hover = _active ?? nearHand ?? target ?? nearOtherHand;
+        _hoverDirect = _active != null ? _owner != 2 : nearHand != null || target == null;
+        if (_hint != null)
+        {
+            // Instructions and eject progress belong to the control being used.
+            // An unrelated tracking notice or welcome message must not cover them.
+            var resultFeedback = Time.unscaledTime < _feedbackUntil && _feedbackControl != null &&
+                (_hover == _feedbackControl || _hover == null);
+            _hint.text = _active == "eject" ? Hint(_active) : resultFeedback ? _feedback :
+                _hover != null ? Hint(_hover) : motion?.PlacementHint ?? motion?.TrackingHint ??
+                (Time.unscaledTime < _feedbackUntil ? _feedback : Hint(null));
+        }
     }
 
     private string? Direct(ControllerSample hand, bool free, Transform root, int index)
     {
-        var available = hand.Valid && free;
+        var available = hand.Valid && free && (_owner < 0 || _owner == index);
         var position = root.TransformPoint(hand.Position + CockpitProfiles.SeatOffset);
         var target = available ? Near(position) : null;
-        _grips[index].Update(available, hand.Grip);
-        if (_grips[index].Pressed && _owner < 0 && target != null)
+        // Either pinch (trigger) or grip can operate a nearby physical control.
+        // Track the combined press even away from the panel so arriving with a
+        // held button cannot activate a switch or begin an eject pull.
+        _directButtons[index].Update(available, Mathf.Max(hand.Grip, hand.Trigger));
+        if (_directButtons[index].Pressed && _owner < 0 && target != null)
             Begin(target, index, _model!.Root.InverseTransformPoint(position), hand);
         if (_owner == index)
         {
-            if (!_grips[index].Held)
+            if (!_directButtons[index].Held)
             {
                 if (!available) _ejection.Reset();
                 End();
@@ -184,6 +205,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private string? RayTarget(Ray ray, out float distance)
     {
         string? best = null; distance = 2.5f;
+        if (!FrontRay(ray, out _, out _)) return null;
         foreach (var pair in _points)
         {
             if (!CanTarget(pair.Key)) continue;
@@ -233,16 +255,16 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private void Activate(string control)
     {
         var action = control switch { "gear" => "Gear", "radar" => "Radar", "engine" => "Toggle Engine", "assist" => "Flight Assist", "weapon" => "Next Weapon", "cm" => "Next Countermeasure", "eject" => "Eject", _ => null };
-        if (control == "radar" && _aircraft?.radar == null) { Feedback("RADAR NOT FITTED TO THIS AIRCRAFT"); return; }
+        if (control == "radar" && _aircraft?.radar == null) { Feedback(control, "RADAR NOT FITTED TO THIS AIRCRAFT"); return; }
         if (control == "gear" && _aircraft != null && _aircraft.radarAlt <= .2f)
-        { Feedback("GEAR LOCKED ON GROUND"); return; }
+        { Feedback(control, "GEAR LOCKED ON GROUND"); return; }
         if (control is "zoom_in" or "zoom_out")
         {
             var map = SceneSingleton<DynamicMap>.i;
             if (map != null && !DynamicMap.mapMaximized)
             {
                 map.SetZoomLevel(Mathf.Clamp(map.GetZoomLevel() * (control == "zoom_in" ? 1.35f : 1 / 1.35f), 1, 12));
-                Feedback($"MAP ZOOM  {map.GetZoomLevel():0.0}×");
+                Feedback(control, $"MAP ZOOM  {map.GetZoomLevel():0.0}×");
             }
         }
         else if (control == "map") ControllerActions.ToggleMap();
@@ -250,26 +272,31 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         Debug.Log($"[NOVR] Universal cockpit panel: {control}.");
         _actionSent = true;
     }
-    private void Feedback(string message) { _feedback = message; _feedbackUntil = Time.unscaledTime + 2f; }
+    private void Feedback(string control, string message)
+    { _feedbackControl = control; _feedback = message; _feedbackUntil = Time.unscaledTime + 2f; }
     private static void Pulse(ControllerSample hand)
     {
         if (hand.Device.isValid && hand.Device.TryGetHapticCapabilities(out var caps) && caps.supportsImpulse)
             hand.Device.SendHapticImpulse(0, .22f, .035f);
     }
-    private string Hint(string? control) => control switch
+    private string Hint(string? control)
     {
-        "gear" => "GEAR  •  CLICK TO TOGGLE / GRAB + MOVE UP OR DOWN",
-        "radar" => _aircraft?.radar == null ? "RADAR  •  NOT FITTED" : "RADAR  •  " + (_aircraft.radar.activated ? "ON" : "OFF"),
-        "engine" => "ENGINE  •  " + (_aircraft?.Ignition == true ? "ON" : "OFF"),
-        "assist" => "FLIGHT ASSIST  •  " + (_aircraft?.flightAssist == true ? "ON" : "OFF"),
-        "weapon" => "CYCLE SELECTED WEAPON", "cm" => "CYCLE COUNTERMEASURE TYPE",
-        "zoom_in" => "MAP ZOOM IN", "zoom_out" => "MAP ZOOM OUT", "map" => "OPEN TACTICAL MAP",
-        "guard" => _ejection.Open ? "CLOSE EJECT GUARD" : "LIFT EJECT GUARD",
-        "eject" => _active == "eject" && _owner == 2
-            ? $"EJECT  •  KEEP HOLDING  {Mathf.Clamp01((Time.unscaledTime - _pressTime) / .75f) * 100:0}%"
-            : "EJECT  •  HOLD TRIGGER 0.75s / GRAB + PULL TOWARD YOU",
-        _ => _ejection.Open ? "EJECT GUARD OPEN" : ""
-    };
+        var press = _hoverDirect ? "TRIGGER / GRIP" : "TRIGGER";
+        return control switch
+        {
+            "gear" => _hoverDirect ? "GEAR  •  HOLD TRIGGER / GRIP + MOVE UP OR DOWN" : "GEAR  •  TRIGGER TO TOGGLE",
+            "radar" => _aircraft?.radar == null ? "RADAR  •  NOT FITTED" : $"RADAR  •  {(_aircraft.radar.activated ? "ON" : "OFF")}  •  {press} TO TOGGLE",
+            "engine" => $"ENGINE  •  {(_aircraft?.Ignition == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
+            "assist" => $"FLIGHT ASSIST  •  {(_aircraft?.flightAssist == true ? "ON" : "OFF")}  •  {press} TO TOGGLE",
+            "weapon" => $"NEXT WEAPON  •  {press}", "cm" => $"NEXT COUNTERMEASURE  •  {press}",
+            "zoom_in" => $"MAP ZOOM IN  •  {press}", "zoom_out" => $"MAP ZOOM OUT  •  {press}", "map" => $"OPEN TACTICAL MAP  •  {press}",
+            "guard" => $"{(_ejection.Open ? "CLOSE" : "LIFT")} EJECT GUARD  •  {press}",
+            "eject" => _hoverDirect ? "EJECT  •  HOLD TRIGGER / GRIP + PULL TOWARD YOU" :
+                _active == "eject" ? $"EJECT  •  KEEP HOLDING  {Mathf.Clamp01((Time.unscaledTime - _pressTime) / .75f) * 100:0}%" :
+                "EJECT  •  HOLD TRIGGER ON HANDLE FOR 0.75s",
+            _ => _ejection.Open ? "EJECT GUARD OPEN" : ""
+        };
+    }
     private void LateUpdate()
     {
         if (!_visible || _model == null || _aircraft == null) return;
@@ -280,7 +307,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         Rotate("assist", _aircraft.flightAssist ? 25 : -25, blend);
         Rotate("guard", _ejection.Open ? 110 : 0, blend);
         foreach (var point in _points)
-            _model.Highlight(point.Key, _active == point.Key ? 2 : _hover == point.Key ? 1 : 0);
+            _model.Highlight(point.Key, _active == point.Key ? 2 : _active == null &&
+                (_nearLeft == point.Key || _nearRight == point.Key || _rayHover == point.Key) ? 1 : 0);
         _model.SetGroupColor("gear_lamps", _aircraft.gearState switch
         {
             LandingGear.GearState.LockedExtended => new Color(.3f, 1f, .5f),
@@ -334,16 +362,23 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         LayerHelper.SetLayerRecursive(_model.Root, LayerHelper.GetVrUiLayer());
         Debug.Log("[NOVR] Created shared 3D cockpit console with live HUD/minimap docking.");
     }
-    private void DrawPointer(Ray ray, bool allowed, string? target)
+    private bool FrontRay(Ray ray, out Vector3 origin, out Vector3 direction)
     {
         var root = _model!.Root;
-        var origin = root.InverseTransformPoint(ray.origin) - new Vector3(0, 0, -.05f);
-        var direction = root.InverseTransformVector(ray.direction);
-        var hit = allowed && PointerGeometry.IntersectRect(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
-            -.385f, -.18f, .385f, .18f, out _);
+        origin = root.InverseTransformPoint(ray.origin) - new Vector3(0, 0, -.05f);
+        direction = root.InverseTransformVector(ray.direction);
+        return TrackedControllers.Finite(origin) && TrackedControllers.Finite(direction) && origin.z < 0 && direction.z > 0;
+    }
+    private void DrawPointer(Ray ray, bool allowed, string? target)
+    {
+        var distance = 0f;
+        var hit = allowed && FrontRay(ray, out var origin, out var direction) &&
+            (target != null || (PointerGeometry.IntersectRect(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
+                -.385f, -.18f, .385f, .18f, out distance) && distance <= 2.5f));
         _laser!.enabled = hit; _dot!.gameObject.SetActive(hit);
         if (!hit) return;
-        var distance = -origin.z / direction.z;
+        // A raised lever/guard can be hit just outside the board's silhouette.
+        // Its visible pointer must still agree with the accepted target.
         var point = target == null ? ray.GetPoint(distance) : Point(target);
         _laser.SetPosition(0, ray.origin); _laser.SetPosition(1, point);
         _dot.position = point - ray.direction * .003f;
@@ -356,7 +391,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
     private void CancelInteraction()
     {
         _ejection.Reset(); _active = _hover = null; _owner = _guardHand = -1;
-        _trigger.Reset(); foreach (var grip in _grips) grip.Reset();
+        _nearLeft = _nearRight = _rayHover = null;
+        _trigger.Reset(); foreach (var button in _directButtons) button.Reset();
     }
     private void OnDisable() => Hide();
     private void OnDestroy()
