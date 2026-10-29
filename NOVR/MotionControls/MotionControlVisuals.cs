@@ -15,7 +15,7 @@ internal sealed class MotionControlVisuals : IDisposable
     private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial;
     private readonly TextMesh _stickLabel, _throttleLabel;
     private int _lastThrottlePercent = -1;
-    private bool? _lastStickHeld, _lastThrottleHeld;
+    private string? _lastStickCaption, _lastThrottleCaption;
 
     public MotionControlVisuals(Transform trackingRoot)
     {
@@ -48,7 +48,8 @@ internal sealed class MotionControlVisuals : IDisposable
 
     public void Update(Vector3 stick, Vector3 throttle, float travel, float angle, float pitch, float roll,
         float thrust, bool stickHeld, bool throttleHeld, bool stickNear, bool throttleNear,
-        bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand)
+        bool stickTracked, Vector3 stickHand, bool throttleTracked, Vector3 throttleHand,
+        bool stickLatched = false, bool throttleLatched = false, bool stickTapMode = false, bool throttleTapMode = false)
     {
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
         _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle);
@@ -61,17 +62,15 @@ internal sealed class MotionControlVisuals : IDisposable
         _stickHand.localPosition = stickHand;
         _throttleHand.gameObject.SetActive(throttleTracked);
         _throttleHand.localPosition = throttleHand;
-        if (_lastStickHeld != stickHeld)
-        {
-            _stickLabel.text = stickHeld ? "STICK / HELD" : "STICK / GRIP";
-            _lastStickHeld = stickHeld;
-        }
+        var stickCaption = stickLatched ? "STICK LATCHED\nTAP GRIP TO RELEASE" : stickHeld ? "STICK / HELD" : stickTapMode ? "STICK / TAP OR HOLD GRIP" : "STICK / HOLD GRIP";
+        if (_lastStickCaption != stickCaption) { _stickLabel.text = stickCaption; _lastStickCaption = stickCaption; }
         var percent = Mathf.RoundToInt(thrust * 100);
-        if (_lastThrottlePercent != percent || _lastThrottleHeld != throttleHeld)
+        var throttleCaption = throttleLatched ? "LATCHED / TAP GRIP TO RELEASE" : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
+        if (_lastThrottlePercent != percent || _lastThrottleCaption != throttleCaption)
         {
-            _throttleLabel.text = $"THROTTLE {percent}%\n{(throttleHeld ? "HELD" : "GRIP")}";
+            _throttleLabel.text = $"THROTTLE {percent}%\n{throttleCaption}";
             _lastThrottlePercent = percent;
-            _lastThrottleHeld = throttleHeld;
+            _lastThrottleCaption = throttleCaption;
         }
     }
 

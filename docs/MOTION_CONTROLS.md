@@ -7,7 +7,7 @@ original Blender model. Neither includes VTOL VR code, models, or textures.
 
 ## Status
 
-The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.0` in the BepInEx log.
+The plugin identifies itself as `NOVR (Motion Prototype) 0.4.5.1` in the BepInEx log.
 
 The mod and patcher compile against Nuclear Option 0.34.3 (Steam build 26272685).
 Automated tests cover grab/release behavior, tracking-loss recovery, stick directions,
@@ -34,7 +34,43 @@ Restoring both backed-up NOVR folders and restarting restores the previous mod,
 including its OpenXR payload. F7 disables flight input immediately, but restoring
 the previous package is the way to revert all HUD/runtime changes.
 
+## Grip comfort and control feel
+
+Open **View → Flight controls** to adjust the stick's sensitivity/deadzone and
+throttle travel without taking off the headset. The displayed travel is the wrist
+angle required for full stick input; increasing it makes the stick less sensitive.
+**Reset response** restores response defaults without changing saved seat/handle
+positions. The yaw switch lets rudder pedals keep control.
+
+**Hold** remains the default for each hand. Optional **Tap** mode works independently
+for stick and throttle: briefly squeeze and release grip to latch the handle, then
+squeeze again to let go. Holding longer than 0.3 seconds still releases when you
+let go. The handle label explicitly says **LATCHED**. Release a latched handle
+before aiming at console controls; combat bindings remain active while latched.
+
+Tracking loss, menus, recentering, mode changes and reaching far from a handle
+release the latch. The default breakaway distance is 40 cm, increased to twice the
+grab radius if that is larger. A fresh grip release/press is required afterward.
+No grab or firing action is synthesized when tracking returns.
+
+The menu uses explicit **Flight actions**, **Cockpit setup** and **Back** buttons;
+button backgrounds remain visible instead of receiving the dark theme tint twice.
+
+**View → Controls help** shows the actual configured combat/map/wrist buttons,
+using native Frame labels or the active fallback and the selected handedness.
+Missing hand tracking and unsuccessful placement now show a message on the console.
+F8 also closes the wrist menu before placing handles.
+
+Validation for this update: 58 automated checks and 18 live offline checks with
+simulated tracked hands. The live checks exercise native pitch/throttle input,
+latching/release, tracking recovery, breakaway, wrist cancellation, settings and
+profile-aware binding help. Fixed-camera captures check the wrist layout and
+button contrast. Physical grip timing and comfort still need headset evaluation.
+
 ## Flying
+
+The release behavior below describes the default Hold mode. Tap mode is described
+above.
 
 | Interaction | Behavior |
 | --- | --- |
@@ -54,7 +90,7 @@ Version 0.4.5.0 corrects the reversed pitch input: pulling back sends the game's
 negative pitch command (nose-up), and pushing forward sends positive pitch
 (nose-down). The visible handle follows the same motion. Roll is unchanged.
 
-For landing gear, open **View → Flight / Setup → Toggle gear** on Frame.
+For landing gear, open **View → Flight actions → Toggle gear** on Frame.
 The same page provides **Eject... → Confirm eject**. Cancel, Close, loss of
 tracking/focus, or changing aircraft clears the confirmation. The native quick
 wheel does not yet have a motion-controller binding; use these wrist actions.

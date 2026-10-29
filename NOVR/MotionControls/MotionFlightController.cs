@@ -11,8 +11,8 @@ namespace NOVR.MotionControls;
 public sealed class MotionFlightController : MonoBehaviour
 {
     internal static MotionFlightController? Instance { get; private set; }
-    private readonly GripLatch _stickGrip = new();
-    private readonly GripLatch _throttleGrip = new();
+    private readonly FlightGrip _stickGrip = new();
+    private readonly FlightGrip _throttleGrip = new();
     private MotionControlVisuals? _visuals;
     private Aircraft? _aircraft;
     private Quaternion _neutralStick;
@@ -26,11 +26,13 @@ public sealed class MotionFlightController : MonoBehaviour
     private bool _ready;
     private float _placementTime = -1f;
     private float _placementConfirmationUntil;
+    private string _placementFeedback = "";
     internal string? PlacementHint => _placementTime >= 0
         ? (Time.unscaledTime < _placementTime
             ? $"PLACE YOUR HANDS  •  {Mathf.CeilToInt(_placementTime - Time.unscaledTime)}"
-            : "PLACEMENT  •  WAITING FOR BOTH CONTROLLERS")
-        : Time.unscaledTime < _placementConfirmationUntil ? "HANDLES PLACED  •  RELEASE GRIPS, THEN GRAB" : null;
+            : "PLACEMENT  •  " + Status)
+        : Time.unscaledTime < _placementConfirmationUntil ? _placementFeedback : null;
+    internal string? TrackingHint => _ready && (!_stickHand.Valid || !_throttleHand.Valid) ? Status : null;
     private string? _reportedStatus;
     private float _nextStatusReport;
     internal string Status { get; private set; } = "Waiting for cockpit";
@@ -69,6 +71,7 @@ public sealed class MotionFlightController : MonoBehaviour
         if (Keyboard.current?.f8Key.wasPressedThisFrame == true)
         {
             Settings.Enabled.Value = true;
+            VrUi.WristMenu.Close();
             _placementTime = Time.unscaledTime;
         }
         Sample();
@@ -77,6 +80,8 @@ public sealed class MotionFlightController : MonoBehaviour
         if (_placementTime >= 0f && Time.unscaledTime > _placementTime + 10f)
         {
             _placementTime = -1f;
+            _placementFeedback = "PLACEMENT TIMED OUT  •  " + Status;
+            _placementConfirmationUntil = Time.unscaledTime + 6f;
             Debug.LogWarning($"[NOVR] Handle placement timed out: {Status}. Try Place handles again after resolving this state.");
         }
         if (!_ready) return;
@@ -110,7 +115,8 @@ public sealed class MotionFlightController : MonoBehaviour
         _visuals.Update(StickPosition, ThrottlePosition, Settings.ThrottleTravel.Value,
             Settings.StickAngle.Value, Pitch, Roll, Throttle, StickHeld, ThrottleHeld,
             IsNearStick(), IsNearThrottle(), _stickHand.Valid, _stickHand.Position,
-            _throttleHand.Valid, _throttleHand.Position);
+            _throttleHand.Valid, _throttleHand.Position, _stickGrip.Latched, _throttleGrip.Latched,
+            Settings.StickTapGrip.Value, Settings.ThrottleTapGrip.Value);
     }
 
     // Called from both the render loop and the native pilot input hooks, so a physics tick
@@ -159,7 +165,6 @@ public sealed class MotionFlightController : MonoBehaviour
         }
 
         _ready = true;
-        ReportStatus("Ready; release grips, then grab a handle");
         _visuals.Root.gameObject.SetActive(true);
         _visuals.Root.localPosition = CockpitProfiles.SeatOffset;
         _stickHand = TrackedControllers.Read(Settings.LeftHanded.Value);
@@ -167,7 +172,8 @@ public sealed class MotionFlightController : MonoBehaviour
         if (!_throttleGrip.Held) Throttle = Mathf.Clamp01(aircraft.GetInputs().throttle);
 
         var stickWasHeld = _stickGrip.Held;
-        _stickGrip.Update(_stickHand.Valid, _stickHand.Grip, IsNearStick());
+        _stickGrip.Update(_stickHand.Valid, _stickHand.Grip, IsNearStick(), Settings.StickTapGrip.Value,
+            Time.realtimeSinceStartup, Vector3.Distance(_stickHand.Position, StickPosition) <= Mathf.Max(.4f, Settings.GrabRadius.Value * 2));
         if (_stickGrip.Held && !stickWasHeld)
         {
             _neutralStick = _stickHand.Rotation;
@@ -185,7 +191,9 @@ public sealed class MotionFlightController : MonoBehaviour
         }
 
         var throttleWasHeld = _throttleGrip.Held;
-        _throttleGrip.Update(_throttleHand.Valid, _throttleHand.Grip, IsNearThrottle());
+        _throttleGrip.Update(_throttleHand.Valid, _throttleHand.Grip, IsNearThrottle(), Settings.ThrottleTapGrip.Value,
+            Time.realtimeSinceStartup, Vector3.Distance(_throttleHand.Position,
+                ThrottlePosition + Vector3.forward * ((Throttle - .5f) * Settings.ThrottleTravel.Value)) <= Mathf.Max(.4f, Settings.GrabRadius.Value * 2));
         if (_throttleGrip.Held && !throttleWasHeld)
         {
             _throttleStartPosition = _throttleHand.Position.z;
@@ -195,6 +203,12 @@ public sealed class MotionFlightController : MonoBehaviour
         if (_throttleGrip.Held)
             Throttle = FlightControlMath.Throttle(_throttleStartValue, _throttleStartPosition,
                 _throttleHand.Position.z, Settings.ThrottleTravel.Value);
+        if (!_stickHand.Valid || !_throttleHand.Valid)
+            ReportStatus(!_stickHand.Valid && !_throttleHand.Valid ? "Both controllers need tracking" :
+                ((!_stickHand.Valid ? Settings.LeftHanded.Value : !Settings.LeftHanded.Value) ? "Left controller needs tracking" : "Right controller needs tracking"));
+        else if (_stickGrip.Latched || _throttleGrip.Latched)
+            ReportStatus($"Stick {(_stickGrip.Latched ? "latched" : _stickGrip.Held ? "held" : "free")} • Throttle {(_throttleGrip.Latched ? "latched" : _throttleGrip.Held ? "held" : "free")}");
+        else ReportStatus("Ready; release grips, then grab a handle");
     }
 
     private bool TryGetCockpit(out Aircraft aircraft, out Transform trackingRoot)
@@ -270,6 +284,7 @@ public sealed class MotionFlightController : MonoBehaviour
         ResetGrips();
         Pulse(_stickHand.Device);
         Pulse(_throttleHand.Device);
+        _placementFeedback = "HANDLES PLACED  •  RELEASE GRIPS, THEN GRAB";
         _placementConfirmationUntil = Time.unscaledTime + 3f;
         Debug.Log("[NOVR] Virtual stick and throttle placed at hands. Release grips before grabbing.");
     }

@@ -8,7 +8,8 @@ This branch adds a primitive cockpit stick and throttle operated by tracked cont
 controller laser pointers, combat bindings, a wrist panel, per-aircraft seat/handle profiles,
 and adjustable HUD readability. Version **0.4.5.0** adds an original shared 3D console
 with guarded physical controls and live weapon/countermeasure/minimap displays,
-and corrects reversed motion-stick pitch. Steam Frame **PC streaming through SteamVR** is the
+and corrects reversed motion-stick pitch. **0.4.5.1** adds optional tap-to-latch
+grips and in-headset control-feel settings and binding help. Steam Frame **PC streaming through SteamVR** is the
 binding target, with a Touch-compatible fallback. It builds against Nuclear
 Option **0.34.3**. It is a prototype awaiting headset flight testing, not a tested release.
 

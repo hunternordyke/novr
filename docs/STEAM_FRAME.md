@@ -1,6 +1,6 @@
 # Steam Frame PC streaming prototype
 
-NOVR Motion Prototype **0.4.5.0**, targeting Nuclear Option **0.34.3**, Steam build
+NOVR Motion Prototype **0.4.5.1**, targeting Nuclear Option **0.34.3**, Steam build
 26272685. Nuclear Option runs on the PC; SteamVR supplies OpenXR tracking and
 controller input while the headset streams the game. This is an experimental build,
 compiled and checked against a local game installation. A live Steam Frame session
@@ -104,6 +104,12 @@ placement adjustments and a weapon SAFE indicator. An offline 22-check exercise
 covers console actions, HUD restoration and the ejection camera handoff; physical
 controller reach and stereo comfort still need headset testing. See [the universal cockpit console guide](UNIVERSAL_COCKPIT_PANEL.md).
 
+Version **0.4.5.1** adds optional tap-to-latch flight grips, separately for stick
+and throttle. Hold-to-grip remains the default. Open **View → Flight controls**
+for grip mode, sensitivity, deadzone, throttle travel and yaw settings. **Controls
+help** shows the bindings currently in use, including Frame/Touch fallback and
+handedness. Missing tracking and failed handle placement have visible feedback.
+
 ## Shared 3D console
 
 The console appears automatically in the cockpit. Its layout and placement are
@@ -112,7 +118,7 @@ trigger or grip a nearby console control. The gear lever supports grab-and-move;
 ejection requires lifting the red guard and a separate deliberate pull/hold.
 Weapon/countermeasure status and the minimap move to its displays.
 
-Use **View → Flight / Setup → Console setup** to adjust its position, tilt and
+Use **View → Flight actions → Console setup** to adjust its position, tilt and
 size. **F6** shows/hides it and restores the previous HUD layout when hidden.
 Console interactions and display fitting still require in-headset validation.
 
@@ -161,7 +167,8 @@ button. Combat bindings are distinct from the fixed trigger/menu pointer interac
 ## Wrist panel and cockpit profiles
 
 The panel follows the throttle hand and faces the headset. It holds still during a
-trigger press. **Flight / Setup** switches between pages. It provides:
+trigger press. **Flight actions** and **Cockpit setup** switch between pages;
+subpages have an explicit Back button. The wrist panel provides:
 
 - Motion enable, delayed handle placement, view recentering, handedness and seat adjustment.
 - Gear, radar, engine, flight assist, weapon/countermeasure cycling, target clearing and map access.
@@ -169,7 +176,7 @@ trigger press. **Flight / Setup** switches between pages. It provides:
 
 Flight actions close the panel and enter the game's existing input path on the next
 frame. The game retains its G-LOC, weapon safety, gear/radar altitude restrictions and
-multiplayer command handling. For landing gear, choose **View → Flight / Setup →
+multiplayer command handling. For landing gear, choose **View → Flight actions →
 Toggle gear**. For ejection, choose **Eject...**, then **Confirm eject**. **Cancel**
 returns to the flight page; closing the panel, losing tracking/focus, or changing
 aircraft clears the confirmation. Ejection uses the game's normal input handling.

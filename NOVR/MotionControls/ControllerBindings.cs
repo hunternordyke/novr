@@ -2,12 +2,6 @@ using BepInEx.Configuration;
 
 namespace NOVR.MotionControls;
 
-public enum ControllerButton
-{
-    None, Trigger, Primary, Secondary, Menu, Shoulder, Top, Outside, StickClick,
-    ShoulderOrPrimary, OutsideOrSecondary
-}
-
 public sealed class ControllerBindings
 {
     public readonly ConfigEntry<bool> PointerEnabled, CombatEnabled;

@@ -33,6 +33,9 @@ internal static class TrackedControllers
         }
     }
 
+    internal static bool NativeFrame(bool left) => (left ? XRController.leftHand : XRController.rightHand)
+        is Valve.OpenXR.Utils.SteamFrameControllerProfile.SteamFrameController;
+
     public static ControllerSample Read(bool left)
     {
         if (!Available) return default;
@@ -59,7 +62,7 @@ internal static class TrackedControllers
         var inputDevice = left ? XRController.leftHand : XRController.rightHand;
         // OpenXR generates device-specific layouts derived from the registered
         // profile, so their layout names need not equal the base layout name.
-        var nativeFrame = inputDevice is Valve.OpenXR.Utils.SteamFrameControllerProfile.SteamFrameController;
+        var nativeFrame = NativeFrame(left);
         if ((left ? _reportedLeft : _reportedRight)?.Equals(device) != true)
         {
             if (left) _reportedLeft = device; else _reportedRight = device;

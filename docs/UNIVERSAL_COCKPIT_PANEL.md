@@ -47,7 +47,7 @@ console and wrist Flight page supply the supported actions, including ejection.
 
 ## Position and fallback
 
-Open **View → Flight / Setup → Console setup** to adjust position in 2 cm steps,
+Open **View → Flight actions → Console setup** to adjust position in 2 cm steps,
 tilt in 5-degree steps, or size in 5% steps. Adjustments preview live on the console;
 its flight controls are inactive until the wrist menu closes.
 **Reset console** restores the shared defaults. **F6** shows/hides the console;
@@ -76,7 +76,7 @@ No military/game model or texture is included.
 
 ## Validation status
 
-46 automated checks pass, including pitch polarity, diagonal stick input,
+58 automated checks pass, including pitch polarity, diagonal stick input,
 guarded-ejection transitions, embedded mesh integrity and 45 Harmony target
 metadata checks against Nuclear Option 0.34.3. The game builds with no errors.
 22 live checks in a disposable offline FS-12 mission verify initialization, widget

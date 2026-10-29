@@ -111,7 +111,9 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (WristMenu.IsOpen)
         {
             CancelInteraction(); _laser!.enabled = false; _dot!.gameObject.SetActive(false);
-            if (_hint != null) _hint.text = "CONSOLE SETUP  •  CHANGES APPLY TO EVERY AIRCRAFT";
+            if (_hint != null) _hint.text = WristMenu.IsConsoleSetup
+                ? "CONSOLE SETUP  •  CHANGES APPLY TO EVERY AIRCRAFT"
+                : "WRIST MENU OPEN  •  CONSOLE CONTROLS PAUSED";
             return;
         }
         var motion = MotionFlightController.Instance;
@@ -143,7 +145,7 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         var showRay = pointerAllowed && nearLeft == null && nearRight == null && _owner != 0 && _owner != 1;
         DrawPointer(ray, showRay, target);
         _hover = _active ?? nearLeft ?? nearRight ?? target;
-        if (_hint != null) _hint.text = motion?.PlacementHint ?? (Time.unscaledTime < _feedbackUntil ? _feedback : Hint(_hover));
+        if (_hint != null) _hint.text = motion?.PlacementHint ?? motion?.TrackingHint ?? (Time.unscaledTime < _feedbackUntil ? _feedback : Hint(_hover));
     }
 
     private string? Direct(ControllerSample hand, bool free, Transform root, int index)

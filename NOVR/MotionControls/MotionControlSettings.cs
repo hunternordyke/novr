@@ -15,6 +15,7 @@ public sealed class MotionControlSettings
     public readonly ConfigEntry<float> ThrottleTravel;
     public readonly ConfigEntry<float> GrabRadius;
     public readonly ConfigEntry<bool> ThumbstickYaw;
+    public readonly ConfigEntry<bool> StickTapGrip, ThrottleTapGrip;
 
     public MotionControlSettings(ConfigFile config)
     {
@@ -28,6 +29,8 @@ public sealed class MotionControlSettings
         ResponseExponent = Float(config, "Stick Response", 1.5f, 1f, 3f, "Response curve; higher values make small movements less sensitive.");
         ThrottleTravel = Float(config, "Throttle Travel", 0.25f, 0.05f, 0.6f, "Meters of forward hand movement from idle to full throttle.");
         GrabRadius = Float(config, "Grab Radius", 0.12f, 0.03f, 0.3f, "Maximum hand distance from a handle when pressing grip.");
+        StickTapGrip = config.Bind(section, "Stick Tap Grip", false, "Tap grip briefly to latch the stick; squeeze again to release. Holding longer than 0.3 seconds releases normally. Moving more than 40 cm from the handle, tracking loss or menus releases the latch.");
+        ThrottleTapGrip = config.Bind(section, "Throttle Tap Grip", false, "Optional tap-to-latch throttle grip, with the same release behavior as Stick Tap Grip.");
         ThumbstickYaw = config.Bind(section, "Thumbstick Yaw", true, "Use horizontal stick-hand thumbstick for yaw while holding the virtual stick. Disable to keep pedals in control.");
     }
 

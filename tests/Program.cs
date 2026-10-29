@@ -106,6 +106,95 @@ Check("stick and throttle release independently", () =>
     stick.Update(false, 1, false);
     True(!stick.Held && throttle.Held);
 });
+FlightGrip TapGrab()
+{
+    var grip = new FlightGrip();
+    grip.Update(true, 0, true, true, 0);
+    True(grip.Update(true, 1, true, true, .1f));
+    True(grip.Update(true, 0, true, true, .2f));
+    True(grip.Latched);
+    return grip;
+}
+Check("quick flight grip tap latches without continuous pressure", () =>
+    True(TapGrab().Update(true, 0, true, true, 1)));
+Check("a long flight grip hold still releases normally in tap mode", () =>
+{
+    var grip = new FlightGrip();
+    grip.Update(true, 0, true, true, 0);
+    grip.Update(true, 1, true, true, .1f);
+    True(!grip.Update(true, 0, true, true, .5f));
+    True(!grip.Latched);
+});
+Check("a fresh press releases a latched handle without regrabbing", () =>
+{
+    var grip = TapGrab();
+    True(!grip.Update(true, 1, true, true, 1));
+    True(!grip.Update(true, 1, true, true, 1));
+    True(!grip.Update(true, 0, true, true, 1.1f));
+    True(grip.Update(true, 1, true, true, 1.2f));
+});
+Check("tap grip cannot grab on startup or after pressing outside reach", () =>
+{
+    var grip = new FlightGrip();
+    True(!grip.Update(true, 1, true, true, 0));
+    grip.Update(true, 0, false, true, .1f);
+    True(!grip.Update(true, 1, false, true, .2f));
+    True(!grip.Update(true, 1, true, true, .3f));
+    True(!grip.Update(true, 0, true, true, .4f));
+});
+Check("latched flight grip cancels on tracking loss and requires a fresh edge", () =>
+{
+    var grip = TapGrab();
+    True(!grip.Update(false, 1, true, true, 1));
+    True(!grip.Update(true, 1, true, true, 1.1f));
+    grip.Update(true, 0, true, true, 1.2f);
+    True(grip.Update(true, 1, true, true, 1.3f));
+});
+Check("flight grip breakaway releases and disarms the held input", () =>
+{
+    var grip = TapGrab();
+    True(!grip.Update(true, 1, false, true, 1, false));
+    True(!grip.Update(true, 1, true, true, 1.1f));
+});
+Check("changing flight grip mode does not silently keep the handle latched", () =>
+{
+    var grip = TapGrab();
+    True(!grip.Update(true, 1, true, false, 1));
+    True(!grip.Latched);
+});
+Check("ordinary hold mode retains control until release", () =>
+{
+    var grip = new FlightGrip();
+    grip.Update(true, 0, true, false, 0);
+    True(grip.Update(true, 1, true, false, .1f));
+    True(grip.Update(true, 1, false, false, .2f, false));
+    True(!grip.Update(true, 0, true, false, .25f));
+});
+Check("invalid flight grip samples and clock rollback cancel a latch", () =>
+{
+    True(!TapGrab().Update(true, float.NaN, true, true, 1));
+    True(!TapGrab().Update(true, 0, true, true, float.NaN));
+    True(!TapGrab().Update(true, 0, true, true, .1f));
+});
+Check("paused or recentered flight handles cannot resume their old latch", () =>
+{
+    var grip = TapGrab(); grip.Reset();
+    True(!grip.Update(true, 1, true, true, 1));
+});
+Check("controller help follows Frame hand and physical button labels", () =>
+{
+    True(ControllerButtonNames.Describe(ControllerButton.Secondary, true, true) == "D-pad right");
+    True(ControllerButtonNames.Describe(ControllerButton.Secondary, false, true) == "X");
+    True(ControllerButtonNames.Describe(ControllerButton.Menu, true, true) == "View");
+    True(ControllerButtonNames.Describe(ControllerButton.OutsideOrSecondary, false, true) == "B");
+});
+Check("controller help resolves fallback bindings and unavailable controls", () =>
+{
+    True(ControllerButtonNames.Describe(ControllerButton.ShoulderOrPrimary, true, false) == "X");
+    True(ControllerButtonNames.Describe(ControllerButton.OutsideOrSecondary, false, false) == "B");
+    True(ControllerButtonNames.Describe(ControllerButton.Top, false, false) == "Unavailable");
+    True(ControllerButtonNames.Describe(ControllerButton.None, false, true) == "Unassigned");
+});
 Check("deadzone suppresses small movements", () =>
 {
     Near(FlightControlMath.Axis(0.05f, 0.06f, 1.5f), 0);
