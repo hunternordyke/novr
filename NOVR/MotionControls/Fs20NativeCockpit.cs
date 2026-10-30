@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using NOVR.VrCamera;
 using NOVR.VrUi;
 using UnityEngine;
@@ -8,68 +6,83 @@ using UnityEngine.Rendering;
 
 namespace NOVR.MotionControls;
 
-// FS-20 only. Every switch is attached to the native cockpit transform; neither
-// the seat offset nor the universal panel's placement is used for its geometry.
+// Integrated FS-20 controls are physical-only. No controller ray can operate
+// a switch or an eject handle. Native aircraft logic owns every action.
 [DefaultExecutionOrder(-1140)]
 internal sealed class Fs20NativeCockpit : MonoBehaviour
 {
     internal static Fs20NativeCockpit? Instance { get; private set; }
     internal static bool IsAircraft(Aircraft? aircraft) => aircraft != null && Fs20ControlMap.Matches(aircraft.definition?.jsonKey);
     internal static bool Selected => GameManager.GetLocalAircraft(out var aircraft) && IsAircraft(aircraft);
-    internal static bool BrakeHeld => Instance?._ready == true && Instance._active == "brake";
+    internal static bool Active => Instance?._ready == true;
+    internal static bool BrakeHeld => Active && Instance!._active == "brake";
+    internal static bool IsDocked(Transform widget) => Instance?._hud?.Contains(widget) == true;
+    internal static Transform? Cockpit => Active ? Instance?._root : null;
+    internal static void ReleaseMap() => Instance?._hud?.ReleaseMap();
+    internal static bool LeftStickSlaved => Active && Instance?._hud?.LeftStickSlaved == true && !WristMenu.IsOpen && !CockpitLayout.Active;
+    internal static bool Pinching(bool left) => Active && Instance!._owner == (left ? 0 : 1) && Instance._active is "gear" or "radar" or "aots";
+    private static CockpitLayout.Element SideHandle(bool left) => left == ModConfiguration.Instance.MotionControls.LeftHanded.Value ? CockpitLayout.Element.Stick : CockpitLayout.Element.Throttle;
     private Aircraft? _aircraft;
-    private Transform? _root;
-    private NativeCockpitMesh? _mesh;
-    private readonly Dictionary<string, Vector3> _rests = new();
-    private readonly ControllerButtonGate[] _direct = { new(), new() };
-    private readonly PointerHandSelection _pointer = new();
-    private readonly GuardedEjection _ejection = new();
+    private Transform? _root, _displayRoot, _seat;
+    private CockpitPanelHud? _hud;
+    private readonly Dictionary<string, Transform> _actuators = new();
+    private readonly Dictionary<string, TextMesh> _labels = new();
+    private readonly Dictionary<string, Renderer> _faces = new();
+    private readonly List<Mesh> _hardwareMeshes = new();
+    private readonly ControllerButtonGate[] _grips = { new(), new() }, _presses = { new(), new() };
+    private readonly Dictionary<string, CockpitTouchGate>[] _touch = { new(), new() };
+    private readonly string?[] _near = new string?[2];
+    private readonly SeatHandlePull _pull = new();
     private readonly EjectionRequest _request = new();
-    private LineRenderer? _laser, _ring;
-    private Transform? _ejectHandle, _guard;
-    private TextMesh? _hint;
-    private Material? _accent, _textMaterial, _yellow, _black;
+    private Material? _base, _cap, _hover, _on, _metal, _textMaterial;
     private Font? _font;
-    private string? _active, _hover;
-    private int _owner = -1, _guardHand = -1;
-    private bool _rayOwnerLeft, _ready, _sent;
+    private TextMesh? _hint;
+    private readonly TextMesh?[] _mfdTitles = new TextMesh?[2];
+    private string? _active;
+    private int _owner = -1;
     private Vector3 _start, _calibration, _anchor;
     private Quaternion _recenter;
-    private float _pressedAt, _feedbackUntil, _knobAngle;
+    private bool _ready, _sent, _physicalPress;
+    private Quaternion _heldHandRotation;
+    private Vector3 _seatGrab;
+    private float _seatLift;
+    private float _feedbackUntil;
     private string _feedback = "";
-    private TacScreen? _tactical;
-    private float _initialRange, _initialPixels;
-    private int _findAttempts;
-    private float _nextFind;
-    private static readonly Vector3 EjectPoint = new(0,-.055f,.448f);
-    private static readonly Vector3 FaceNormal = new(0,.205f,-.979f);
-    private static readonly System.Reflection.FieldInfo RangeField = AccessTools.Field(typeof(TacScreen), "displaySize");
-    private static readonly System.Reflection.FieldInfo PixelsField = AccessTools.Field(typeof(TacScreen), "metersPerPixel");
-    private static readonly System.Reflection.FieldInfo IconsField = AccessTools.Field(typeof(TacScreen), "iconLayer");
-    private void Awake() => Instance = this;
-
-    private bool Ready(out Aircraft aircraft, out Transform tracking)
+    internal static Pose? HandPose(bool left, out bool pointing)
     {
-        aircraft = null!; tracking = null!;
-        if (!ModConfiguration.Instance.Fs20NativeCockpitEnabled.Value || !TrackedControllers.Available ||
+        pointing = false; var self = Instance; var side = left ? 0 : 1;
+        if (self?._ready != true) return null;
+        var near = self._near[side];
+        pointing = near != null && (near.EndsWith("_prev") || near.EndsWith("_next") || near.EndsWith("_lock") || near.StartsWith("seat_") || near is "brake" or "map_pan");
+        if (self._owner != side || self._active == null) return null;
+        if (self._active.StartsWith("eject_") && self._seat != null)
+            return new Pose(self._seat.TransformPoint(self._seatGrab + Vector3.up * self._seatLift), self._seat.rotation * self._heldHandRotation);
+        if (self._active is "gear" or "radar" or "aots")
+        {
+            var actuator = self._actuators[self._active];
+            return new Pose(actuator.TransformPoint(new Vector3(0,0,-.022f)), actuator.rotation * self._heldHandRotation);
+        }
+        return null;
+    }
+    private void Awake() => Instance = this;
+    private void OnEnable() => Application.onBeforeRender += PlaceDisplays;
+    private bool Ready(out Aircraft aircraft)
+    {
+        aircraft = null!;
+        if (!ModConfiguration.Instance.Fs20NativeCockpitEnabled.Value || !UnityEngine.XR.XRSettings.enabled ||
             !GameManager.GetLocalAircraft(out aircraft) || !IsAircraft(aircraft) || aircraft.cockpit == null ||
-            aircraft.cockpit.IsDetached() || aircraft.HasEjected() || CameraStateManager.cameraMode != CameraMode.cockpit ||
-            !GameManager.flightControlsEnabled || Time.timeScale <= 0 || WristMenu.IsOpen || CockpitLayout.Active ||
-            DynamicMap.mapMaximized || CursorManager.GetFlag(CursorFlags.GameMenu) ||
-            (GameManager.controlMapper != null && GameManager.controlMapper.isOpen) ||
-            (SceneSingleton<RadialMenuMain>.i != null && RadialMenuMain.IsInUse())) return false;
+            aircraft.cockpit.IsDetached() || aircraft.HasEjected() || CameraStateManager.cameraMode != CameraMode.cockpit) return false;
         var camera = APIBus.MainCamera;
         if (camera == null || camera.GetComponent<NOVRPoseDriver>() == null || camera.transform.parent == null ||
+            NOUIManager.I == null || APIBus.CockpitHudCamera?.transform.parent == null ||
             SceneSingleton<CameraStateManager>.i?.followingUnit != aircraft) return false;
-        var pilotReady = false;
         foreach (var pilot in aircraft.pilots)
-            if (pilot != null && !pilot.dead && pilot.currentState == pilot.playerState) { pilotReady = true; break; }
-        if (!pilotReady) return false;
-        tracking = camera.transform.parent; return true;
+            if (pilot != null && !pilot.dead && pilot.currentState == pilot.playerState) return true;
+        return false;
     }
     private void Update()
     {
-        if (!Ready(out var aircraft, out var tracking))
+        if (!Ready(out var aircraft))
         {
             Pause();
             if (_aircraft != null && (!GameManager.GetLocalAircraft(out var current) || current != _aircraft)) Release();
@@ -79,308 +92,304 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
         {
             Release();
             var cockpit = aircraft.cockpit.GetComponentInChildren<Cockpit>(true);
-            var filter = cockpit?.GetComponent<MeshFilter>();
-            if (filter?.sharedMesh == null || cockpit!.name != "cockpit_int") return;
+            if (cockpit == null || cockpit.name != "cockpit_int") return;
             _aircraft = aircraft;
-            _root = new GameObject("NOVR FS-20 integrated interactions").transform; _root.SetParent(cockpit.transform,false);
-            try { CreateVisuals(); }
-            catch (Exception e) { Release(); Debug.LogError("[NOVR] FS-20 interaction setup failed: " + e.Message); enabled = false; return; }
+            _root = new GameObject("NOVR FS-20 integrated controls").transform; _root.SetParent(cockpit.transform, false);
+            foreach (var node in aircraft.cockpit.GetComponentsInChildren<Transform>(true))
+                if (node.name == "EjectionSeat") { _seat = node; break; }
             try
             {
-                _mesh = new NativeCockpitMesh(filter,_root);
-                foreach (var part in _mesh.Parts) _rests[part.Key] = part.Value.localPosition;
+                CreateVisuals();
+                _displayRoot = new GameObject("NOVR FS-20 native display positions").transform;
+                _displayRoot.SetParent(transform, false);
+                _hud = new CockpitPanelHud(_displayRoot, true);
             }
-            catch (Exception e) { Debug.LogWarning("[NOVR] FS-20 switch animation unavailable; retaining native geometry and click targets: " + e.Message); }
-            Debug.Log("[NOVR] FS-20 native cockpit interactions attached. Original screens and warning lights retained.");
+            catch (System.Exception e) { Release(); Debug.LogError("[NOVR] FS-20 cockpit setup failed: " + e); enabled = false; return; }
+            Debug.Log("[NOVR] FS-20 physical controls ready: separate PREV/NEXT keys for each MFD, gear/brake/radar/AOTS, native seat handles. Left MFD defaults to MAP.");
         }
         if (_calibration != NOVRHeadsetData.TranslationCalibrationOffset || _anchor != NOVRHeadsetData.TranslationAnchor || _recenter != NOVRHeadsetData.RotationCalibrationOffset)
+        { Cancel(); _calibration = NOVRHeadsetData.TranslationCalibrationOffset; _anchor = NOVRHeadsetData.TranslationAnchor; _recenter = NOVRHeadsetData.RotationCalibrationOffset; }
+        _ready = true; _root!.gameObject.SetActive(true); _displayRoot!.gameObject.SetActive(true);
+        // Presentation remains fixed and visible while positioning or using
+        // setup menus. Only interaction pauses; native floating HUD stays hidden.
+        if (!TrackedControllers.Available || !GameManager.flightControlsEnabled || Time.timeScale <= 0 || WristMenu.IsOpen ||
+            DynamicMap.mapMaximized || CursorManager.GetFlag(CursorFlags.GameMenu) ||
+            (GameManager.controlMapper != null && GameManager.controlMapper.isOpen) ||
+            (SceneSingleton<RadialMenuMain>.i != null && RadialMenuMain.IsInUse()))
+        { Cancel(); _hint!.text = ""; _hud!.ClosePageMenus(); return; }
+        _request.Update(aircraft.HasEjected(), Time.unscaledTime, Time.frameCount);
+        var motion = MotionFlightController.Instance;
+        var leftStick = ModConfiguration.Instance.MotionControls.LeftHanded.Value;
+        for (var i = 0; i < 2; i++)
         {
-            Cancel(); _calibration = NOVRHeadsetData.TranslationCalibrationOffset; _anchor = NOVRHeadsetData.TranslationAnchor;
-            _recenter = NOVRHeadsetData.RotationCalibrationOffset;
+            var left = i == 0; var hand = TrackedControllers.Read(left);
+            var free = hand.Valid && !HelmetNightVision.OwnsHand(left) && CockpitLayout.HeldByHand(left) == CockpitLayout.Element.None &&
+                !(left == leftStick ? motion?.StickHeld == true : motion?.ThrottleHeld == true);
+            Direct(hand, free, left, i);
         }
-        _ready = true; _root!.gameObject.SetActive(true); _mesh?.SetVisible(true);
-        _request.Update(aircraft.HasEjected(),Time.unscaledTime,Time.frameCount);
-        if (_tactical == null && _findAttempts < 8 && Time.unscaledTime >= _nextFind)
+        ShowHint();
+    }
+    private void Direct(ControllerSample hand, bool free, bool left, int side)
+    {
+        var available = free && !_request.BlocksInput && (_owner < 0 || _owner == side);
+        var tracking = APIBus.MainCamera!.transform.parent;
+        var world = PilotHandVisuals.TouchPoint(left, hand, tracking);
+        var fingertip = PilotHandVisuals.TouchPoint(left, hand, tracking, true);
+        _grips[side].Update(available, hand.Grip); _presses[side].Update(available, Mathf.Max(hand.Trigger, hand.Grip));
+        string? near = null;
+        Fs20PanelLayout.Control? target = null;
+        float closest = float.MaxValue;
+        var touched = false;
+        foreach (var c in Fs20PanelLayout.Controls)
         {
-            _findAttempts++; _nextFind = Time.unscaledTime + 1;
-            _tactical = aircraft.cockpit.GetComponentInChildren<TacScreen>(true);
-            if (_tactical != null) { _initialRange = (float)RangeField.GetValue(_tactical); _initialPixels = (float)PixelsField.GetValue(_tactical); }
+            if (CockpitLayout.Active && c.Type != Fs20PanelLayout.Kind.Setup) continue;
+            var touchPosition = c.Type == Fs20PanelLayout.Kind.Switch ? world : fingertip;
+            var p = Quaternion.Inverse(c.Rotation) * (_root!.InverseTransformPoint(touchPosition) - c.Point);
+            var inside = Mathf.Abs(p.x) < c.Size.x * .5f && Mathf.Abs(p.y) < c.Size.y * .5f;
+            var depth = -p.z - (c.Type == Fs20PanelLayout.Kind.Switch ? 0 : .016f); var close = available && inside && depth > -.025f && depth < .085f;
+            if (!_touch[side].TryGetValue(c.Id, out var gate)) _touch[side][c.Id] = gate = new CockpitTouchGate();
+            var contact = gate.Update(available, inside, depth);
+            if (close && Mathf.Abs(depth) < closest)
+            { closest = Mathf.Abs(depth); near = c.Id; target = c; touched = contact; }
         }
-        var left = TrackedControllers.Read(true); var right = TrackedControllers.Read(false);
-        if (_ejection.Open && (_guardHand == 0 ? !left.Valid : !right.Valid)) { _ejection.Reset(); End(); }
-        var motion = MotionFlightController.Instance; var leftStick = ModConfiguration.Instance.MotionControls.LeftHanded.Value;
-        var lf = left.Valid && !HelmetNightVision.OwnsHand(true) && !(leftStick ? motion?.StickHeld == true : motion?.ThrottleHeld == true);
-        var rf = right.Valid && !HelmetNightVision.OwnsHand(false) && !(leftStick ? motion?.ThrottleHeld == true : motion?.StickHeld == true);
-        var nearL = Direct(left,lf,tracking,0); var nearR = Direct(right,rf,tracking,1);
-        var pointerOn = ModConfiguration.Instance.ControllerBindings.PointerEnabled.Value && !_request.BlocksInput;
-        var la = pointerOn && lf && nearL == null && (_owner < 0 || _owner == 2 && _rayOwnerLeft);
-        var ra = pointerOn && rf && nearR == null && (_owner < 0 || _owner == 2 && !_rayOwnerLeft);
-        var lr = new Ray(tracking.TransformPoint(left.AimPosition),tracking.rotation * left.AimRotation * Vector3.forward);
-        var rr = new Ray(tracking.TransformPoint(right.AimPosition),tracking.rotation * right.AimRotation * Vector3.forward);
-        var lt = la ? RayTarget(lr) : null; var rt = ra ? RayTarget(rr) : null;
-        _pointer.Update(leftStick,la,left.Trigger,lt != null,ra,right.Trigger,rt != null);
-        var hand = _pointer.Left ? left : right; var ray = _pointer.Left ? lr : rr;
-        var target = _pointer.Left ? lt : rt;
-        if (_pointer.Trigger.Pressed && _owner < 0 && target != null)
-        { _rayOwnerLeft = _pointer.Left; Begin(target,2,Vector3.zero,hand); }
-        if (_owner == 2)
+        // The long striped handles are part of the native seat mesh. Match
+        // their upper rails, not a guessed point on a replacement dashboard.
+        if (available && _seat != null && !CockpitLayout.Active)
         {
-            if (!_pointer.Trigger.Held || target != _active) End();
-            else Hold(Vector3.zero,hand);
+            var p = _seat.InverseTransformPoint(world);
+            for (var i = 0; i < 2; i++)
+            {
+                var rail = new Vector3(i == 0 ? -.258f : .258f, .086f, Mathf.Clamp(p.z, .25f, .42f));
+                var distance = Vector3.Distance(p, rail);
+                if (distance < .035f && distance < closest) { near = i == 0 ? "eject_left" : "eject_right"; target = null; closest = distance; }
+            }
         }
-        _hover = _active ?? nearL ?? nearR ?? target;
-        _laser!.enabled = target != null && (_pointer.Left ? la : ra);
-        if (_laser.enabled) { _laser.SetPosition(0,ray.origin); _laser.SetPosition(1,Point(target!)); }
-        ShowHint(_hover);
-    }
-    private string? Direct(ControllerSample hand, bool free, Transform tracking, int index)
-    {
-        var available = free && !_request.BlocksInput && (_owner < 0 || _owner == index);
-        var world = tracking.TransformPoint(hand.Position);
-        var target = available ? Near(world) : null;
-        _direct[index].Update(available,Mathf.Max(hand.Trigger,hand.Grip));
-        if (_direct[index].Pressed && _owner < 0 && target != null) Begin(target,index,LocalMeters(world),hand);
-        if (_owner == index)
+        if (near != _near[side] && near != null) InteractionHaptics.Pulse(hand.Device, .16f, .025f, InteractionCue.Touch);
+        _near[side] = near;
+        if (_owner < 0 && near != null)
         {
-            if (!_direct[index].Held) End();
-            else if (_active != "gear" && _active != "eject" && Vector3.Distance(world,Point(_active!)) > .09f) End();
-            else Hold(LocalMeters(world),hand);
+            var seatHandle = near.StartsWith("eject_");
+            var flick = target?.Type == Fs20PanelLayout.Kind.Switch;
+            var press = seatHandle || flick ? _grips[side].Pressed : touched;
+            if (press)
+            {
+                _active = near; _owner = side; _sent = false; _physicalPress = touched;
+                _start = seatHandle ? _seat!.InverseTransformPoint(world) : _root!.InverseTransformPoint(world);
+                InteractionHaptics.Pulse(hand.Device, .35f, .045f, seatHandle || flick ? InteractionCue.Grab : InteractionCue.Click);
+                if (seatHandle)
+                {
+                    _pull.Begin(); _seatLift = 0;
+                    _seatGrab = new Vector3(near == "eject_left" ? -.258f : .258f, .086f, Mathf.Clamp(_start.z,.25f,.42f));
+                    _heldHandRotation = Quaternion.Euler(0, left ? 90 : -90, 0);
+                }
+                else if (flick) _heldHandRotation = Quaternion.Inverse(_actuators[near].rotation) * PilotHandVisuals.HandRotation(left,hand,tracking);
+                else if (target?.Type != Fs20PanelLayout.Kind.Hold) { Activate(near, fingertip); _sent = true; }
+            }
         }
-        return target;
-    }
-    private Vector3 LocalMeters(Vector3 world) => Quaternion.Inverse(_root!.rotation) * (world - _root.position);
-    private Vector3 LocalPoint(string id)
-    {
-        if (id == "guard") return _root!.InverseTransformPoint(_guard!.TransformPoint(new Vector3(0,-.026f,-.003f)));
-        if (id == "eject") return _ejectHandle!.localPosition;
-        foreach (var c in Fs20ControlMap.Controls)
-            if (c.Id == id)
-                return _mesh != null && _mesh.Parts.TryGetValue(id,out var part)
-                    ? part.localPosition + part.localRotation * (c.Point - _rests[id]) : c.Point;
-        return Vector3.zero;
-    }
-    private Vector3 Point(string id) => _root!.TransformPoint(LocalPoint(id));
-    private IEnumerable<string> Targets()
-    {
-        foreach (var c in Fs20ControlMap.Controls) yield return c.Id;
-        yield return "guard";
-        if (_ejection.Open) yield return "eject";
-    }
-    private string? Near(Vector3 world)
-    {
-        var distance = .035f; string? best = null;
-        foreach (var id in Targets()) { var d = Vector3.Distance(world,Point(id)); if (d < distance) { best = id; distance = d; } }
-        return best;
-    }
-    private string? RayTarget(Ray ray)
-    {
-        // Only the pilot-facing side is clickable. Aiming through the back of
-        // the cluster or across its side cannot operate an unseen switch.
-        if (Vector3.Dot(ray.direction,_root!.TransformDirection(FaceNormal)) > -.15f) return null;
-        var error = float.MaxValue; string? best = null;
-        foreach (var id in Targets())
+        if (_owner != side) return;
+        if (!available) { End(); return; }
+        if (_active!.StartsWith("eject_"))
         {
-            var center = Point(id); var along = Vector3.Dot(center-ray.origin,ray.direction);
-            var d = Vector3.Distance(ray.GetPoint(along),center);
-            var radius = id is "gear" or "weapon" or "guard" or "eject" ? .024f : .011f;
-            if (along > .025f && along < 1.8f && d < radius && d/radius < error)
-            { best = id; error = d/radius; }
+            var d = _seat!.InverseTransformPoint(world) - _start;
+            _seatLift = Mathf.Clamp(d.y,0,.045f);
+            if (!_grips[side].Held || new Vector2(d.x, d.z).magnitude > .12f) { End(); return; }
+            if (_pull.Update(true, d.y, new Vector2(d.x, d.z).magnitude))
+            {
+                ControllerActions.Instance?.QueuePanelAction("Eject"); _request.Begin(Time.unscaledTime, Time.frameCount);
+                InteractionHaptics.Pulse(hand.Device, .65f, .09f, InteractionCue.Eject); End();
+            }
+            return;
         }
-        return best;
-    }
-    private void Begin(string id, int owner, Vector3 local, ControllerSample hand)
-    {
-        _active = id; _owner = owner; _start = local; _pressedAt = Time.unscaledTime; _sent = false;
-        if (id == "guard")
+        Fs20PanelLayout.Control? active = null;
+        foreach (var c in Fs20PanelLayout.Controls) if (c.Id == _active) { active = c; break; }
+        if (active == null) { End(); return; }
+        var held = active.Type == Fs20PanelLayout.Kind.Switch ? _grips[side].Held : _physicalPress ? near == _active && closest < .012f : _presses[side].Held;
+        if (!held || Vector3.Distance(active.Type == Fs20PanelLayout.Kind.Switch ? world : fingertip, _root!.TransformPoint(active.Point)) > .18f)
+        { InteractionHaptics.Pulse(hand.Device,.14f,.025f,InteractionCue.Release); End(); return; }
+        if (active.Type == Fs20PanelLayout.Kind.Switch && !_sent)
         {
-            if (_request.State == EjectionRequestState.Unconfirmed) _request.Reset();
-            if (_ejection.Open) _ejection.Reset();
-            else { _ejection.LiftCover(); _guardHand = owner == 2 ? (_rayOwnerLeft ? 0 : 1) : owner; }
-        }
-        else if (id == "eject") _ejection.BeginPull();
-        else if (id != "brake" && (id != "gear" || owner == 2)) Activate(id);
-        InteractionHaptics.Pulse(hand.Device,cue:id == "guard" ? InteractionCue.Guard : InteractionCue.Click);
-    }
-    private void Hold(Vector3 local, ControllerSample hand)
-    {
-        if (_active == "gear" && _owner != 2 && !_sent && Mathf.Abs(local.y-_start.y) >= .025f)
-        {
-            if (_aircraft!.gearDeployed != (local.y < _start.y)) Activate("gear");
-            _sent = true; InteractionHaptics.Pulse(hand.Device);
-        }
-        if (_active == "eject" && _ejection.Pull(_start.z-local.z,Time.unscaledTime-_pressedAt,_owner != 2))
-        {
-            ControllerActions.Instance?.QueuePanelAction("Eject"); _request.Begin(Time.unscaledTime,Time.frameCount);
-            InteractionHaptics.Pulse(hand.Device,.5f,.065f,InteractionCue.Eject); End();
+            var delta = Quaternion.Inverse(active.Rotation) * (_root.InverseTransformPoint(world) - _start);
+            if (Mathf.Abs(delta.y) >= .012f)
+            {
+                var desired = delta.y > 0;
+                // Gear UP means retract; radar/AOTS UP means on.
+                var state = State(active.Id);
+                if (state != desired) Activate(active.Id, world);
+                _sent = true; InteractionHaptics.Pulse(hand.Device, .5f, .065f, InteractionCue.Switch);
+            }
         }
     }
-    private void Activate(string id)
+    private bool State(string id) => id switch
     {
-        if (id == "gear" && _aircraft!.radarAlt <= .2f) { Feedback("GEAR LOCKED ON GROUND"); return; }
-        if (id == "hover" && HoverAssist.UnavailableReason(_aircraft) is string reason) { Feedback(reason); return; }
-        if (id == "assist" && _aircraft!.GetControlsFilter()?.HasFlightAssist() != true) { Feedback("FLIGHT ASSIST FIXED ON THIS AIRCRAFT"); return; }
-        if (id == "radar" && _aircraft!.radar == null) { Feedback("RADAR NOT FITTED"); return; }
-        switch (id)
+        "gear" => !_aircraft!.gearDeployed,
+        "radar" => _aircraft!.radar?.activated == true,
+        "aots" => ModConfiguration.Instance.OpticalHud.Enabled.Value,
+        "brake" => BrakeHeld || _aircraft!.GetInputs().brake > .05f, _ => false
+    };
+    private void Activate(string id, Vector3 world)
+    {
+        if (id.EndsWith("_lock")) CockpitLayout.Instance?.ToggleHandle(SideHandle(id == "left_lock"));
+        else if (id.StartsWith("seat_"))
         {
-            case "range_in": ChangeRange(.5f); break;
-            case "range_out": ChangeRange(2); break;
-            case "map": ControllerActions.ToggleMap(); break;
-            case "aots": OpticalTargetingHud.Toggle(); break;
-            case "head": OpticalTargetingHud.LookToAim(); break;
-            case "unlock": SceneSingleton<CombatHUD>.i?.DeselectLast(); break;
-            case "clear": SceneSingleton<CombatHUD>.i?.DeselectAll(); break;
-            default:
-                foreach (var c in Fs20ControlMap.Controls) if (c.Id == id && c.Action.Length > 0) ControllerActions.Instance?.QueuePanelAction(c.Action);
-                if (id is "weapon" or "next_weapon" or "prev_weapon") _knobAngle += id == "prev_weapon" ? -45 : 45;
-                break;
+            var delta = id switch { "seat_up" => Vector3.up, "seat_down" => Vector3.down, "seat_left" => Vector3.left,
+                "seat_right" => Vector3.right, "seat_forward" => Vector3.forward, _ => Vector3.back };
+            CockpitProfiles.Instance?.MoveSeat(delta*.02f); ModConfiguration.Instance.Config.Save();
         }
-    }
-    private void ChangeRange(float factor)
-    {
-        if (_tactical == null) { Feedback("TACTICAL DISPLAY INITIALIZING"); return; }
-        var current = (float)RangeField.GetValue(_tactical); var next = Mathf.Clamp(current * factor,5000,160000);
-        if (current <= 0 || next == current) return;
-        RangeField.SetValue(_tactical,next); PixelsField.SetValue(_tactical,(float)PixelsField.GetValue(_tactical) * current / next);
-        if (IconsField.GetValue(_tactical) is Transform icons)
-            for (var i = 0; i < icons.childCount; i++) icons.GetChild(i).localPosition *= current / next;
-        Feedback($"TACTICAL SPAN {next / 1000:0} KM");
+        else if (id == "map_pan") _hud!.ToggleSlave(true);
+        else if (id.EndsWith("_prev") || id.EndsWith("_next"))
+        {
+            _hud!.Cycle(id.StartsWith("left_"), id.EndsWith("_prev") ? -1 : 1);
+        }
+        else if (id == "gear")
+        {
+            if (_aircraft!.radarAlt <= .2f) Feedback("GEAR LOCKED ON GROUND");
+            else ControllerActions.Instance?.QueuePanelAction("Gear");
+        }
+        else if (id == "radar")
+        {
+            if (_aircraft!.radar == null) Feedback("RADAR NOT FITTED");
+            else ControllerActions.Instance?.QueuePanelAction("Radar");
+        }
+        else if (id == "aots") OpticalTargetingHud.Toggle();
     }
     private void Feedback(string text) { _feedback = text; _feedbackUntil = Time.unscaledTime + 2; }
-    private void ShowHint(string? id)
+    private void ShowHint()
     {
-        _ring!.enabled = id != null;
-        if (id != null)
-        {
-            var local = LocalPoint(id) + FaceNormal * .003f;
-            for (var i = 0; i < 25; i++)
-            {
-                var angle = i * Mathf.PI * 2 / 24;
-                var offset = Vector3.right * Mathf.Cos(angle) * .014f + new Vector3(0,.979f,.205f) * Mathf.Sin(angle) * .014f;
-                _ring.SetPosition(i,_root!.TransformPoint(local+offset));
-            }
-            _hint!.transform.localPosition = local + new Vector3(0,.039f,-.009f);
-        }
-        var message = "";
-        if (_request.BlocksInput) message = "EJECT REQUESTED";
-        else if (_request.State == EjectionRequestState.Unconfirmed) message = "EJECT NOT CONFIRMED · LIFT GUARD TO RETRY";
-        else if (Time.unscaledTime < _feedbackUntil) message = _feedback;
-        else if (id == "guard") message = _ejection.Open ? "CLOSE EJECT GUARD" : "LIFT EJECT GUARD";
-        else if (id == "eject") message = _owner == 2 ? "EJECT · FRESH TRIGGER PRESS" : "EJECT · GRAB + PULL TOWARD YOU";
-        else if (id != null)
-            foreach (var c in Fs20ControlMap.Controls) if (c.Id == id) message = c.Label + (id switch
-            {
-                "gear" => " · " + (_aircraft!.gearDeployed ? "DOWN" : "UP"),
-                "radar" => " · " + (_aircraft!.radar?.activated == true ? "ON" : "OFF"),
-                "engine" => " · " + (_aircraft!.Ignition ? "ON" : "OFF"),
-                "assist" => " · " + (_aircraft!.flightAssist ? "ON" : "OFF"),
-                "hover" => " · " + (_aircraft!.IsAutoHoverEnabled() ? "ON" : "OFF"),
-                "aots" => " · " + (ModConfiguration.Instance.OpticalHud.Enabled.Value ? "ON" : "OFF"), _ => ""
-            });
-        if (id == null) _hint!.transform.localPosition = new Vector3(0,.325f,.510f);
-        _hint!.text = message;
+        var id = _active ?? _near[0] ?? _near[1];
+        _hint!.text = _request.BlocksInput ? "EJECT REQUESTED" : Time.unscaledTime < _feedbackUntil ? _feedback :
+            id?.StartsWith("eject_") == true ? "GRIP + PULL UP TO EJECT" : "";
+        _hint.transform.localPosition = id?.StartsWith("eject_") == true && _seat != null
+            ? _root!.InverseTransformPoint(_seat.TransformPoint(new Vector3(id == "eject_left" ? -.258f : .258f, .14f, .33f)))
+            : new Vector3(0,.157f,.470f);
     }
     private void LateUpdate()
     {
-        if (!_ready || _aircraft == null || _root == null) return;
-        var blend = FlightControlMath.SmoothingWeight(Time.unscaledDeltaTime,18);
-        if (_mesh != null)
-            foreach (var c in Fs20ControlMap.Controls)
-            {
-                if (!_mesh.Parts.TryGetValue(c.Id,out var part)) continue;
-                var angle = c.Id switch
-                {
-                    "engine" => _aircraft.Ignition ? 60 : 0,
-                    "assist" => _aircraft.flightAssist ? 0 : -60,
-                    "radar" => _aircraft.radar?.activated == true ? 60 : 0,
-                    "hover" => _aircraft.IsAutoHoverEnabled() ? 60 : 0,
-                    "brake" => _aircraft.GetInputs().brake > .05f ? 60 : 0, _ => 0
-                };
-                var target = _rests[c.Id];
-                if (c.Id == "gear" && _aircraft.gearDeployed) target += new Vector3(0,-.032f,-.0067f);
-                if (c.Animation == Fs20ControlMap.Motion.Button && _active == c.Id) target -= FaceNormal * .002f;
-                part.localPosition = Vector3.Lerp(part.localPosition,target,blend);
-                part.localRotation = Quaternion.Slerp(part.localRotation,c.Animation == Fs20ControlMap.Motion.Knob
-                    ? Quaternion.AngleAxis(_knobAngle,FaceNormal) : Quaternion.Euler(angle,0,0),blend);
-            }
-        _guard!.localRotation = Quaternion.Slerp(_guard.localRotation,Quaternion.Euler(_ejection.Open ? -100 : 0,0,0),blend);
-        _ejectHandle!.localPosition = EjectPoint + Vector3.back * (_active == "eject" ? .018f : 0);
+        if (!_ready) return;
+        PlaceDisplays(); _hud!.SetVisible(true); _hud.Update();
+        var config = ModConfiguration.Instance;
+        foreach (var c in Fs20PanelLayout.Controls)
+        {
+            var hover = _near[0] == c.Id || _near[1] == c.Id; var active = _active == c.Id;
+            var state = c.Id.EndsWith("_lock") ? CockpitLayout.Unlocked(SideHandle(c.Id == "left_lock")) : c.Id == "map_pan" ? _hud.LeftStickSlaved : State(c.Id); var actuator = _actuators[c.Id];
+            var material = active || hover ? _hover : state ? _on : _cap;
+            if (_faces[c.Id].sharedMaterial != material) _faces[c.Id].sharedMaterial = material;
+            if (c.Type == Fs20PanelLayout.Kind.Switch)
+                actuator.localRotation = Quaternion.Slerp(actuator.localRotation, Quaternion.Euler(state ? -25 : 25,0,0), FlightControlMath.SmoothingWeight(Time.unscaledDeltaTime, 20));
+            else actuator.localPosition = new Vector3(0,0,active ? -.008f : -.011f);
+            var text = c.Type == Fs20PanelLayout.Kind.Page
+                ? c.Label
+                : c.Id.EndsWith("_lock") ? (SideHandle(c.Id == "left_lock") == CockpitLayout.Element.Stick ? "STICK POS" : "THROTTLE POS") + "\n" + (CockpitLayout.Unlocked(SideHandle(c.Id == "left_lock")) ? "UNLOCKED" : "LOCKED")
+                : c.Id.StartsWith("seat_") ? "SEAT\n" + c.Label
+                : c.Id == "map_pan" ? "MAP PAN\n" + (_hud.LeftStickSlaved ? "ON" : "OFF")
+                : c.Label + "\n" + (c.Id == "gear" ? (state ? "UP" : "DOWN") : c.Id == "brake" ? "HOLD" : state ? "ON" : "OFF");
+            if (_labels[c.Id].text != text) _labels[c.Id].text = text;
+        }
+        for (var i = 0; i < 2; i++)
+        {
+            var title = (i == 0 ? "LEFT MFD · " : "RIGHT MFD · ") + MfdPages.ShortTitle(i == 0 ? config.Fs20LeftMfdPage.Value : config.Fs20RightMfdPage.Value);
+            if (_mfdTitles[i]!.text != title) _mfdTitles[i]!.text = title;
+        }
+    }
+    private void PlaceDisplays()
+    {
+        if (!_ready || _root == null || _displayRoot == null) return;
+        var game = APIBus.MainCamera?.transform.parent; var ui = APIBus.CockpitHudCamera?.transform.parent;
+        if (game == null || ui == null) return;
+        _displayRoot.SetPositionAndRotation(ui.TransformPoint(game.InverseTransformPoint(_root.position)), ui.rotation * Quaternion.Inverse(game.rotation) * _root.rotation);
     }
     private void CreateVisuals()
     {
-        _accent = CockpitMaterials.Opaque("FS-20 interaction cue",new Color(.45f,.9f,.8f));
-        _yellow = CockpitMaterials.Opaque("FS-20 eject yellow",new Color(.85f,.65f,.06f));
-        _black = CockpitMaterials.Opaque("FS-20 eject guard",new Color(.035f,.045f,.045f));
-        _laser = Line("FS-20 pointer",2,.001f); _ring = Line("FS-20 hover",25,.0008f);
+        _base = CockpitMaterials.Hardware("FS-20 recessed switch plate", new Color(.045f,.050f,.053f));
+        _cap = CockpitMaterials.Hardware("FS-20 switch cap", new Color(.22f,.24f,.25f));
+        _hover = CockpitMaterials.Hardware("FS-20 touched switch", new Color(.45f,.38f,.18f));
+        _on = CockpitMaterials.Hardware("FS-20 active switch", new Color(.16f,.32f,.25f));
+        _metal = CockpitMaterials.Hardware("FS-20 brushed switch hardware", new Color(.42f,.44f,.46f), .7f);
+        var cockpitMaterial = _root!.parent.GetComponent<MeshRenderer>()?.sharedMaterial;
+        CockpitMaterials.Fs20Finish(_base,cockpitMaterial,new Color(.55f,.55f,.55f));
+        CockpitMaterials.Fs20Finish(_cap,cockpitMaterial,Color.white);
+        CockpitMaterials.Fs20Finish(_hover,cockpitMaterial,new Color(1.3f,1.12f,.75f));
+        CockpitMaterials.Fs20Finish(_on,cockpitMaterial,new Color(.8f,1.25f,.9f));
         _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        _textMaterial = new Material(Shader.Find("UI/Default")); _textMaterial.SetInt("unity_GUIZTestMode",(int)CompareFunction.LessEqual);
+        _textMaterial = new Material(Shader.Find("UI/Default")); _textMaterial.SetInt("unity_GUIZTestMode", (int)CompareFunction.LessEqual);
         _textMaterial.color = Color.white; RefreshFont(_font); Font.textureRebuilt += RefreshFont;
-        var label = new GameObject("FS-20 contextual hint",typeof(TextMesh)); label.transform.SetParent(_root,false);
-        label.layer = (int)LayerHelper.Layers.Cockpit; label.transform.localRotation = Quaternion.Euler(12,0,0);
-        _hint = label.GetComponent<TextMesh>(); _hint.font = _font; _hint.fontSize = 48; _hint.characterSize = .0024f;
-        _hint.anchor = TextAnchor.MiddleCenter; _hint.alignment = TextAlignment.Center; _hint.color = Color.white;
-        label.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial;
-        // A seat-style pull loop below the existing center pedestal. The native
-        // JETTISON control is deliberately not repurposed as ejection.
-        _ejectHandle = new GameObject("FS-20 eject pull loop").transform; _ejectHandle.SetParent(_root,false); _ejectHandle.localPosition = EjectPoint;
-        Bar(_ejectHandle,new(-.025f,0,0),new(.009f,.035f,.012f),_yellow);
-        Bar(_ejectHandle,new(.025f,0,0),new(.009f,.035f,.012f),_yellow);
-        Bar(_ejectHandle,new(0,-.017f,0),new(.058f,.009f,.012f),_yellow);
-        for (var i = -2; i <= 2; i++) Bar(_ejectHandle,new(i*.011f,-.017f,-.0002f),new(.005f,.0092f,.0124f),_black);
-        _guard = new GameObject("FS-20 eject guard").transform; _guard.SetParent(_root,false); _guard.localPosition = EjectPoint + Vector3.up*.026f + Vector3.back*.008f;
-        Bar(_guard,new(0,-.026f,0),new(.069f,.055f,.005f),_black);
-        var guardLabel = new GameObject("EJECT",typeof(TextMesh)); guardLabel.transform.SetParent(_guard,false); guardLabel.layer = (int)LayerHelper.Layers.Cockpit;
-        guardLabel.transform.localPosition = new Vector3(0,-.026f,-.003f);
-        var text = guardLabel.GetComponent<TextMesh>(); text.font = _font; text.fontSize = 48; text.characterSize = .002f; text.anchor = TextAnchor.MiddleCenter; text.text = "EJECT"; text.color = Color.white;
-        guardLabel.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial;
+        foreach (var c in Fs20PanelLayout.Controls)
+        {
+            var plate = new GameObject("FS-20 " + c.Label).transform; plate.SetParent(_root, false); plate.localPosition = c.Point; plate.localRotation = c.Rotation;
+            Box(plate, Vector3.zero, new Vector3(c.Size.x,c.Size.y,.009f), _base);
+            // Recessed corner fasteners and raised bezels seat these controls in
+            // the existing instrument cluster instead of floating UI rectangles.
+            foreach (var x in new[] { -1f, 1f })
+                Cylinder(plate, new Vector3(x*(c.Size.x*.5f-.005f),0,-.005f), .005f, .002f, _metal);
+            var actuator = new GameObject("Physical actuator").transform; actuator.SetParent(plate, false); _actuators[c.Id] = actuator;
+            if (c.Type == Fs20PanelLayout.Kind.Switch)
+            {
+                actuator.localPosition = new Vector3(c.Size.x*.31f, 0, -.012f);
+                Cylinder(plate, actuator.localPosition + Vector3.forward*.004f, .018f, .008f, _metal);
+                Cylinder(actuator,new Vector3(0,0,-.009f),.007f,.026f,_metal);
+                _faces[c.Id] = Box(actuator,new Vector3(0,0,-.022f),new Vector3(.020f,.024f,.012f),_cap);
+                _labels[c.Id] = Label(plate,new Vector3(-.012f,0,-.005f),.0015f);
+            }
+            else
+            {
+                actuator.localPosition = new Vector3(0,0,-.011f);
+                _faces[c.Id] = Box(actuator,Vector3.zero,new Vector3(c.Size.x-.008f,c.Size.y-.008f,.009f),_cap);
+                _labels[c.Id] = Label(actuator,new Vector3(0,0,-.005f),c.Type == Fs20PanelLayout.Kind.Page ? .0016f : .0015f);
+            }
+        }
+        for (var i = 0; i < 2; i++)
+        {
+            var nameplate = new GameObject("MFD page name").transform; nameplate.SetParent(_root,false);
+            nameplate.localPosition = new Vector3(i == 0 ? -.110f : .110f,.389f,.515f); nameplate.localRotation = Fs20PanelLayout.Face;
+            Box(nameplate,Vector3.zero,new Vector3(.164f,.018f,.005f),_base);
+            _mfdTitles[i] = Label(nameplate,Vector3.back*.003f,.0016f);
+        }
+        _hint = Label(_root!,Vector3.zero,.0017f); _hint.transform.localRotation = Fs20PanelLayout.Face;
     }
-    private LineRenderer Line(string name, int count, float width)
+    private TextMesh Label(Transform parent, Vector3 position, float size)
     {
-        var go = new GameObject(name,typeof(LineRenderer)); go.transform.SetParent(_root,false); go.layer = (int)LayerHelper.Layers.Cockpit;
-        var line = go.GetComponent<LineRenderer>(); line.sharedMaterial = _accent; line.positionCount = count;
-        line.startWidth = line.endWidth = width; line.enabled = false; line.shadowCastingMode = ShadowCastingMode.Off; return line;
+        var go = new GameObject("White control label", typeof(TextMesh)); go.transform.SetParent(parent,false); go.transform.localPosition = position;
+        go.layer = (int)LayerHelper.Layers.Cockpit; var text = go.GetComponent<TextMesh>();
+        text.font = _font; text.fontSize = 48; text.characterSize = size; text.anchor = TextAnchor.MiddleCenter; text.alignment = TextAlignment.Center; text.color = Color.white;
+        go.GetComponent<MeshRenderer>().sharedMaterial = _textMaterial; return text;
     }
-    private static void Bar(Transform parent, Vector3 position, Vector3 scale, Material material)
+    private Renderer Box(Transform parent, Vector3 position, Vector3 scale, Material material)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(go.GetComponent<Collider>());
-        go.transform.SetParent(parent,false); go.transform.localPosition = position; go.transform.localScale = scale;
-        go.layer = (int)LayerHelper.Layers.Cockpit; go.GetComponent<Renderer>().sharedMaterial = material;
+        var go=new GameObject("Machined control housing",typeof(MeshFilter),typeof(MeshRenderer));
+        go.transform.SetParent(parent,false);go.transform.localPosition=position;go.layer=(int)LayerHelper.Layers.Cockpit;
+        var mesh=CockpitHardware.Keycap(scale);_hardwareMeshes.Add(mesh);go.GetComponent<MeshFilter>().sharedMesh=mesh;
+        var renderer=go.GetComponent<MeshRenderer>();renderer.sharedMaterial=material;renderer.shadowCastingMode=ShadowCastingMode.Off;return renderer;
+    }
+    private static Renderer Cylinder(Transform parent, Vector3 position, float diameter, float length, Material material)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder); var collider = go.GetComponent<Collider>(); collider.enabled = false; Destroy(collider);
+        go.transform.SetParent(parent,false); go.transform.localPosition = position; go.transform.localRotation=Quaternion.Euler(90,0,0);go.transform.localScale = new Vector3(diameter,length*.5f,diameter); go.layer = (int)LayerHelper.Layers.Cockpit;
+        var renderer = go.GetComponent<Renderer>(); renderer.sharedMaterial = material; renderer.shadowCastingMode = ShadowCastingMode.Off; return renderer;
     }
     private void RefreshFont(Font font)
     {
         if (font != _font || _textMaterial == null) return;
-        var texture = font.material.mainTexture;
-        _textMaterial.mainTexture = texture;
-        // CanvasRenderer supplies this for UI fonts, but MeshRenderer does not.
-        // Without white RGB, an Alpha8 atlas produces black TextMesh labels.
-        var alphaOnly = texture is Texture2D atlas && atlas.format == TextureFormat.Alpha8;
-        _textMaterial.SetVector("_TextureSampleAdd", alphaOnly ? new Vector4(1, 1, 1, 0) : Vector4.zero);
+        var texture = font.material.mainTexture; _textMaterial.mainTexture = texture;
+        _textMaterial.SetVector("_TextureSampleAdd", texture is Texture2D atlas && atlas.format == TextureFormat.Alpha8 ? new Vector4(1,1,1,0) : Vector4.zero);
     }
-    private void End() { _active = null; _owner = -1; _ejection.Release(); }
+    private void End() { _active = null; _owner = -1; _seatLift = 0; _pull.Reset(); }
     private void Cancel()
     {
-        End(); _hover = null; _ejection.Reset(); _request.Reset(); _guardHand = -1;
-        foreach (var gate in _direct) gate.Reset(); _pointer.Reset();
+        End(); _request.Reset();
+        for (var i = 0; i < 2; i++) { _grips[i].Reset(); _presses[i].Reset(); _near[i] = null; foreach (var gate in _touch[i].Values) gate.Reset(); }
     }
     private void Pause()
     {
-        _ready = false; Cancel(); _mesh?.SetVisible(false); if (_root != null) _root.gameObject.SetActive(false);
+        if (_ready) _hud?.Restore();
+        _ready = false; Cancel(); if (_root != null) _root.gameObject.SetActive(false); if (_displayRoot != null) _displayRoot.gameObject.SetActive(false);
     }
     private void Release()
     {
-        Pause();
-        if (_tactical != null && _initialRange > 0)
-        {
-            var current = (float)RangeField.GetValue(_tactical);
-            if (IconsField.GetValue(_tactical) is Transform icons)
-                for (var i = 0; i < icons.childCount; i++) icons.GetChild(i).localPosition *= current / _initialRange;
-            RangeField.SetValue(_tactical,_initialRange); PixelsField.SetValue(_tactical,_initialPixels);
-        }
-        _tactical = null; _findAttempts = 0; _nextFind = 0; _initialRange = _initialPixels = 0;
-        Font.textureRebuilt -= RefreshFont; _mesh?.Dispose(); _mesh = null; _rests.Clear();
-        if (_root != null) Destroy(_root.gameObject);
-        foreach (var material in new[] { _accent,_textMaterial,_yellow,_black }) if (material != null) Destroy(material);
-        _root = null; _aircraft = null; _knobAngle = 0;
+        Pause(); _hud?.Restore(); _hud = null; Font.textureRebuilt -= RefreshFont;
+        if (_root != null) Destroy(_root.gameObject); if (_displayRoot != null) Destroy(_displayRoot.gameObject);
+        foreach (var material in new[] { _base,_cap,_hover,_on,_metal,_textMaterial }) if (material != null) Destroy(material);
+        foreach (var mesh in _hardwareMeshes) Destroy(mesh); _hardwareMeshes.Clear();
+        _root = _displayRoot = _seat = null; _aircraft = null; _actuators.Clear(); _faces.Clear(); _labels.Clear(); foreach (var gates in _touch) gates.Clear();
     }
-    private void OnDisable() => Release();
+    private void OnDisable() { Application.onBeforeRender -= PlaceDisplays; Release(); }
     private void OnDestroy() { Release(); if (Instance == this) Instance = null; }
 }

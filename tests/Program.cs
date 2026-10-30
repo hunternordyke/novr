@@ -68,6 +68,28 @@ Check("Menu history returns shared help to its source and clears confirmations o
     True(h.Trail.SequenceEqual(new[] { "Home", "Controls" }));
     h.Push("Controls"); True(h.Trail.Count == 2);
 });
+Check("Physical button touch needs an approach and rearms only after withdrawal", () =>
+{
+    var gate = new CockpitTouchGate();
+    True(!gate.Update(true, true, 0)); True(!gate.Update(true, true, 0));
+    True(!gate.Update(true, true, .04f)); True(gate.Update(true, true, .003f));
+    True(!gate.Update(true, true, .002f)); True(!gate.Update(true, true, .008f));
+    True(!gate.Update(true, true, -.08f)); True(!gate.Update(true, true, 0));
+    True(!gate.Update(true, false, .04f)); True(!gate.Update(true, false, 0));
+    True(gate.Update(true, true, 0));
+    gate.Update(false, true, .04f); True(!gate.Update(true, true, 0));
+    gate.Update(true, true, .04f); gate.Update(false, true, 0); True(!gate.Update(true, true, 0));
+});
+Check("Seat handle needs a fresh grab and an upward pull; release never ejects", () =>
+{
+    var pull = new SeatHandlePull();
+    True(!pull.Update(true,.08f,0)); pull.Begin();
+    True(!pull.Update(true,.04f,0)); True(pull.Update(true,.046f,.02f)); True(!pull.Update(true,.08f,0));
+    pull.Begin(); True(!pull.Update(false,.08f,0)); True(!pull.Update(true,.08f,0));
+    pull.Begin(); True(!pull.Update(true,.08f,.13f)); True(!pull.Update(true,.08f,0));
+    pull.Begin(); True(!pull.Update(true,float.NaN,0)); True(!pull.Update(true,.08f,0));
+    pull.Begin(); True(!pull.Update(true,-.1f,0)); pull.Reset(); True(!pull.Update(true,.08f,0));
+});
 Check("MIL shelf fits entirely inside the chosen throttle range and preserves regrabs", () =>
 {
     foreach (var travel in new[] { .05f, .12f, .22f, .6f })

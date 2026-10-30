@@ -138,7 +138,6 @@ internal sealed class CockpitAlerts : MonoBehaviour
         SceneSingleton<CameraStateManager>.i?.followingUnit == _aircraft &&
         Time.timeScale > 0 && !PlayerSettings.cinematicMode && !DynamicMap.mapMaximized && !CursorManager.GetFlag(CursorFlags.GameMenu) &&
         (SceneSingleton<RadialMenuMain>.i == null || !RadialMenuMain.IsInUse()) &&
-        !WristMenu.IsOpen && !CockpitLayout.Active &&
         (GameManager.controlMapper == null || !GameManager.controlMapper.isOpen);
 
     private void LateUpdate()
@@ -213,6 +212,19 @@ internal sealed class CockpitAlerts : MonoBehaviour
         var gameRoot = APIBus.MainCamera?.transform.parent;
         var uiRoot = APIBus.CockpitHudCamera.transform.parent;
         if (gameRoot == null || uiRoot == null) return;
+        var fs20 = Fs20NativeCockpit.Cockpit;
+        if (fs20 != null)
+        {
+            var right = fs20.TransformPoint(new Vector3(.39f,.29f,.43f));
+            _root.transform.SetPositionAndRotation(uiRoot.TransformPoint(gameRoot.InverseTransformPoint(right)),
+                uiRoot.rotation * Quaternion.Inverse(gameRoot.rotation) * fs20.rotation * Quaternion.Euler(12,-12,0));
+            _root.transform.localScale = Vector3.one * (.0004f * Settings.Scale.Value);
+            _threatRoot!.transform.localPosition = new Vector3(-55,80,0);
+            _feedRoot!.localPosition = new Vector3(0,-180,0);
+            return;
+        }
+        _threatRoot!.transform.localPosition = new Vector3(-390,0,0);
+        _feedRoot!.localPosition = new Vector3(350,0,0);
         var eye = _aircraft.cockpitViewPoint;
         // Same cockpit-to-UI-space conversion as the dashboard. Physical leaning,
         // head turns and saved seat shifts do not drag the overlay around.

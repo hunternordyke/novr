@@ -8,8 +8,8 @@ internal sealed class InteractionAudio : MonoBehaviour
 {
     private static InteractionAudio? _instance;
     private readonly AudioSource[] _voices=new AudioSource[6];
-    private readonly AudioClip[] _clips=new AudioClip[7];
-    private readonly float[,] _next=new float[2,7];
+    private readonly AudioClip[] _clips=new AudioClip[Enum.GetValues(typeof(InteractionCue)).Length];
+    private readonly float[,] _next=new float[2,Enum.GetValues(typeof(InteractionCue)).Length];
     private Aircraft? _aircraft;
     private AudioMixerGroup? _mixer;
     private bool _ready;

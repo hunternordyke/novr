@@ -28,6 +28,13 @@ internal sealed class PilotHandVisuals : MonoBehaviour
     private Matrix4x4[]? _bindPoses;
     private int _attempts;
     internal static bool Visible(bool left) => _instance?._gloves[left?0:1]?.Root.gameObject.activeInHierarchy==true;
+    internal static Vector3 TouchPoint(bool left, ControllerSample sample, Transform tracking, bool fingertip = false)
+    {
+        var glove = _instance?._gloves[left ? 0 : 1];
+        return glove != null ? glove.FreeTouchPoint(sample, fingertip) : tracking.TransformPoint(sample.Position);
+    }
+    internal static Quaternion HandRotation(bool left, ControllerSample sample, Transform tracking) =>
+        _instance?._gloves[left ? 0 : 1]?.Root.rotation ?? tracking.rotation * sample.Rotation;
     private void Awake()=>_instance=this;
     private void LateUpdate()
     {
@@ -62,11 +69,12 @@ internal sealed class PilotHandVisuals : MonoBehaviour
             var left=side==0; var sample=TrackedControllers.Read(left);
             Pose? attachment = null; var stick = false; var collective = false;
             if (controls != null && controls.TryGetHeldHandPose(left, out var gripPose, out stick, out collective)) attachment = gripPose;
-            _gloves[side]?.Pose(sample, attachment, stick, collective);
+            var cockpitGrip = Fs20NativeCockpit.HandPose(left, out var pointing);
+            _gloves[side]?.Pose(sample, attachment, stick, collective, cockpitGrip, pointing, Fs20NativeCockpit.Pinching(left));
             if(_sleeves[side]!=null)
             {
                 var glove=_gloves[side]!.Root;
-                Vector3? cuff=attachment.HasValue && collective ? glove.TransformDirection(Vector3.back) : null;
+                Vector3? cuff=!attachment.HasValue || !stick ? glove.TransformDirection(Vector3.back) : null;
                 _sleeves[side]!.enabled=settings.PilotArms.Value && sample.Valid && SolveArm(side,glove.position,cuff);
             }
         }
@@ -147,9 +155,9 @@ internal sealed class PilotHandVisuals : MonoBehaviour
         var a=Vector3.Distance(upper.position,fore.position);var b=Vector3.Distance(fore.position,hand.position);var delta=target-shoulder;var distance=delta.magnitude;
         if(a<.05f||b<.05f||distance<.03f||distance>a+b-.002f)return false; // Gloves remain tracked beyond the sleeve's reachable envelope.
         var direction=delta/distance;var hint=_root!.TransformDirection(new Vector3(side==0?-.35f:.35f,-.5f,-.2f));
-        // A held collective's cuff faces up toward the shoulder. Choose the point
-        // on the elbow's reachable circle closest to that cuff direction instead
-        // of pulling the elbow down as for a freely tracked hand.
+        // Follow the free hand or held throttle/collective cuff, choosing the closest point
+        // on the elbow's reachable circle. An independent downward elbow hint
+        // otherwise introduces a sideways kink at a naturally aligned wrist.
         var bend=cuffDirection.HasValue?Vector3.ProjectOnPlane(cuffDirection.Value,direction):Vector3.zero;
         if(bend.sqrMagnitude<.0001f)bend=Vector3.ProjectOnPlane(hint,direction);
         bend=bend.normalized;if(bend.sqrMagnitude<.5f)bend=Vector3.ProjectOnPlane(_root.right,direction).normalized;

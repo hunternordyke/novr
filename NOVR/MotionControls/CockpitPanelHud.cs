@@ -11,6 +11,9 @@ namespace NOVR.MotionControls;
 // second map. Every game-owned transform is restored before the console hides.
 internal sealed class CockpitPanelHud
 {
+    private readonly bool _integrated;
+    private BepInEx.Configuration.ConfigEntry<MfdPage> LeftPage => _integrated ? ModConfiguration.Instance.Fs20LeftMfdPage : ModConfiguration.Instance.LeftMfdPage;
+    private BepInEx.Configuration.ConfigEntry<MfdPage> RightPage => _integrated ? ModConfiguration.Instance.Fs20RightMfdPage : ModConfiguration.Instance.RightMfdPage;
     private sealed class Dock
     {
         internal readonly RectTransform Widget, Slot;
@@ -167,8 +170,8 @@ internal sealed class CockpitPanelHud
         var config = ModConfiguration.Instance;
         // Map is the first supported interactive page. Selecting the slave key
         // brings it onto this MFD, swapping the other page if necessary.
-        if (left) { if (config.RightMfdPage.Value == MfdPage.Map) config.RightMfdPage.Value = config.LeftMfdPage.Value; config.LeftMfdPage.Value = MfdPage.Map; }
-        else { if (config.LeftMfdPage.Value == MfdPage.Map) config.LeftMfdPage.Value = config.RightMfdPage.Value; config.RightMfdPage.Value = MfdPage.Map; }
+        if (left) { if (RightPage.Value == MfdPage.Map) RightPage.Value = LeftPage.Value; LeftPage.Value = MfdPage.Map; }
+        else { if (LeftPage.Value == MfdPage.Map) LeftPage.Value = RightPage.Value; RightPage.Value = MfdPage.Map; }
         _slave = index; _mapPan = Vector2.zero; _recenter.Reset();
     }
     private void UpdateSlave()
@@ -203,8 +206,9 @@ internal sealed class CockpitPanelHud
         foreach (var dock in _nativeDocks) if (dock.Widget != null && (widget == dock.Widget || widget.IsChildOf(dock.Widget))) return true;
         return false;
     }
-    internal CockpitPanelHud(Transform panel)
+    internal CockpitPanelHud(Transform panel, bool integrated = false)
     {
+        _integrated = integrated;
         var go = new GameObject("Console live displays", typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
         _canvas = go.transform; _canvas.SetParent(panel, false); _canvas.localScale = Vector3.one * .001f;
         var canvas = go.GetComponent<Canvas>(); canvas.renderMode = RenderMode.WorldSpace;
@@ -237,6 +241,25 @@ internal sealed class CockpitPanelHud
         Label(_weapons, "GRID", new Vector2(-72, -80), new Vector2(50, 16), 11);
         _map = Rect("Map page", _canvas, Vector2.zero, new Vector2(215, 180));
         Slot("map", _map, Vector2.zero, new Vector2(215, 180));
+        if (integrated)
+        {
+            // Reuse the lower native display apertures. The canvas root is fixed
+            // to the actual cockpit; this layout never uses a movable panel.
+            for (var i = 0; i < 2; i++)
+            {
+                var x = i == 0 ? -110f : 110f;
+                _screens[i].localPosition = new Vector3(x, 282, 503);
+                _screens[i].localRotation = Quaternion.Euler(12, 0, 0);
+                _screens[i].localScale = Vector3.one * .63f;
+                var background = _screens[i].gameObject.AddComponent<Image>();
+                background.color = new Color(.004f, .009f, .008f, 1); background.raycastTarget = false;
+                _headers[i].rectTransform.localPosition = new Vector3(x, 340, 514);
+                _headers[i].rectTransform.localRotation = Quaternion.Euler(12, 0, 0);
+                _headers[i].rectTransform.localScale = Vector3.one * .67f;
+                _numbers[i].gameObject.SetActive(false);
+                _headers[i].transform.parent.gameObject.SetActive(false); // Physical nameplate carries the page title.
+            }
+        }
         LayerHelper.SetLayerRecursive(_canvas, LayerHelper.GetVrUiLayer());
     }
     private float _aspect = 1;
@@ -304,8 +327,8 @@ internal sealed class CockpitPanelHud
             if (page.HasValue)
             {
                 var config = ModConfiguration.Instance;
-                var pair = MfdPages.Select(config.LeftMfdPage.Value, config.RightMfdPage.Value, i == 0, page.Value);
-                config.LeftMfdPage.Value = pair.left; config.RightMfdPage.Value = pair.right;
+                var pair = MfdPages.Select(LeftPage.Value, RightPage.Value, i == 0, page.Value);
+                LeftPage.Value = pair.left; RightPage.Value = pair.right;
             }
             return true;
         }
@@ -330,19 +353,19 @@ internal sealed class CockpitPanelHud
     {
         ClosePageMenus();
         var config = ModConfiguration.Instance;
-        var pages = MfdPages.Cycle(config.LeftMfdPage.Value, config.RightMfdPage.Value, left, direction);
-        config.LeftMfdPage.Value = pages.left; config.RightMfdPage.Value = pages.right;
+        var pages = MfdPages.Cycle(LeftPage.Value, RightPage.Value, left, direction);
+        LeftPage.Value = pages.left; RightPage.Value = pages.right;
     }
     internal void Update()
     {
         if (!GameManager.GetLocalAircraft(out var aircraft)) { Restore(); return; }
         var config = ModConfiguration.Instance;
-        if (config.LeftMfdPage.Value == config.RightMfdPage.Value)
-            config.RightMfdPage.Value = (MfdPage)(((int)config.LeftMfdPage.Value + 1) % MfdPages.Count);
+        if (LeftPage.Value == RightPage.Value)
+            RightPage.Value = (MfdPage)(((int)LeftPage.Value + 1) % MfdPages.Count);
         if (_aircraft != aircraft) { Restore(); _aircraft = aircraft; }
-        if (_left != config.LeftMfdPage.Value || _right != config.RightMfdPage.Value)
+        if (_left != LeftPage.Value || _right != RightPage.Value)
         {
-            RestoreNative(); _left = config.LeftMfdPage.Value; _right = config.RightMfdPage.Value; _nextFind = 0;
+            RestoreNative(); _left = LeftPage.Value; _right = RightPage.Value; _nextFind = 0;
             PlacePage(_weapons, MfdPage.Weapons); PlacePage(_map, MfdPage.Map);
             for (var i = 0; i < 2; i++)
             {

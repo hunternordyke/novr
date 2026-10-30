@@ -5,7 +5,7 @@ namespace NOVR.MotionControls;
 public sealed class ControllerBindings
 {
     public readonly ConfigEntry<bool> PointerEnabled, CombatEnabled;
-    public readonly ConfigEntry<ControllerButton> Fire, Countermeasures, NextWeapon, SelectTarget, NextCountermeasure, Map, WristMenu, ClearTargets, UnlockTarget, Brake;
+    public readonly ConfigEntry<ControllerButton> Fire, WeaponRelease, Countermeasures, NextWeapon, SelectTarget, NextCountermeasure, Map, WristMenu, ClearTargets, UnlockTarget, Brake;
     public readonly ConfigEntry<float> PointerResponse;
     public readonly ConfigEntry<bool> RightBumperZoom, SelectTargetOnStick;
     public readonly ConfigEntry<float> ViewZoomFactor;
@@ -17,9 +17,10 @@ public sealed class ControllerBindings
         PointerResponse = config.Bind(section, "Pointer Response", 24f, new ConfigDescription("Laser aim smoothing. 0 disables smoothing. Higher follows faster.", new AcceptableValueRange<float>(0f, 60f)));
         RightBumperZoom = config.Bind(section, "Right Bumper View Zoom", true, "Hold the physical right bumper to show a magnified inspection window, with either flight grip held or released. Reserved for zoom even in left-handed mode. Requires a controller with a shoulder button.");
         ViewZoomFactor = config.Bind(section, "View Zoom Factor", 1.7f, new ConfigDescription("Magnification of the fixed-depth inspection window while right bumper is held. Headset projection is unchanged; release hides the window.", new AcceptableValueRange<float>(1.1f, 3f)));
-        Fire = config.Bind(section, "Fire - stick hand", ControllerButton.Trigger, "Hold while gripping the virtual stick to fire.");
+        Fire = config.Bind(section, "Fire - stick hand", ControllerButton.Trigger, "GUNS ONLY. Hold while gripping the virtual stick. Guns remain available with a missile or bomb selected; native safety and readiness still apply.");
+        WeaponRelease = config.Bind(section, "Weapon Release - stick hand", ControllerButton.Primary, "A on the right controller: release the selected non-gun weapon while gripping the stick. Touching the button only animates the thumb.");
         Countermeasures = config.Bind(section, "Countermeasures - throttle hand", ControllerButton.Primary, "Throttle action button: Frame D-pad down or Touch X. Hold while gripping to deploy selected countermeasures.");
-        NextWeapon = config.Bind(section, "Next Weapon - stick hand", ControllerButton.Primary, "Stick action button: A in the right-handed layout. Release while gripping to cycle.");
+        NextWeapon = config.Bind(section, "Next Weapon - stick hand", ControllerButton.OutsideOrSecondary, "B in the right-handed layout. Release while gripping to cycle weapons. With the handle released, B opens the map.");
         // Keep the old key so existing custom button assignments survive the hand change.
         SelectTarget = config.Bind(section, "Select Target - throttle hand", ControllerButton.StickClick, "Target-select button. Uses the stick hand when Select Target On Stick Hand is enabled; otherwise the throttle hand. Press and release while gripping to select under the head-directed designator.");
         NextCountermeasure = config.Bind(section, "Next Countermeasure - throttle hand", ControllerButton.Secondary, "Frame D-pad right, or Y on Touch-compatible controllers.");
@@ -36,7 +37,7 @@ public sealed class ControllerBindings
             "Hold throttle trigger while gripping the throttle to use the game's wheel/air-brake input. Other layouts are available in the wrist Button bindings page.");
         // Only move the recognized stock VTOL layout automatically. Older throttle
         // presets, custom layouts and an explicitly saved hand choice are retained.
-        var stockVtol = Fire.Value == ControllerButton.Trigger && NextWeapon.Value == ControllerButton.Primary &&
+        var stockVtol = Fire.Value == ControllerButton.Trigger && (NextWeapon.Value == ControllerButton.Primary || NextWeapon.Value == ControllerButton.OutsideOrSecondary) &&
             ClearTargets.Value == ControllerButton.Top && UnlockTarget.Value == ControllerButton.SecondaryOrNone &&
             Map.Value == ControllerButton.OutsideOrSecondary && WristMenu.Value == ControllerButton.Menu &&
             Brake.Value == ControllerButton.Trigger && Countermeasures.Value == ControllerButton.Primary &&
@@ -53,13 +54,20 @@ public sealed class ControllerBindings
                 ApplyVtolStyle();
             upgraded.Value = true;
         }
+        var splitUpgrade = config.Bind(section, "Split Weapon Controls Upgrade Applied", false, "One-time move of the stock A weapon-cycle binding to B, freeing A for weapon release.");
+        if (!splitUpgrade.Value)
+        {
+            if (stockVtol && NextWeapon.Value == ControllerButton.Primary)
+                NextWeapon.Value = ControllerButton.OutsideOrSecondary;
+            splitUpgrade.Value = true;
+        }
     }
 
     internal ThrottleButtons ThrottleButtons => new(Brake.Value, Countermeasures.Value,
         SelectTargetOnStick.Value ? ControllerButton.None : SelectTarget.Value, NextCountermeasure.Value);
     internal void ApplyVtolStyle()
     {
-        Fire.Value = ControllerButton.Trigger; NextWeapon.Value = ControllerButton.Primary;
+        Fire.Value = ControllerButton.Trigger; WeaponRelease.Value = ControllerButton.Primary; NextWeapon.Value = ControllerButton.OutsideOrSecondary;
         UnlockTarget.Value = ControllerButton.SecondaryOrNone; ClearTargets.Value = ControllerButton.Top;
         RightBumperZoom.Value = true;
         ApplyThrottleLayout(ThrottleBindingLayout.VtolStyle);

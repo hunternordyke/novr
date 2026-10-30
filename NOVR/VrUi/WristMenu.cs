@@ -89,7 +89,7 @@ internal sealed class WristMenu : MonoBehaviour
                 var stickLeft = config.MotionControls.LeftHanded.Value;
                 var b = config.ControllerBindings;
                 _helpFooter!.text = "Combat buttons need a held or latched handle.\n" +
-                    "Map: " + ControllerButtonNames.Describe(b.Map.Value, stickLeft, TrackedControllers.NativeFrame(stickLeft)) +
+                    "Map (free hand): " + ControllerButtonNames.Describe(b.Map.Value, stickLeft, TrackedControllers.NativeFrame(stickLeft)) +
                     " · View: " + ControllerButtonNames.Describe(b.WristMenu.Value, !stickLeft, TrackedControllers.NativeFrame(!stickLeft)) +
                     "\n" + (b.RightBumperZoom.Value ? "Right bumper: hold magnifier, with either grip released or held." : "Right bumper magnifier is OFF.");
             }
@@ -324,7 +324,7 @@ internal sealed class WristMenu : MonoBehaviour
             () => config.Fs20NativeCockpitEnabled.Value = !config.Fs20NativeCockpitEnabled.Value);
         AddButton("Flight actions", 1, 0, () => ShowPage(_flightPage!));
         Label(_nativeCockpitPage.transform,
-            "Original cluster · fixed to the aircraft\nFree hand: reach + trigger/grip, or point + trigger\n\nLeft: gear lever, weapon dial, hold PARK for brakes\nRight APU switch: engine · adjacent switch: radar\nCenter: AUTO TRIM assist · lower switch: hover\nUpper bezel: range +/− · map · lights · AOTS / head\nLower left: previous/next weapon · CM · linked guns\nLower right: unlock last / clear all targets\n\nEject: lift guard below center cluster, release,\nthen grab the loop and pull toward you.\nNative screens and warning lights stay live.\nSeat adjustment never moves this cluster.",
+            "Physical controls · fixed to the aircraft\nPointing finger: touch a key to press it\nSwitches: reach, grip, then flick up/down\n\nEach MFD: separate PREV and NEXT buttons\nLeft MFD starts on minimap · MAP PAN slaves stick\nGear · hold BRAKE · radar · AOTS HUD\n\nSide panels: unlock, move handle, press to lock\nLeft side arrows: move seat by 2 cm per press\nSeat movement leaves the controls in place\n\nEject: grip a striped seat handle and pull UP\nCockpit stays visible while adjusting layout.",
             new Vector2(0,-48), new Vector2(510,350), 18);
 
         _controlsPage = Page("CONTROLS");
@@ -526,9 +526,9 @@ internal sealed class WristMenu : MonoBehaviour
         var text = (stick ? "STICK" : CollectiveControls ? "COLLECTIVE" : "THROTTLE") + " · " + (left ? "LEFT" : "RIGHT") + "\n\n";
         if (stick)
         {
-            text += Action("Fire (hold)", b.Fire.Value) + Action("Next weapon (release)", b.NextWeapon.Value);
-            if (b.SelectTargetOnStick.Value) text += Action("Select target (release)", b.SelectTarget.Value);
-            text += Action("Unlock last (release)", b.UnlockTarget.Value) + Action("Clear all (release)", b.ClearTargets.Value);
+            text += Action("Guns (hold)", b.Fire.Value) + Action("Missile / weapon release", b.WeaponRelease.Value) + Action("Next weapon (release)", b.NextWeapon.Value);
+            if (b.SelectTargetOnStick.Value) text += "Select: " + Name(b.SelectTarget.Value) + "\n\n";
+            text += "Unlock: " + Name(b.UnlockTarget.Value) + "\n\nClear all: " + Name(b.ClearTargets.Value);
         }
         else
         {

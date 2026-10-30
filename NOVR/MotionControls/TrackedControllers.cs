@@ -10,6 +10,8 @@ namespace NOVR.MotionControls;
 internal struct ControllerSample
 {
     public bool Valid, HasAxis, StickClick, Primary, Secondary, Menu, Shoulder, Top, Outside, NativeFrame;
+    // Presence is visual-only and never aliases a button press or flight action.
+    public bool HasThumbTouch, HasTriggerTouch, ThumbstickTouched, ButtonTouched, PrimaryTouched, ThumbrestTouched, TriggerTouched, GripTouched;
     public InputDevice Device;
     public float Grip, Trigger;
     public Vector3 Position, AimPosition;
@@ -96,6 +98,17 @@ internal static class TrackedControllers
             Debug.Log($"[NOVR] {(left ? "Left" : "Right")} controller: {device.name}; layout {inputDevice?.layout ?? "unavailable"}; {(nativeFrame ? "native Steam Frame bindings" : "generic XR / Touch-compatible bindings")}.");
         }
         bool Button(string name) => inputDevice?.TryGetChildControl<ButtonControl>(name)?.isPressed == true;
+        bool Touch(string name, out bool supported)
+        {
+            var control = inputDevice?.TryGetChildControl<ButtonControl>(name);
+            supported = control != null; return control?.isPressed == true;
+        }
+        var stickTouch = Touch("thumbstickTouched", out var hasStickTouch);
+        var triggerTouch = Touch("triggerTouched", out var hasTriggerTouch);
+        var primaryTouch = Touch(nativeFrame ? "faceButtonBottomTouched" : "primaryTouched", out var hasButtonTouch);
+        var secondaryTouch = Button(nativeFrame ? "faceButtonInsideTouched" : "secondaryTouched");
+        var faceTouch = primaryTouch || secondaryTouch || nativeFrame && (Button("faceButtonTopTouched") || Button("faceButtonOutsideTouched"));
+        var restTouch = Touch("thumbrestTouched", out var hasRestTouch);
         var aimPosition = position;
         var aimRotation = rotation;
         // Use the runtime's aim pose, which differs from the grip pose on Frame.
@@ -117,6 +130,9 @@ internal static class TrackedControllers
             Menu = nativeFrame ? Button("menu") : menu,
             Shoulder = Button("shoulder"), Top = Button("faceButtonTop"), Outside = Button("faceButtonOutside"),
             NativeFrame = nativeFrame,
+            HasThumbTouch = hasStickTouch || hasButtonTouch || hasRestTouch, HasTriggerTouch = hasTriggerTouch,
+            ThumbstickTouched = stickTouch, ButtonTouched = faceTouch, PrimaryTouched = primaryTouch, ThumbrestTouched = restTouch,
+            TriggerTouched = triggerTouch, GripTouched = Button("gripTouched"),
             Position = MapPosition(position), Rotation = NOVRHeadsetData.RotationCalibrationOffset * rotation,
             AimPosition = MapPosition(aimPosition), AimRotation = NOVRHeadsetData.RotationCalibrationOffset * aimRotation
         };

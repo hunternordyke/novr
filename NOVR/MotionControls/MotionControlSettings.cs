@@ -39,8 +39,20 @@ public sealed class MotionControlSettings
         GloveRotation = config.Bind(section, "Glove Wrist Rotation", new Vector3(0,0,90), "Visual left glove rotation in degrees; Y/Z mirror for the right hand. Does not change controller pointers or flight inputs.");
         HelmetNightVision = config.Bind(section, "Helmet Night Vision Gesture", true, "Raise either free hand to the forehead/brow and make a fresh trigger press to toggle native night vision. A short pulse marks the gesture area. Disabled in menus, map and layout editing.");
         MilDetent = config.Bind(section, "MIL Throttle Detent", true, "Afterburning jets only: a 1.6 cm shelf at the installed engine's military-power boundary. Push through for afterburner; no timer or extra button.");
-        InteractionVolume = Float(config, "Interaction Sound Volume", .25f, 0f, 1f, "Volume of spatial button, grip, detent, guard and helmet cues. Zero mutes them without disabling haptics. Uses the aircraft audio mixer when available.");
-        HapticStrength = Float(config, "Interaction Haptic Strength", 1f, 0f, 2f, "Strength of brief grab, release, button, lever and detent feedback. Zero disables these cues.");
+        InteractionVolume = Float(config, "Interaction Sound Volume", .4f, 0f, 1f, "Volume of spatial button, grip, detent, guard and helmet cues. Zero mutes them without disabling haptics. Uses the aircraft audio mixer when available.");
+        HapticStrength = Float(config, "Interaction Haptic Strength", 1.5f, 0f, 2f, "Strength of brief grab, release, button, lever and detent feedback. Zero disables these cues.");
+        var hapticsUpgrade = config.Bind(section, "Stronger Haptics Applied", false, "Migrates the former stock strength once; preserves custom levels and disabled haptics.");
+        if (!hapticsUpgrade.Value)
+        {
+            if (Mathf.Abs(HapticStrength.Value - 1f) < .0001f) HapticStrength.Value = 1.5f;
+            hapticsUpgrade.Value = true;
+        }
+        var audioUpgrade = config.Bind(section, "Mechanical Audio Defaults Applied", false, "Migrates the former stock cue volume once; preserves custom levels and muted audio.");
+        if (!audioUpgrade.Value)
+        {
+            if (Mathf.Abs(InteractionVolume.Value - .25f) < .0001f) InteractionVolume.Value = .4f;
+            audioUpgrade.Value = true;
+        }
         var comfortUpgrade = config.Bind(section, "Frame Comfort Defaults Applied", false, "Tracks the one-time shorter default throttle travel and neutral-wrist visual adjustment.");
         if (!comfortUpgrade.Value)
         {

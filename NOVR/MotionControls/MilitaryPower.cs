@@ -10,8 +10,11 @@ internal static class MilitaryPower
     internal static float Find(Aircraft aircraft)
     {
         var result = 1f;
-        foreach (var engine in aircraft.GetComponentsInChildren<Turbojet>(true))
+        // Aircraft parts become separate physics roots at runtime. The engine
+        // registry remains authoritative after that reparenting.
+        foreach (var state in aircraft.engineStates)
         {
+            if (state is not Turbojet engine) continue;
             if (AccessTools.Field(typeof(Turbojet), "nozzles")?.GetValue(engine) is not JetNozzle[] nozzles) continue;
             foreach (var nozzle in nozzles)
             {

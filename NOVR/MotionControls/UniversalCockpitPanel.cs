@@ -57,8 +57,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         ["cm"] = Vector3.zero, ["hover"] = Vector3.zero, ["zoom_in"] = Vector3.zero, ["zoom_out"] = Vector3.zero,
         ["guard"] = new(0, -.05f, -.017f), ["eject"] = new(0, -.025f, 0)
     };
-    internal static bool IsDocked(Transform widget) => Instance?._hud?.Contains(widget) == true;
-    internal static bool LeftStickSlaved => Instance?._visible == true && Instance._hud?.LeftStickSlaved == true && !WristMenu.IsOpen && !CockpitLayout.Active;
+    internal static bool IsDocked(Transform widget) => Instance?._hud?.Contains(widget) == true || Fs20NativeCockpit.IsDocked(widget);
+    internal static bool LeftStickSlaved => Fs20NativeCockpit.LeftStickSlaved || Instance?._visible == true && Instance._hud?.LeftStickSlaved == true && !WristMenu.IsOpen && !CockpitLayout.Active;
     internal static Vector2 MapPan => Instance?._visible == true ? Instance._hud?.MapPan ?? Vector2.zero : Vector2.zero;
     internal static bool HasDisplays => Instance?._visible == true && Instance._hud?.HasStatus == true;
     private void Awake() => Instance = this;
@@ -134,8 +134,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (!TryCreateModel()) { Hide(); return; }
         _visible = true; _model!.Root.gameObject.SetActive(true);
         UpdatePlacement(root);
-        _model.SetLayoutMode(CockpitLayout.Active || WristMenu.IsConsoleSetup);
-        _hud!.SetVisible(!CockpitLayout.Active);
+        _model.SetLayoutMode(false);
+        _hud!.SetVisible(true);
         if (CockpitLayout.Active)
         {
             CancelInteraction(); _laser!.enabled = false; _dot!.gameObject.SetActive(false);
@@ -147,8 +147,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         if (WristMenu.IsOpen)
         {
             _hud!.ClosePageMenus();
-            _hud.SetVisible(false);
-            _model.Root.gameObject.SetActive(WristMenu.IsConsoleSetup);
+            _hud.SetVisible(true);
+            _model.Root.gameObject.SetActive(true);
             CancelInteraction(); _laser!.enabled = false; _dot!.gameObject.SetActive(false);
             if (_hint != null) _hint.text = WristMenu.IsConsoleSetup
                 ? "CONSOLE SETUP  •  PLACEMENT SAVED FOR THIS AIRCRAFT"
@@ -419,8 +419,8 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
         _model.Groups["eject"].localPosition = new Vector3(_ejectRest.x * CockpitPanelPlacement.Aspect, _ejectRest.y, _ejectRest.z) + Vector3.back * (_active == "eject" ? .02f : 0);
         foreach (var button in _buttonRest)
             _model.Groups[button.Key].localPosition = new Vector3(button.Value.x * CockpitPanelPlacement.Aspect, button.Value.y, button.Value.z) + Vector3.forward * (_active == button.Key ? .003f : 0);
-        if (!CockpitLayout.Active) _hud!.Update();
-        _nativeInstruments.Update(_aircraft, !CockpitLayout.Active && !WristMenu.IsOpen && _model.Root.gameObject.activeInHierarchy);
+        _hud!.Update();
+        _nativeInstruments.Update(_aircraft, _model.Root.gameObject.activeInHierarchy);
     }
     private bool TryCreateModel()
     {
@@ -514,5 +514,5 @@ internal sealed class UniversalCockpitPanel : MonoBehaviour
 [HarmonyPatch(typeof(DynamicMap), nameof(DynamicMap.Maximize))]
 internal static class ConsoleMapUndockPatch
 {
-    [HarmonyPrefix] private static void Prefix() => UniversalCockpitPanel.Instance?.ReleaseMap();
+    [HarmonyPrefix] private static void Prefix() { UniversalCockpitPanel.Instance?.ReleaseMap(); Fs20NativeCockpit.ReleaseMap(); }
 }

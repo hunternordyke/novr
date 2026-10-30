@@ -183,7 +183,7 @@ caption stays above the lift range. Saved seat and handle placements are retaine
 
 ## Default bindings
 
-The 0.4.6.1 VTOL-style preset uses the following right-handed Frame layout.
+The 0.4.7.2 VTOL-style preset uses the following right-handed Frame layout.
 Combat/flight buttons work only with the corresponding handle held or latched.
 Twist the stick for rudder in flight and native wheel steering on the ground;
 30° twist gives full input. Horizontal thumbstick yaw remains optional. Turn both
@@ -191,8 +191,9 @@ yaw options off under View → Flight controls when using pedals.
 
 | Action | Frame | Touch fallback |
 | --- | --- | --- |
-| Fire | Right trigger | Right trigger |
-| Next weapon | Right A | Right A |
+| Guns only | Right trigger | Right trigger |
+| Selected non-gun weapon release | Right A | Right A |
+| Next weapon, stick held | Right B | Right B |
 | Wheel/air brake | Left trigger | Left trigger |
 | Deploy countermeasures | Left D-pad down | Left X |
 | Select target at head-directed cue, stick held | Right thumbstick click | Right thumbstick click |
@@ -200,7 +201,7 @@ yaw options off under View → Flight controls when using pedals.
 | Clear all targets | Right Y | Wrist Flight actions |
 | Next CM type | Left D-pad right | Left Y |
 | Inspection magnifier, grip optional | Physical right bumper, hold | Shoulder button if fitted |
-| Map | Right B | Right B |
+| Map, stick released | Right B | Right B |
 | Wrist panel | Left View | Left menu |
 
 Weapon/target/CM-type changes and unlocks act on release; fire, brake and CM
@@ -584,3 +585,8 @@ Version 0.4.6.8 retains the [AOTS HUD and contextual aiming cue](OPTICAL_HUD.md)
 PC dynamic foveated rendering is still not active; see [capability limits](PC_FOVEATION.md).
 The build and 118 automated checks pass, including the installed Rewired API
 contract. Actual mission-menu recovery and controller behavior require a user test.
+
+
+Version 0.4.7.2 physical FS-20 controls, handle poses and setup buttons are described
+in [FS20_NATIVE_COCKPIT.md](FS20_NATIVE_COCKPIT.md). Capacitive A touch rests the
+thumb on the red release button; A press depresses it. Trigger still operates guns.

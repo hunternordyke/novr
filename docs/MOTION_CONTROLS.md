@@ -67,8 +67,9 @@ custom bindings are retained. Held or tap-latched handles both enable their butt
 
 | Action | Default Frame button | Required context |
 | --- | --- | --- |
-| Fire | Right trigger | Stick held |
-| Next weapon | Right A, release | Stick held |
+| Guns only | Right trigger | Stick held |
+| Selected non-gun weapon release | Right A | Stick held |
+| Next weapon | Right B, release | Stick held |
 | Wheel/air brakes | Left trigger, hold | Throttle held |
 | Countermeasures | Left D-pad down, hold | Throttle held |
 | Select target under head-directed cue | Right thumbstick click, release | Stick held |
@@ -76,12 +77,12 @@ custom bindings are retained. Held or tap-latched handles both enable their butt
 | Clear all selected targets | Right Y, release | Stick held |
 | Next countermeasure type | Left D-pad right, release | Throttle held |
 | Inspection magnifier | Physical right bumper, hold | Cockpit, with either grip held or released |
-| Map / wrist menu | Right B / left View | Cockpit |
+| Map / wrist menu | Right B / left View | Cockpit; stick released for B map |
 
 Target selection does not force a weapon lock: seeker, range, radar and weapon
 restrictions still apply. X removes the most recently selected target; Y clears
 all selected targets. Both actions are also on the wrist Flight actions page.
-For Touch fallback: A changes weapon, X deploys CMs, right thumbstick click selects,
+For Touch fallback: A releases non-gun weapons, B cycles while gripping, X deploys CMs, right thumbstick click selects,
 and Y changes CM type; use wrist actions for unlock/clear. A controller without a
 shoulder button has no default inspection binding.
 
@@ -691,3 +692,9 @@ clipping, hand comfort and streaming performance remain to be tested.
 See [OPTICAL_HUD.md](OPTICAL_HUD.md) for the AOTS HUD toggle, HEAD/TRACK targeting
 and contextual acquisition cue. [PC_FOVEATION.md](PC_FOVEATION.md) records the
 PC foveation investigation and eye-input readiness; PC DFR is not active.
+
+
+Version 0.4.7.2 removes the floating handle captions and adds fitted FS-20 hand
+poses, capacitive touch response, separate gun/weapon-release inputs and physical
+cockpit controls. See [FS20_NATIVE_COCKPIT.md](FS20_NATIVE_COCKPIT.md) for current
+interaction and positioning instructions; earlier caption notes above are history.

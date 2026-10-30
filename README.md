@@ -4,7 +4,16 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-NOVR Motion Prototype **0.4.6.9 candidate** adds a tracked-controller stick and throttle,
+Version **0.4.7.2** adds the [FS-20 physical cockpit](docs/FS20_NATIVE_COCKPIT.md):
+large touch buttons and grip/flick switches, two seven-page MFDs (including a live
+minimap), seat-handle ejection, side-panel handle locks and seat arrows. Fitted
+throttle/stick gloves respond to capacitive touch, including separate A-button
+rest/press poses. Trigger fires guns, A releases the selected non-gun weapon, and
+B cycles weapons while gripping (map with a free hand). The FS-20 MIL detent is
+fixed, handle status captions are removed, and setup keeps cockpit displays visible.
+The FS-20 metal shaft/arm ends have short spatial fades; the grips stay solid.
+
+NOVR Motion Prototype **0.4.7.2** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
 The shared 3D console combines seven selectable MFD pages with physical gear,
 radar, engine, flight-assist and guarded eject controls. View → Edit cockpit layout
@@ -25,7 +34,7 @@ are grip-gated. Physical right bumper opens a fixed-depth inspection magnifier
 with either grip released or held; it does not change headset stereo projection.
 
 Optional tap-to-latch grips, adjustable control response, a live binding guide,
-wheel/air brakes and readable handle captions support flying without a keyboard.
+wheel/air brakes and physical cockpit controls support flying without a keyboard.
 The **HOV** key and wrist action operate native hover assist; its lamp follows
 actual aircraft state. Throttle/collective readouts preserve the pilot’s command
 while hover assist adjusts engine power. Unavailable controls explain why.

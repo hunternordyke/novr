@@ -19,6 +19,17 @@ internal sealed class CockpitLayout : MonoBehaviour
     internal static CockpitLayout? Instance { get; private set; }
     internal static bool Active => Instance?._active == true;
     private bool _active, _leftHanded, _panelChanged;
+    private Element _onlyElement;
+    internal static bool PhysicalHandleEdit => Active && Instance!._onlyElement != Element.None;
+    internal static bool Unlocked(Element element) => Active && (Instance!._onlyElement == Element.None || Instance._onlyElement == element);
+    internal void ToggleHandle(Element element)
+    {
+        if (element != Element.Stick && element != Element.Throttle) return;
+        var close = Unlocked(element);
+        if (_active) Finish(true);
+        if (close) return;
+        Begin(); if (_active) _onlyElement = element;
+    }
     private float _panelScale;
     private Aircraft? _aircraft;
     private Vector3 _stick, _throttle, _panel, _calibration, _anchor;
@@ -34,6 +45,7 @@ internal sealed class CockpitLayout : MonoBehaviour
     internal static string Hint => Fs20NativeCockpit.Selected ? "EDIT HANDLES  •  FS-20 CLUSTER IS FIXED  •  VIEW → SAVE LAYOUT" : "EDIT LAYOUT  •  GRIP A HANDLE OR PANEL TO MOVE  •  VIEW → SAVE LAYOUT";
     internal static bool Held(Element element) => Active && (Instance!._hands[0].Element == element || Instance._hands[1].Element == element);
     internal static bool Hovered(Element element) => Active && (Instance!._hands[0].Hover == element || Instance._hands[1].Hover == element);
+    internal static Element HeldByHand(bool left) => Active ? Instance!._hands[left ? 0 : 1].Element : Element.None;
     private Vector3 Mirror(Vector3 p) => _leftHanded ? new Vector3(-p.x, p.y, p.z) : p;
     private void Awake() => Instance = this;
 
@@ -50,7 +62,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         ModConfiguration.Instance.CockpitPanelEnabled.Value = true;
         MotionFlightController.Instance?.CancelPlacement();
         ControllerActions.Instance?.ResetButtons();
-        _active = true; Release(); WristMenu.Close();
+        _onlyElement = Element.None; _active = true; Release(); WristMenu.Close();
     }
 
     internal void Finish(bool save)
@@ -58,7 +70,7 @@ internal sealed class CockpitLayout : MonoBehaviour
         if (!_active) return;
         var sameAircraft = GameManager.GetLocalAircraft(out var aircraft) && aircraft == _aircraft &&
             _leftHanded == ModConfiguration.Instance.MotionControls.LeftHanded.Value;
-        _active = false; Release();
+        _active = false; _onlyElement = Element.None; Release();
         if (save && sameAircraft)
         {
             CockpitProfiles.Instance?.SaveHandles(_stick, _throttle);
@@ -142,12 +154,13 @@ internal sealed class CockpitLayout : MonoBehaviour
         // Reach takes precedence over pointing. Either hand may move any item.
         foreach (var element in new[] { Element.Stick, Element.Throttle, Element.Panel })
         {
+            if (_onlyElement != Element.None && element != _onlyElement) continue;
             if (_hands[1 - index].Element == element || element == Element.Panel && Fs20NativeCockpit.Selected) continue;
             var d = element == Element.Panel ? PanelDistance(hand) : Vector3.Distance(hand, GripPosition(element));
             if (d < (element == Element.Panel ? .065f : ModConfiguration.Instance.MotionControls.GrabRadius.Value) && d < distance)
             { best = element; distance = d; }
         }
-        if (best != Element.None) return best;
+        if (best != Element.None || Fs20NativeCockpit.Selected) return best;
         foreach (var element in new[] { Element.Stick, Element.Throttle, Element.Panel })
         {
             if (_hands[1 - index].Element == element || element == Element.Panel && Fs20NativeCockpit.Selected) continue;
@@ -185,7 +198,7 @@ internal sealed class CockpitLayout : MonoBehaviour
     private static Vector3 BoundHandle(Vector3 p) => new(Mathf.Clamp(p.x, -1.2f, 1.2f), Mathf.Clamp(p.y, -1.25f, .7f), Mathf.Clamp(p.z, -.35f, 1.5f));
     private void DrawRay(int index, ControllerSample hand, Element element)
     {
-        if (!hand.Valid || element == Element.None) { if (_rays[index] != null) _rays[index]!.enabled = false; return; }
+        if (Fs20NativeCockpit.Selected || !hand.Valid || element == Element.None) { if (_rays[index] != null) _rays[index]!.enabled = false; return; }
         var root = APIBus.CockpitHudCamera?.transform.parent;
         if (root == null) return;
         if (_rays[index] == null)

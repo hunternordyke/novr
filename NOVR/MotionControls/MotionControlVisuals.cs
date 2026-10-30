@@ -12,23 +12,19 @@ internal sealed class MotionControlVisuals : IDisposable
 {
     public Transform Root { get; }
     private readonly Transform _stickBase, _stickPivot, _throttleBase, _throttleHandle;
-    private readonly Transform _stickHand, _throttleHand, _rail, _throttleCaption;
+    private readonly Transform _stickHand, _throttleHand, _rail;
     private readonly Transform _sliderParts, _collectiveParts, _collectiveJoint, _collectiveShaft;
     private readonly Transform _milMark;
     private readonly Transform[] _railTicks = new Transform[5];
     private readonly Renderer _stickGrip, _throttleGrip, _collectiveGrip;
     private readonly Material _baseMaterial, _idleMaterial, _hoverMaterial, _heldMaterial, _handMaterial, _textMaterial;
     private readonly Font _font;
-    private readonly TextMesh _stickLabel, _throttleLabel, _brakeLabel;
     private NativeControlModel? _nativeStick, _nativeThrottle;
     private readonly List<Renderer> _fallbackStick = new(), _fallbackThrottle = new();
-    private bool? _lastBrake;
     private float _lastTravel = -1;
     private bool? _lastCollective;
     private float _lastSide;
     private readonly Dictionary<Mesh, Mesh> _shadedMeshes = new();
-    private int _lastThrottlePercent = -1;
-    private string? _lastStickCaption, _lastThrottleCaption, _lastThrottleTitle;
 
     public MotionControlVisuals(Transform trackingRoot)
     {
@@ -56,10 +52,6 @@ internal sealed class MotionControlVisuals : IDisposable
             Shape("Shaft", PrimitiveType.Cylinder, _stickPivot, new Vector3(0, 0.05f, 0), new Vector3(0.025f, 0.05f, 0.025f), _idleMaterial);
             _stickGrip = Shape("Grip", PrimitiveType.Capsule, _stickPivot, new Vector3(0, 0.12f, 0), new Vector3(0.05f, 0.04f, 0.05f), _idleMaterial);
             Shape("Top", PrimitiveType.Sphere, _stickPivot, new Vector3(0, 0.155f, 0), new Vector3(0.025f, 0.012f, 0.025f), _baseMaterial);
-            _stickLabel = Label("STICK\nHOLD GRIP", _stickBase, new Vector3(.04f, .28f, -.055f));
-            _stickLabel.transform.localScale = Vector3.one * .65f;
-            Shape("Stick label backplate", PrimitiveType.Cube, _stickLabel.transform, new Vector3(0, 0, .005f),
-                new Vector3(.19f, .054f, .006f), _baseMaterial);
 
             _throttleBase = Child("Throttle", Root);
             _rail = Shape("Rail", PrimitiveType.Cube, _throttleBase, new Vector3(0, -0.05f, 0), new Vector3(0.1f, 0.02f, 0.3f), _baseMaterial).transform;
@@ -78,16 +70,6 @@ internal sealed class MotionControlVisuals : IDisposable
             _collectiveJoint.localRotation = Quaternion.Euler(0, 0, 90);
             _collectiveShaft = Shape("Collective arm", PrimitiveType.Cylinder, _throttleBase, Vector3.zero,
                 new Vector3(.023f, .14f, .023f), _baseMaterial).transform;
-            _throttleCaption = Child("Throttle readout", _throttleBase);
-            _throttleCaption.localRotation = Quaternion.Euler(35, 0, 0);
-            _throttleCaption.localScale = Vector3.one * .65f;
-            _throttleLabel = Label("THROTTLE\nHOLD GRIP", _throttleCaption, new Vector3(0, .0185f, 0));
-            _throttleLabel.transform.localRotation = Quaternion.identity;
-            _brakeLabel = Label("BRAKES RELEASED", _throttleCaption, new Vector3(0, -.035f, 0));
-            _brakeLabel.transform.localRotation = Quaternion.identity;
-            _brakeLabel.characterSize = .0041f;
-            Shape("Throttle label backplate", PrimitiveType.Cube, _throttleCaption, new Vector3(0, 0, .005f),
-                new Vector3(.19f, .105f, .006f), _baseMaterial);
             for (var i = 0; i < _railTicks.Length; i++)
                 _railTicks[i] = Shape("Travel marker " + i, PrimitiveType.Cube, _throttleBase,
                     Vector3.zero, new Vector3(i % 2 == 0 ? .02f : .013f, .003f, .003f), _idleMaterial).transform;
@@ -95,8 +77,8 @@ internal sealed class MotionControlVisuals : IDisposable
             _milMark = Child("MIL detent gate", _throttleBase);
             Shape("Detent notch", PrimitiveType.Cube, _milMark, Vector3.zero, new Vector3(.025f, .004f, .007f), _hoverMaterial);
             Shape("Detent notch edge", PrimitiveType.Cube, _milMark, new Vector3(.011f, .003f, .006f), new Vector3(.004f, .009f, .018f), _baseMaterial);
-            var milLabel = Label("MIL", _milMark, new Vector3(0, .018f, 0));
-            milLabel.characterSize = .0045f;
+            var milLabel = Label("MIL", _milMark, new Vector3(0, .0022f, -.011f));
+            milLabel.characterSize = .0011f; milLabel.transform.localRotation = Quaternion.Euler(90,0,0);
             _stickHand = Shape("Stick Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
             _throttleHand = Shape("Throttle Hand", PrimitiveType.Sphere, Root, Vector3.zero, Vector3.one * 0.025f, _handMaterial).transform;
         }
@@ -122,7 +104,7 @@ internal sealed class MotionControlVisuals : IDisposable
     }
 
     internal Pose GripPose(bool stick) => stick
-        ? new Pose(_stickPivot.TransformPoint(Vector3.up * .12f), _stickPivot.rotation)
+        ? new Pose(_stickPivot.TransformPoint(Vector3.up * .108f), _stickPivot.rotation)
         : new Pose(_throttleHandle.position, _throttleHandle.rotation);
 
     public void Update(Vector3 stick, Vector3 throttle, float travel, float angle, float pitch, float roll,
@@ -134,12 +116,7 @@ internal sealed class MotionControlVisuals : IDisposable
         _stickBase.localPosition = stick - Vector3.up * 0.12f;
         _stickPivot.localRotation = Quaternion.Euler(pitch * angle, 0f, -roll * angle) * Quaternion.Euler(0f, yawDegrees, 0f);
         _throttleBase.localPosition = throttle;
-        // Keep captions near the pilot and just outside each grip: farther outboard
-        // intersects cockpit walls, while centered text overlaps the HUD console.
-        // Lift collective captions above the complete lever arc; mirror with the hands.
         var side = stick.x >= throttle.x ? 1f : -1f;
-        _stickLabel.transform.localPosition = new Vector3(side * .04f, .28f, -.055f);
-        _throttleCaption.localPosition = new Vector3(-side * .04f, collective ? Mathf.Max(.16f, travel * .5f + .075f) : .16f, -.055f);
         if (_lastTravel != travel || _lastCollective != collective || _lastSide != side)
         {
             _lastTravel = travel;
@@ -184,29 +161,9 @@ internal sealed class MotionControlVisuals : IDisposable
         _stickHand.localPosition = stickHand;
         _throttleHand.gameObject.SetActive(throttleTracked && !PilotHandVisuals.Visible(!ModConfiguration.Instance.MotionControls.LeftHanded.Value));
         _throttleHand.localPosition = throttleHand;
-        var stickCaption = stickLatched ? "STICK LATCHED\nGRIP TO RELEASE" : stickHeld ? "STICK\nHELD" : stickTapMode ? "STICK\nTAP OR HOLD GRIP" : "STICK\nHOLD GRIP";
-        if (_lastStickCaption != stickCaption) { _stickLabel.text = stickCaption; _lastStickCaption = stickCaption; }
-        if (_lastBrake != brakesApplied)
-        {
-            _lastBrake = brakesApplied;
-            _brakeLabel.text = brakesApplied ? "BRAKES ON" : "BRAKES RELEASED";
-            _brakeLabel.color = brakesApplied ? new Color(1f, .75f, .18f) : new Color(.65f, .72f, .78f);
-        }
         _milMark.gameObject.SetActive(!collective && milPower > 0 && milPower < 1);
         _milMark.localPosition = new Vector3(-side * .07f, -.025f, (ThrottleDetent.Position(milPower, milPower, travel) - .5f) * travel);
-        var power = milPower > 0 && thrust >= milPower ? (thrust > milPower + .00001f ? " · AB" : " · MIL") : "";
-        throttleTitle += power;
-        var percent = Mathf.RoundToInt(thrust * 100);
-        var throttleCaption = throttleLatched ? "LATCHED\nGRIP TO RELEASE" : collective
-            ? (throttleHeld ? "LIFT TO INCREASE" : throttleTapMode ? "TAP/HOLD + LIFT" : "GRIP + LIFT")
-            : throttleHeld ? "HELD" : throttleTapMode ? "TAP OR HOLD GRIP" : "HOLD GRIP";
-        if (_lastThrottlePercent != percent || _lastThrottleCaption != throttleCaption || _lastThrottleTitle != throttleTitle)
-        {
-            _throttleLabel.text = $"{throttleTitle} {percent}%\n{throttleCaption}";
-            _lastThrottlePercent = percent;
-            _lastThrottleCaption = throttleCaption;
-            _lastThrottleTitle = throttleTitle;
-        }
+
     }
 
     private static Transform Child(string name, Transform parent)

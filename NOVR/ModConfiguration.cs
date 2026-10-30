@@ -26,7 +26,7 @@ public class ModConfiguration
     public readonly ConfigEntry<bool> HudContrast, HudDeclutter, FocusedFlightHud;
     public readonly ConfigEntry<float> FlightHudScale, InstrumentBrightness, MfdBrightness;
     public readonly ConfigEntry<float> MarkerScale, MarkerLabelScale, ReticleScale, WeaponHudScale;
-    internal readonly ConfigEntry<MotionControls.MfdPage> LeftMfdPage, RightMfdPage;
+    internal readonly ConfigEntry<MotionControls.MfdPage> LeftMfdPage, RightMfdPage, Fs20LeftMfdPage, Fs20RightMfdPage;
     public readonly ConfigEntry<bool> CockpitPanelEnabled, Fs20NativeCockpitEnabled;
     public readonly ConfigEntry<Vector3> CockpitPanelPosition;
     public readonly ConfigEntry<float> CockpitPanelTilt, CockpitPanelScale, CockpitPanelYaw, CockpitPanelRoll;
@@ -53,6 +53,8 @@ public class ModConfiguration
         CockpitPanelScale = config.Bind("Universal Cockpit Panel", "Scale", 1f, new ConfigDescription("Automatic dashboard-fit size multiplier, also used for fallback placement. Manual panel sizes are saved per aircraft.", new AcceptableValueRange<float>(0.65f, 1.4f)));
         LeftMfdPage = config.Bind("Universal Cockpit Panel", "Left MFD page", global::NOVR.MotionControls.MfdPage.Weapons, "Page on the left display.");
         RightMfdPage = config.Bind("Universal Cockpit Panel", "Right MFD page", global::NOVR.MotionControls.MfdPage.Map, "Page on the right display. Selecting an occupied page swaps the displays.");
+        Fs20LeftMfdPage = config.Bind("FS-20 Cockpit", "Left MFD page", global::NOVR.MotionControls.MfdPage.Map, "Integrated left display; defaults to the live minimap.");
+        Fs20RightMfdPage = config.Bind("FS-20 Cockpit", "Right MFD page", global::NOVR.MotionControls.MfdPage.Weapons, "Integrated right display. Selecting an occupied page swaps the displays.");
         InstrumentBrightness = config.Bind("VR HUD", "Instrument Brightness", 1f,
             new ConfigDescription("Brightness of flight instruments, compass and pitch ladder only. Target/flight-path markers and missile warnings retain their native brightness.", new AcceptableValueRange<float>(.35f, 1f)));
         MfdBrightness = config.Bind("Universal Cockpit Panel", "Display Brightness", 1f,

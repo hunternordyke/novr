@@ -19,6 +19,7 @@
     <Compile Include="../NOVR/MotionControls/MenuHistory.cs" Link="MenuHistory.cs" />
     <Compile Include="../NOVR/MotionControls/MfdPages.cs" Link="MfdPages.cs" />
     <Compile Include="../NOVR/MotionControls/HelmetGestureMath.cs" Link="HelmetGestureMath.cs" />
+    <Compile Include="../NOVR/MotionControls/CockpitTouchGate.cs" Link="CockpitTouchGate.cs" />
     <Compile Include="../NOVR/MotionControls/ThrottleDetent.cs" Link="ThrottleDetent.cs" />
     <Compile Include="../NOVR/MotionControls/FlightGrip.cs" Link="FlightGrip.cs" />
     <Compile Include="../NOVR/MotionControls/FlightControlMath.cs" Link="FlightControlMath.cs" />

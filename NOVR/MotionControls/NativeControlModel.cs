@@ -19,6 +19,7 @@ internal sealed class NativeControlModel : IDisposable
     private readonly MaterialPropertyBlock _highlight = new();
     private int _lastHighlight = -1;
     private bool _visible;
+    private NativeHandleFade? _fade;
 
     private NativeControlModel(Transform parent)
     {
@@ -73,7 +74,20 @@ internal sealed class NativeControlModel : IDisposable
             else if (!MotionFlightController.UsesLiftCollective(aircraft))
                 grip.y = bounds.max.y - Mathf.Min(.028f, bounds.size.y * .22f);
             geometry.localPosition = -grip;
+            if (!stick && Fs20NativeCockpit.IsAircraft(aircraft))
+            {
+                // This native assembly includes a very broad throttle housing.
+                // Fit the VR copy to the glove (about 16 cm across), retaining
+                // the acquired palm socket and the installed mesh/materials.
+                geometry.localScale *= .68f; geometry.localPosition *= .68f;
+                geometry.localPosition += Vector3.up * .005f;
+            }
             if (stick) model._root.localPosition = Vector3.up * .12f;
+            if (Fs20NativeCockpit.IsAircraft(aircraft))
+            {
+                try { model._fade = new NativeHandleFade(model._root,model._copies); }
+                catch(Exception e) { Debug.LogWarning("[NOVR] Shaft fade unavailable; opaque native handle retained: " + e.Message); }
+            }
             foreach (var source in sources)
                 foreach (var renderer in source.GetComponentsInChildren<MeshRenderer>(true))
                     if (renderer.GetComponent<MeshFilter>()?.sharedMesh != null)
@@ -143,10 +157,12 @@ internal sealed class NativeControlModel : IDisposable
             _highlight.SetColor("_BaseColor", Color.Lerp(baseColor, state == 2 ? new Color(.25f, 1, .5f) : new Color(1, .75f, .2f), .4f));
             renderer.SetPropertyBlock(_highlight);
         }
+        _fade?.SyncPropertyBlocks();
     }
     public void Dispose()
     {
         if (_visible) SetVisible(false);
+        _fade?.Dispose(); _fade = null;
         if (_root != null) Object.Destroy(_root.gameObject);
     }
 }

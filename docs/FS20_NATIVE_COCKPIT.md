@@ -1,85 +1,101 @@
 # FS-20 Vortex: integrated VR cockpit
 
-Available in 0.4.7.0. The FS-20 retains its original cockpit cluster, instruments,
-tactical display, target/landing camera behavior and warning lights. There is no
-movable replacement panel on this aircraft. Seat adjustment and saved console
-placements do not move the cluster. Other aircraft retain the shared console.
+Version 0.4.7.2 keeps the FS-20's original instrument cluster and adds raised,
+labelled physical controls over its existing switch rows. There is no movable
+replacement panel. Seat adjustments never move the cluster or flight handles.
+Other aircraft retain the shared console.
 
-Release the flight-control grip on the hand you want to use. Either free hand can
-point at an enabled control and press trigger, or reach within 3.5 cm and press
-trigger or grip. White contextual hints identify the function and current state.
-Release before moving to another control. Button presses, grabs and eject actions
-use the existing sound and haptic settings.
+## Physical interaction
 
-In 0.4.7.1, interaction hints and the eject-cover label are explicitly white.
-The font material also handles alpha-only font atlases correctly, including
-after the dynamic atlas rebuilds; these could previously make the text black
-despite its light tint. This changes the VR interaction text, not the aircraft's
-original painted legends.
+Release the flight handle with the hand you want to use. Either hand works.
+Approach a button with the pointing fingertip, touch it, then withdraw before
+pressing again. No trigger or grip is needed for buttons. For a switch, reach
+close, grip to attach the thumb/index pinch, and flick up or down at least 1.2 cm.
+Release to detach. Controller rays cannot operate these FS-20 controls.
+Raised housings, chamfered caps and metal stems use cockpit lighting. The caps
+reference a plain paint/normal-map region of the installed FS-20 cockpit atlas,
+with restrained surface detail; white legends use a separate text material.
+Touch, press, grab, switch travel and release have distinct sound/haptic cues.
 
-## Control locations
-
-Bezel button numbers below run left to right along the **upper row beneath the
-wide screen**, or along the **single row immediately beneath each small screen**.
-They exclude the rectangular lamps below those rows.
-
-| Existing cockpit part | VR function |
+| Location | Control and operation |
 | --- | --- |
-| Left gear wheel/lever | Point + trigger toggles; directly grab and move up/down 2.5 cm. Ground gear lock remains active. |
-| Upper-left PYLON dial | Next weapon |
-| Left PARK switch | Hold for wheel brakes; release to release brakes. It does not latch. |
-| Right APU toggle | Engine ignition on/off; the game does not expose a separate APU simulation here. |
-| Toggle immediately left of APU | Radar on/off |
-| Center AUTO TRIM toggle | Native flight assist |
-| Bottom center toggle | Native hover assist; availability/ground restrictions still apply. The original decorative legend remains. |
-| Wide-screen upper bezel 1 / 2 | Tactical display span larger / smaller, 5–160 km. Rescales existing radar/optical plot contacts, not the full-screen map. |
-| Wide-screen upper bezel 3 | Open full tactical map |
-| Wide-screen upper bezel 5 | Navigation lights |
-| Wide-screen upper bezel 7 / 8 | AOTS helmet view on/off / return AOTS to head aiming |
-| Lower-left screen buttons 1 / 2 | Previous / next weapon |
-| Lower-left screen buttons 5 / 6 | Next countermeasure type / toggle linked guns |
-| Lower-right screen buttons 1 / 2 | Unlock last target / clear all selected targets |
+| Separate PREV / NEXT keys above each MFD | Touch the desired key; page name appears on the fixed nameplate above |
+| Lower switch row, left to right | Gear flick switch; touch-and-hold brake; radar flick switch; AOTS HUD flick switch |
+| Between the displays | MAP PAN: slaves physical left thumbstick to the minimap; click stick to recenter; touch again to release |
+| Left side tray, below shoulder | THROTTLE POS: unlock throttle, grab/move it, release, then touch again to save and lock |
+| Right side tray, below shoulder | STICK POS: independently unlock/move/save the stick |
+| Left side tray, six arrow keys | Seat up/down/left/right/forward/back, 2 cm per touch |
+| Striped handles beside the seat | Fresh grip, then pull UP at least 4.5 cm to eject; no hold timer |
 
-Unmapped controls remain decorative. JETTISON, ENG FIRE, ground power and IFF are
-not assigned unrelated actions. Native gauges/screens retain the game's content;
-this build does not add generic seven-page MFDs over them.
+The position buttons follow handedness. Ground gear/weapon restrictions remain.
+Unassigned original switches are decorative; engine, lights, flight assist,
+weapon selection and target clearing remain available in View → Flight actions
+and through the controller bindings. No decorative JETTISON switch triggers eject.
+The View menu retains its separate confirmed ejection action.
 
-## Ejection
+## MFDs and cockpit presentation
 
-A small guarded pull loop sits beneath the existing center pedestal. Lift its
-cover with a fresh trigger/grip press, **release**, then grab the loop and pull
-toward you at least 4.5 cm. With the pointer, open the guard, release, then press
-trigger on the exposed handle. There is no added hold timer. Menus, tracking loss
-and leaving the cockpit cancel the interaction. The native JETTISON switch is
-not the ejection control. View → Flight actions retains its separate confirmation.
+Both integrated MFDs cycle Weapons, Map, Flight, Engine/Fuel, Systems, Tactical and
+Sensor. The left starts on the live minimap, the right on Weapons. The native
+widgets/camera feeds are reused; unavailable feeds report NOT FITTED. Selecting a
+page already owned by the other display swaps the pages. MAP PAN owns the left
+thumbstick while active, preventing accidental VTOL-angle or target input.
 
-## Setup
+The upper native wide display and cockpit geometry remain intact. Duplicate
+floating status panels are hidden while the integrated displays are active.
+Compact missile/radar warnings, feed and damage information sit off the right
+side of the cluster. MFDs and physical controls stay visible while moving handles,
+adjusting the seat or opening the setup menu. Flight actions suspend during setup.
+No seat/headrest masking is installed and the cockpit mesh is not removed.
 
-View → Cockpit setup → FS-20 cockpit contains the interaction toggle and a short
-guide. F6 toggles FS-20 interactions, leaving the original cockpit visible. Edit
-handle layout still adjusts the ergonomic stick/throttle positions; it cannot
-select or move the aircraft's cluster. Flight bindings, twist yaw, VTOL throttle
-thumbstick input, right-bumper magnifier and helmet night-vision gesture remain.
+## Flight handles and gloves
 
-## Implementation and validation
+The FS-20 throttle's rendered copy is 68% of the former size (approximately 16 cm
+across). Travel remains independently adjustable, defaulting to 12 cm. The MIL
+shelf resolves from the aircraft's runtime engine registry: 90% command on FS-20.
+Push through its shelf for afterburner. There are no floating throttle/stick status
+captions. A small physical MIL mark remains. The bottom 4.5 cm of the metal stick
+shaft and throttle arm fades smoothly to transparent, marking their floating
+ends. The upper handles stay opaque. The geometry is prepared once per handle;
+original cockpit meshes and shared materials are untouched.
 
-The installed game's FS-20 definition is `SmallFighter1` (`Multirole1` is the
-KR-67). Interactions are scoped to the local living pilot in that aircraft's VR
-cockpit. Gear, engine, radar, lights, weapons, gun linking and flight-assist actions
-use the native input path, preserving its validation and multiplayer commands.
+The FS-20 has separate authored joint poses for its throttle and stick. The
+throttle palm rests above the handle, fingers curl independently around its front,
+and the thumb can reach the side hat. The stick hand wraps below the head with
+its heel clear of the palm shelf. The cuff and sleeve align toward the forearm.
+Gloves stay attached to the control while held; free hands follow tracking.
 
-Most FS-20 switches are static islands within a combined native mesh. At runtime,
-NOVR creates an instance of that mesh and separates only the mapped moving pieces,
-retaining original materials, UVs, vertex colors, normals and tangents. The white
-gear stem moves with its black wheel. Actual aircraft state drives toggle/lever
-positions; bezel keys depress on press. Native screens and warning components are
-never suppressed or paused for the FS-20. Original mesh state restores on exit.
-If mesh extraction fails, the original geometry remains with static click targets.
+Steam Frame capacitive thumbstick, face-button, trigger and grip presence drive
+visual finger motion. On the stick, touching A rests the thumb on the red release
+button; pressing A moves its pad inward slightly. Thumbstick touch uses a separate
+hat pose. Touch alone never becomes a button press. Controllers without capacitive
+signals still animate actual presses. These are input-driven poses, not optical
+hand tracking. Other aircraft retain their existing grip poses.
 
-No game meshes/textures are distributed. Coordinates were checked against the
-installed 0.34.3 cockpit: 19 distinct controls, 1,586 animated triangles out of
-13,292 cockpit triangles; no overlapping selection regions. Private offline
-renders checked the native layout and gear travel. Release compilation, input/
-ejection checks, private-field compatibility and menu layout checks passed.
-These are offline checks, not in-headset or live aircraft validation. The new
-switches, grip reach, foreground stereo pass and restoration need the user's test.
+## Right-handed weapon bindings
+
+- Trigger: guns, including when a missile/bomb is selected.
+- A: selected non-gun weapon release. It cannot fire a selected gun.
+- B: next weapon on release while holding the stick; map when the stick is free.
+- Right stick click: target selection; X: unlock latest; Y: clear all.
+- Right bumper: magnifier, regardless of grip.
+
+Native pilot/menu/cockpit checks, station safety, reloads and launch/lock/salvo
+behavior remain in the firing path. Fixed guns can fire alongside a selected
+non-gun weapon without changing the selected station. Existing keyboard/HOTAS
+inputs retain their ordinary behavior when no VR firing command is active.
+Reapply the preset under View → Flight controls → Button bindings if needed.
+
+## Scope and validation
+
+The installed game's FS-20 definition is `SmallFighter1` (not `Multirole1`).
+The implementation targets Nuclear Option 0.34.3 and Steam Frame PC streaming.
+No proprietary game meshes, textures or assemblies are distributed. Handle meshes
+and pilot sleeves are reused from the local installation; authored poses are only
+joint rotations and offsets. No per-frame mesh collision solver is added.
+
+Release compilation, input/asset checks, UI lifecycle checks and menu layout
+checks accompany the build. Private geometry checks sample vertices, triangle
+centers and edge midpoints against the installed control meshes, including thumb
+transitions. Offline mission checks use synthetic tracked inputs and inspection
+cameras; physical reach, haptic feel and stereo comfort still require headset use.

@@ -22,11 +22,13 @@ internal sealed class RiggedGlove : IDisposable
     internal readonly Transform Root;
     internal readonly SkinnedMeshRenderer Renderer;
     private readonly Transform[] _bones;
-    private readonly Quaternion[] _open, _closed;
+    private readonly Quaternion[] _open, _closed, _fs20Throttle, _fs20Stick, _throttleThumb, _stickThumb, _fireTouch, _firePress;
     private readonly int[] _fingers;
     private readonly Mesh _mesh;
     private readonly bool _left;
-    private float _grip, _trigger, _thumb;
+    private float _grip, _trigger, _thumb, _thumbContact, _indexContact;
+    private bool _wasFitted;
+    private readonly Vector3 _indexRest;
     internal static Asset Load(bool left)
     {
         var index = left ? 0 : 1;
@@ -49,15 +51,27 @@ internal sealed class RiggedGlove : IDisposable
     {
         _left = left; var asset = Load(left);
         Root = new GameObject(left ? "NOVR Left Glove" : "NOVR Right Glove").transform; Root.SetParent(parent, false);
-        _bones = new Transform[asset.bones.Length]; _open = new Quaternion[_bones.Length]; _closed = new Quaternion[_bones.Length]; _fingers = new int[_bones.Length];
+        _bones = new Transform[asset.bones.Length]; _open = new Quaternion[_bones.Length]; _closed = new Quaternion[_bones.Length]; _fs20Throttle = new Quaternion[_bones.Length]; _fs20Stick = new Quaternion[_bones.Length]; _throttleThumb = new Quaternion[_bones.Length]; _stickThumb = new Quaternion[_bones.Length]; _fingers = new int[_bones.Length];
+        _fireTouch = new Quaternion[_bones.Length]; _firePress = new Quaternion[_bones.Length];
         var bind = new Matrix4x4[_bones.Length];
         for (var i = 0; i < _bones.Length; i++)
         {
             var b = asset.bones[i]; var t = new GameObject(b.name).transform; t.SetParent(b.parent < 0 ? Root : _bones[b.parent], false);
             t.localPosition = V(b.position, 0); _bones[i] = t; bind[i] = t.worldToLocalMatrix * Root.localToWorldMatrix;
             _open[i] = Q(asset.open[i]); _closed[i] = Q(asset.fist[i]);
+            _fs20Throttle[i] = Fs20HandPoses.Joint(i, false, left, _open[i], _closed[i]);
+            _fs20Stick[i] = Fs20HandPoses.Joint(i, true, left, _open[i], _closed[i]);
+            _throttleThumb[i] = Fs20HandPoses.Joint(i, false, left, _open[i], _closed[i], true);
+            _stickThumb[i] = Fs20HandPoses.Joint(i, true, left, _open[i], _closed[i], true);
+            if (i >= 2 && i <= 4)
+            {
+                _fireTouch[i] = Fs20HandPoses.FireButtonJoint(i, left, _open[i], _closed[i], false);
+                _firePress[i] = Fs20HandPoses.FireButtonJoint(i, left, _open[i], _closed[i], true);
+            }
             _fingers[i] = b.name.Contains("thumb") ? 1 : b.name.Contains("index") ? 2 : b.name.Contains("finger") ? 3 : 0;
         }
+        for (var i = 0; i < _bones.Length; i++) _bones[i].localRotation = _open[i];
+        _indexRest = Root.InverseTransformPoint(_bones[10].position);
         var vertices = new Vector3[asset.vertices.Length / 3]; var weights = new BoneWeight[vertices.Length]; var uv = new Vector2[vertices.Length];
         for (var i = 0; i < vertices.Length; i++)
         {
@@ -71,14 +85,33 @@ internal sealed class RiggedGlove : IDisposable
         Renderer.localBounds = new Bounds(new Vector3(0,0,.06f),Vector3.one*.45f); Renderer.shadowCastingMode=ShadowCastingMode.Off; Renderer.receiveShadows=true; Renderer.updateWhenOffscreen=false;
         LayerHelper.SetLayerRecursive(Root, LayerHelper.Layers.Cockpit);
     }
-    internal void Pose(ControllerSample sample, Pose? attachment, bool stick, bool collective)
+    // Compute interaction points from the real tracked pose, even when the
+    // rendered glove is snapped to a switch. Visual attachment never feeds back
+    // into the input used to move/release that switch.
+    internal Vector3 FreeTouchPoint(ControllerSample sample, bool fingertip)
+    {
+        var settings = ModConfiguration.Instance.MotionControls;
+        var offset = settings.GloveOffset.Value; if (!_left) offset.x = -offset.x;
+        var angles = settings.GloveRotation.Value; if (!_left) { angles.y = -angles.y; angles.z = -angles.z; }
+        var tip = fingertip ? _indexRest : new Vector3(0,-.019f,.043f);
+        return Root.parent.TransformPoint(sample.Position + sample.Rotation * offset + sample.Rotation * Quaternion.Euler(angles) * tip);
+    }
+    internal void Pose(ControllerSample sample, Pose? attachment, bool stick, bool collective, Pose? cockpitGrip = null, bool pointing = false, bool pinching = false)
     {
         Root.gameObject.SetActive(sample.Valid);
-        if (!sample.Valid) return;
+        if (!sample.Valid) { _wasFitted = false; return; }
         var settings=ModConfiguration.Instance.MotionControls;
         var offset=settings.GloveOffset.Value; if (!_left) offset.x=-offset.x;
+        var angles=settings.GloveRotation.Value; if (!_left) { angles.y=-angles.y; angles.z=-angles.z; }
+        var trackedRotation = sample.Rotation * Quaternion.Euler(angles);
         var held = attachment.HasValue;
-        if (held)
+        var fitted = held && !collective && !cockpitGrip.HasValue && Fs20NativeCockpit.Selected;
+        if (cockpitGrip.HasValue)
+        {
+            var socket = cockpitGrip.Value;
+            Root.SetPositionAndRotation(socket.position - socket.rotation * new Vector3(0,-.019f,.043f), socket.rotation);
+        }
+        else if (held)
         {
             // Asset axes: fingers +Z, back of hand +Y, thumb toward +/-X.
             // The socket sits between the palm and curled fingers. The old
@@ -87,24 +120,55 @@ internal sealed class RiggedGlove : IDisposable
             // around the handle axis preserves the finger wrap as it is lifted.
             var grip = attachment!.Value;
             var rotation = grip.rotation * (stick ? Quaternion.Euler(0, 0, _left ? 90 : -90)
-                : collective ? Quaternion.Euler(0, 0, _left ? 60 : -60) * Quaternion.Euler(0, _left ? -90 : 90, 0) : Quaternion.identity);
-            Root.SetPositionAndRotation(grip.position - rotation * new Vector3(0, -.019f, .043f), rotation);
+                : collective ? Quaternion.Euler(0, 0, _left ? 60 : -60) * Quaternion.Euler(0, _left ? -90 : 90, 0) : Quaternion.Euler(8, 0, 0));
+            if (fitted)
+                Root.SetPositionAndRotation(grip.position + grip.rotation * Fs20HandPoses.Wrist(stick, _left),
+                    grip.rotation * (stick ? Quaternion.Euler(0, 0, _left ? 90 : -90) : Quaternion.identity));
+            else Root.SetPositionAndRotation(grip.position - rotation * new Vector3(0, -.019f, .043f), rotation);
         }
         else
         {
             Root.localPosition=sample.Position + sample.Rotation * offset;
-            var angles=settings.GloveRotation.Value; if (!_left) { angles.y=-angles.y; angles.z=-angles.z; }
-            Root.localRotation=sample.Rotation * Quaternion.Euler(angles);
+            Root.localRotation=trackedRotation;
         }
         var amount=1-Mathf.Exp(-22*Time.unscaledDeltaTime);
+        var thumbPressed = sample.Primary || sample.Secondary || sample.Top || sample.Outside || sample.StickClick;
+        var thumbTouch = sample.ThumbstickTouched || sample.ButtonTouched || sample.ThumbrestTouched;
+        // Capacitive presence only changes visual joints. It never becomes a
+        // click, acquisition action, trigger value, or a synthetic flight input.
+        _thumbContact = Mathf.Lerp(_thumbContact, thumbPressed ? 1 : thumbTouch ? .85f : 0, amount);
+        _indexContact = Mathf.Lerp(_indexContact, sample.Trigger > .02f ? Mathf.Lerp(.85f,1,Mathf.Clamp01(sample.Trigger)) : sample.TriggerTouched ? .85f : 0, amount);
         // Leave space for a roughly 5 cm grip instead of crushing a full fist
         // through the handle. The index moves a little with the real trigger.
-        _grip=Mathf.Lerp(_grip,held ? .5f : Mathf.Clamp01(sample.Grip),amount);
-        _trigger=Mathf.Lerp(_trigger,held ? Mathf.Lerp(.48f, .62f, Mathf.Clamp01(sample.Trigger)) : Mathf.Clamp01(sample.Trigger),amount);
-        _thumb=Mathf.Lerp(_thumb,held ? .65f : sample.Primary || sample.Secondary || sample.StickClick ? 1 : _grip*.75f,amount);
-        for(var i=0;i<_bones.Length;i++) _bones[i].localRotation=Quaternion.Slerp(_open[i],_closed[i],_fingers[i]==1?_thumb:_fingers[i]==2?_trigger:_fingers[i]==3?_grip:0);
+        _grip=Mathf.Lerp(_grip,cockpitGrip.HasValue ? .75f : pointing ? .75f : held ? .5f : Mathf.Max(Mathf.Clamp01(sample.Grip), sample.GripTouched ? .32f : 0),amount);
+        _trigger=Mathf.Lerp(_trigger,pinching ? .9f : cockpitGrip.HasValue ? .65f : pointing ? 0f : held ? Mathf.Lerp(.48f, .62f, Mathf.Clamp01(sample.Trigger)) : Mathf.Max(Mathf.Clamp01(sample.Trigger), sample.TriggerTouched ? .2f : 0),amount);
+        _thumb=Mathf.Lerp(_thumb,pinching ? 1f : cockpitGrip.HasValue ? .85f : pointing ? .7f : held ? .65f : thumbPressed ? 1 : thumbTouch ? .65f : _grip*.3f,amount);
+        for (var i = 0; i < _bones.Length; i++)
+        {
+            var pose = fitted ? (stick ? _fs20Stick[i] : _fs20Throttle[i])
+                : Quaternion.Slerp(_open[i], _closed[i], _fingers[i]==1 ? _thumb : _fingers[i]==2 ? _trigger : _fingers[i]==3 ? _grip : 0);
+            // Lift clear of the actuator when not touching it; settle onto the
+            // fitted contact pose on touch, then the final millimeter on press.
+            if (fitted && i >= 2 && i <= 4)
+            {
+                if (stick)
+                {
+                    var target = sample.Primary ? _firePress[i] : sample.PrimaryTouched ? _fireTouch[i]
+                        : Quaternion.Slerp(pose, _stickThumb[i], thumbPressed ? 1 : thumbTouch ? .85f : 0);
+                    pose = _wasFitted ? Quaternion.Slerp(_bones[i].localRotation, target, amount) : target;
+                }
+                else pose = Quaternion.Slerp(pose, _throttleThumb[i], _thumbContact);
+            }
+            if (fitted && !stick && i == 2)
+                pose = Quaternion.AngleAxis(-10*Mathf.Sin(Mathf.PI*_thumbContact), Vector3.right) * pose;
+            if (fitted && i == 7) pose = Quaternion.AngleAxis(-5*(1-_indexContact), Vector3.right) * pose;
+            _bones[i].localRotation = pose;
+        }
+        _wasFitted = fitted;
+        if (pinching && cockpitGrip.HasValue)
+            Root.position += cockpitGrip.Value.position - (_bones[5].position + _bones[10].position) * .5f;
     }
     private static Vector3 V(float[] a,int i)=>new(a[i],a[i+1],a[i+2]);
     private static Quaternion Q(float[] a)=>new Quaternion(a[0],a[1],a[2],a[3]).normalized;
-    public void Dispose() { Object.Destroy(Root.gameObject); Object.Destroy(_mesh); }
+    public void Dispose() { if (Root != null) Object.Destroy(Root.gameObject); if (_mesh != null) Object.Destroy(_mesh); }
 }

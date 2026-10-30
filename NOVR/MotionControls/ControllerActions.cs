@@ -9,7 +9,9 @@ internal sealed class ControllerActions : MonoBehaviour
 {
     internal static ControllerActions? Instance { get; private set; }
     internal bool TargetSelecting => _target.Held;
-    private readonly ControllerButtonGate _fire = new(), _countermeasures = new(), _weapon = new(), _target = new(), _nextCountermeasure = new(), _map = new(), _clear = new(), _brake = new(), _unlock = new();
+    private readonly ControllerButtonGate _fire = new(), _release = new(), _countermeasures = new(), _weapon = new(), _target = new(), _nextCountermeasure = new(), _map = new(), _clear = new(), _brake = new(), _unlock = new();
+    internal bool GunsHeld => Held("Guns");
+    internal bool WeaponReleaseHeld => Held("Weapon Release");
     private string? _queuedAction;
     private int _queuedFrame;
     private Aircraft? _queuedAircraft;
@@ -52,6 +54,7 @@ internal sealed class ControllerActions : MonoBehaviour
         var throttleActive = flight && throttle.Valid && controls!.ThrottleHeld;
         _brake.Update(flightControls && throttle.Valid && controls!.ThrottleHeld, bindings.ReadFlight(throttle, !config.MotionControls.LeftHanded.Value, bindings.Brake.Value));
         _fire.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.Fire.Value));
+        _release.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.WeaponRelease.Value));
         _countermeasures.Update(throttleActive, bindings.ReadFlight(throttle, !config.MotionControls.LeftHanded.Value, bindings.Countermeasures.Value));
         _weapon.Update(stickActive, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.NextWeapon.Value));
         var targetOnStick = bindings.SelectTargetOnStick.Value;
@@ -68,7 +71,9 @@ internal sealed class ControllerActions : MonoBehaviour
         var cockpit = Time.timeScale > 0 && CameraStateManager.cameraMode == CameraMode.cockpit &&
                       GameManager.GetLocalAircraft(out _) && !RadialMenuMain.IsInUse() &&
                       (GameManager.controlMapper == null || !GameManager.controlMapper.isOpen);
-        _map.Update(bindings.PointerEnabled.Value && stick.Valid && cockpit && !WristMenu.IsOpen && !CockpitLayout.Active, bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.Map.Value));
+        var mapSharesWeapon = ControllerButtonNames.Resolve(bindings.Map.Value, stick.NativeFrame) == ControllerButtonNames.Resolve(bindings.NextWeapon.Value, stick.NativeFrame);
+        _map.Update(bindings.PointerEnabled.Value && stick.Valid && cockpit && !WristMenu.IsOpen && !CockpitLayout.Active &&
+            !(mapSharesWeapon && controls != null && controls.StickHeld), bindings.ReadFlight(stick, config.MotionControls.LeftHanded.Value, bindings.Map.Value));
         if (_map.Pressed) ToggleMap();
     }
 
@@ -84,7 +89,9 @@ internal sealed class ControllerActions : MonoBehaviour
     internal bool Held(string action) => TrackedControllers.Available && !WristMenu.IsOpen && !Cursor.visible && action switch
     {
         "Brake" => _brake.Held || Fs20NativeCockpit.BrakeHeld,
-        "Fire" => _fire.Held,
+        "Fire" => _fire.Held || _release.Held,
+        "Guns" => _fire.Held,
+        "Weapon Release" => _release.Held,
         "Countermeasures" => _countermeasures.Held,
         _ => false
     };
@@ -100,7 +107,7 @@ internal sealed class ControllerActions : MonoBehaviour
     internal void ResetButtons()
     {
         _queuedAction = null;
-        foreach (var gate in new[] { _fire, _countermeasures, _weapon, _target, _nextCountermeasure, _map, _clear, _brake, _unlock }) gate.Reset();
+        foreach (var gate in new[] { _fire, _release, _countermeasures, _weapon, _target, _nextCountermeasure, _map, _clear, _brake, _unlock }) gate.Reset();
     }
     private void OnDisable() => ResetButtons();
     private void OnDestroy() { OnDisable(); if (Instance == this) Instance = null; }

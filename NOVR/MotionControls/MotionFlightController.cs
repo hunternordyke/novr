@@ -22,6 +22,7 @@ public sealed class MotionFlightController : MonoBehaviour
     private float _throttleStartPosition;
     private float _throttleStartValue;
     private float _milPower = 1f;
+    private float _nextMilCheck;
     private bool _hasVtol;
     private TiltWingController? _tiltWing;
     private int _throttleZone;
@@ -55,7 +56,7 @@ public sealed class MotionFlightController : MonoBehaviour
     private ControllerSample _throttleHand;
     private MotionControlSettings Settings => ModConfiguration.Instance.MotionControls;
 
-    internal bool FlightActive => _ready && !CockpitLayout.Active;
+    internal bool FlightActive => _ready && !CockpitLayout.Active && !VrUi.WristMenu.IsOpen;
     internal void CancelPlacement() { _placementTime = -1; ResetGrips(); }
     internal bool StickHeld => _ready && _stickGrip.Held;
     internal bool ThrottleHeld => _ready && _throttleGrip.Held;
@@ -63,6 +64,9 @@ public sealed class MotionFlightController : MonoBehaviour
     internal bool TryGetHeldHandPose(bool left, out Pose pose, out bool stick, out bool collective)
     {
         pose = default; stick = left == Settings.LeftHanded.Value; collective = !stick && LiftCollective;
+        var editing = CockpitLayout.HeldByHand(left);
+        if (_visuals != null && editing is CockpitLayout.Element.Stick or CockpitLayout.Element.Throttle)
+        { stick = editing == CockpitLayout.Element.Stick; collective = !stick && LiftCollective; pose = _visuals.GripPose(stick); return true; }
         if (!FlightActive || _visuals == null || !(stick ? StickHeld : ThrottleHeld)) return false;
         pose = _visuals.GripPose(stick);
         return true;
@@ -127,7 +131,7 @@ public sealed class MotionFlightController : MonoBehaviour
             _placementConfirmationUntil = Time.unscaledTime + 6f;
             Debug.LogWarning($"[NOVR] Handle placement timed out: {Status}. Try Place handles again after resolving this state.");
         }
-        if (!_ready || CockpitLayout.Active) return;
+        if (!_ready || CockpitLayout.Active || VrUi.WristMenu.IsOpen) return;
         if (_placementTime >= 0f && Time.unscaledTime >= _placementTime && _stickHand.Valid && _throttleHand.Valid)
         {
             _placementTime = -1f;
@@ -190,7 +194,7 @@ public sealed class MotionFlightController : MonoBehaviour
         Sample();
         // Pilot.playerControlled is a legacy serialized field with no writers in
         // 0.34.3. Local aircraft ownership and the active pilot state are authoritative.
-        return _ready && !CockpitLayout.Active && pilot != null && !pilot.dead &&
+        return FlightActive && pilot != null && !pilot.dead &&
                pilot.aircraft == _aircraft && pilot.currentState == pilot.playerState;
     }
 
@@ -217,6 +221,7 @@ public sealed class MotionFlightController : MonoBehaviour
             _visuals = null;
             _aircraft = aircraft;
             _milPower = MilitaryPower.Find(aircraft);
+            _nextMilCheck = Time.unscaledTime + 1f;
             _tiltWing = aircraft.GetComponentInChildren<TiltWingController>(true);
             _hasVtol = _tiltWing != null || aircraft.GetComponentInChildren<DuctedThrustSystem>(true) != null ||
                 aircraft.GetComponentInChildren<SwivelDuctSystem>(true) != null;
@@ -232,6 +237,11 @@ public sealed class MotionFlightController : MonoBehaviour
             Debug.Log($"[NOVR] Created motion control models for {aircraft.name}; tracking root={trackingRoot.name}, camera={APIBus.MainCamera?.name}, cockpit layer={(int)LayerHelper.Layers.Cockpit}.");
             ResetGrips();
         }
+
+        // The engine registry can finish initializing after the cockpit appears.
+        // Never change the command mapping in the middle of a held throttle.
+        if (_milPower >= 1f && !_throttleGrip.Held && Time.unscaledTime >= _nextMilCheck)
+        { _nextMilCheck = Time.unscaledTime + 2f; _milPower = MilitaryPower.Find(aircraft); }
 
         // NOVR's headset recentering changes the mapping from tracked hands into the cockpit.
         if (_lastCalibrationPosition != NOVRHeadsetData.TranslationCalibrationOffset ||
@@ -252,7 +262,7 @@ public sealed class MotionFlightController : MonoBehaviour
         if (!_throttleGrip.Held) Throttle = _throttleCommandAircraft == aircraft
             ? _throttleCommand : Mathf.Clamp01(aircraft.GetInputs().throttle);
 
-        if (CockpitLayout.Active) { ResetGrips(); ReportStatus(CockpitLayout.Hint); return; }
+        if (CockpitLayout.Active || VrUi.WristMenu.IsOpen) { ResetGrips(); ReportStatus(CockpitLayout.Active ? CockpitLayout.Hint : "Handle input paused while wrist menu is open"); return; }
 
         var stickWasHeld = _stickGrip.Held;
         _stickGrip.Update(_stickHand.Valid, _stickHand.Grip, IsNearStick(), Settings.StickTapGrip.Value,
@@ -301,7 +311,7 @@ public sealed class MotionFlightController : MonoBehaviour
             var zone = Throttle <= 0 ? -2 : Throttle >= 1 ? 2 : MilDetent && Throttle == _milPower ? 0 : MilDetent && Throttle > _milPower ? 1 : -1;
             if (zone != _throttleZone && (zone == 0 || zone == 1 || zone == -2 || zone == 2) && Time.unscaledTime >= _nextThrottlePulse)
             {
-                InteractionHaptics.Pulse(_throttleHand.Device, zone == 1 ? .45f : .3f, .045f, InteractionCue.Detent);
+                InteractionHaptics.Pulse(_throttleHand.Device, zone == 0 || zone == 1 ? .65f : .3f, zone == 0 || zone == 1 ? .075f : .045f, InteractionCue.Detent);
                 _nextThrottlePulse = Time.unscaledTime + .12f;
             }
             _throttleZone = zone;
@@ -319,7 +329,6 @@ public sealed class MotionFlightController : MonoBehaviour
         aircraft = null!;
         trackingRoot = null!;
         if (!Settings.Enabled.Value) return Blocked("Motion controls are off");
-        if (VrUi.WristMenu.IsOpen) return Blocked("Close wrist panel to use the handles");
         if (!XRSettings.enabled) return Blocked("VR is not active");
         if (!OpenXRUtility.IsSessionFocused) return Blocked("Return to the game from SteamVR");
         if (CameraStateManager.cameraMode != CameraMode.cockpit) return Blocked("Switch to cockpit view");

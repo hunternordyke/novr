@@ -104,7 +104,7 @@ internal sealed class NativeCockpitMesh : IDisposable
         catch { Dispose(); throw; }
     }
 
-    private static Mesh ReadableCopy(Mesh original)
+    internal static Mesh ReadableCopy(Mesh original)
     {
         if (original.isReadable) return Object.Instantiate(original);
         var copy = new Mesh { name = original.name + " (interactive instance)", indexFormat = original.indexFormat };
