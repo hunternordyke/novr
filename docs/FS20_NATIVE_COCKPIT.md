@@ -1,6 +1,6 @@
 # FS-20 Vortex: integrated VR cockpit
 
-Version 0.4.7.2 keeps the FS-20's original instrument cluster and adds raised,
+Version 0.4.7.3 keeps the FS-20's original instrument cluster and adds raised,
 labelled physical controls over its existing switch rows. There is no movable
 replacement panel. Seat adjustments never move the cluster or flight handles.
 Other aircraft retain the shared console.
@@ -46,7 +46,11 @@ floating status panels are hidden while the integrated displays are active.
 Compact missile/radar warnings, feed and damage information sit off the right
 side of the cluster. MFDs and physical controls stay visible while moving handles,
 adjusting the seat or opening the setup menu. Flight actions suspend during setup.
-No seat/headrest masking is installed and the cockpit mesh is not removed.
+The original small caps, knobs and fasteners intersecting the new housings are
+hidden using a private copy of the cockpit index buffer. Only 44 measured
+decorative islands are omitted; the panel structure, seat and displays remain.
+Disabling the integrated controls restores the original mesh. A geometry mismatch
+leaves the native mesh untouched. No seat/headrest masking is installed.
 
 ## Flight handles and gloves
 

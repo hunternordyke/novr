@@ -25,6 +25,7 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
     private Aircraft? _aircraft;
     private Transform? _root, _displayRoot, _seat;
     private CockpitPanelHud? _hud;
+    private Fs20ControlCover? _nativeCover;
     private readonly Dictionary<string, Transform> _actuators = new();
     private readonly Dictionary<string, TextMesh> _labels = new();
     private readonly Dictionary<string, Renderer> _faces = new();
@@ -100,6 +101,8 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
             try
             {
                 CreateVisuals();
+                try { _nativeCover = new Fs20ControlCover(cockpit.GetComponent<MeshFilter>()); }
+                catch (System.Exception e) { Debug.LogWarning("[NOVR] Native control cover skipped: " + e.Message); }
                 _displayRoot = new GameObject("NOVR FS-20 native display positions").transform;
                 _displayRoot.SetParent(transform, false);
                 _hud = new CockpitPanelHud(_displayRoot, true);
@@ -109,6 +112,7 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
         }
         if (_calibration != NOVRHeadsetData.TranslationCalibrationOffset || _anchor != NOVRHeadsetData.TranslationAnchor || _recenter != NOVRHeadsetData.RotationCalibrationOffset)
         { Cancel(); _calibration = NOVRHeadsetData.TranslationCalibrationOffset; _anchor = NOVRHeadsetData.TranslationAnchor; _recenter = NOVRHeadsetData.RotationCalibrationOffset; }
+        _nativeCover?.SetVisible(true);
         _ready = true; _root!.gameObject.SetActive(true); _displayRoot!.gameObject.SetActive(true);
         // Presentation remains fixed and visible while positioning or using
         // setup menus. Only interaction pauses; native floating HUD stays hidden.
@@ -379,12 +383,13 @@ internal sealed class Fs20NativeCockpit : MonoBehaviour
     }
     private void Pause()
     {
+        _nativeCover?.SetVisible(false);
         if (_ready) _hud?.Restore();
         _ready = false; Cancel(); if (_root != null) _root.gameObject.SetActive(false); if (_displayRoot != null) _displayRoot.gameObject.SetActive(false);
     }
     private void Release()
     {
-        Pause(); _hud?.Restore(); _hud = null; Font.textureRebuilt -= RefreshFont;
+        Pause(); _nativeCover?.Dispose(); _nativeCover = null; _hud?.Restore(); _hud = null; Font.textureRebuilt -= RefreshFont;
         if (_root != null) Destroy(_root.gameObject); if (_displayRoot != null) Destroy(_displayRoot.gameObject);
         foreach (var material in new[] { _base,_cap,_hover,_on,_metal,_textMaterial }) if (material != null) Destroy(material);
         foreach (var mesh in _hardwareMeshes) Destroy(mesh); _hardwareMeshes.Clear();

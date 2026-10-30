@@ -4,7 +4,7 @@ NOVR is a reworked version of [UUVR](https://github.com/Raicuparta/uuvr) designe
 
 ## Experimental motion controls fork
 
-Version **0.4.7.2** adds the [FS-20 physical cockpit](docs/FS20_NATIVE_COCKPIT.md):
+Version **0.4.7.3** adds the [FS-20 physical cockpit](docs/FS20_NATIVE_COCKPIT.md):
 large touch buttons and grip/flick switches, two seven-page MFDs (including a live
 minimap), seat-handle ejection, side-panel handle locks and seat arrows. Fitted
 throttle/stick gloves respond to capacitive touch, including separate A-button
@@ -13,7 +13,7 @@ B cycles weapons while gripping (map with a free hand). The FS-20 MIL detent is
 fixed, handle status captions are removed, and setup keeps cockpit displays visible.
 The FS-20 metal shaft/arm ends have short spatial fades; the grips stay solid.
 
-NOVR Motion Prototype **0.4.7.2** adds a tracked-controller stick and throttle,
+NOVR Motion Prototype **0.4.7.3** adds a tracked-controller stick and throttle,
 laser pointers, combat bindings, a wrist menu and saved seat/handle positions.
 The shared 3D console combines seven selectable MFD pages with physical gear,
 radar, engine, flight-assist and guarded eject controls. View → Edit cockpit layout
